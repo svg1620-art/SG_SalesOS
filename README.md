@@ -68,10 +68,15 @@ flask --app app run         # http://127.0.0.1:5000
 5. **Деплой.** `railway.toml` при **старте контейнера** (не в билде) прогоняет
    `flask --app app db upgrade`, затем поднимает gunicorn. Healthcheck —
    `/healthz`.
-6. **Создать админа** один раз — в Railway shell выполнить:
-   ```bash
-   flask --app app seed-admin
-   ```
+6. **Создать админа** одним из способов:
+   - **Авто-сид (проще на Railway):** задать `SEED_ADMIN_ON_START=true` —
+     админ создаётся из `ADMIN_EMAIL`/`ADMIN_PASSWORD` при старте приложения.
+     После первого успешного старта переменную убрать.
+   - **Вручную через консоль:** зависит от того, где лежит venv (у Railpack —
+     `/opt/venv`), поэтому вызывать бинарь по полному пути:
+     ```bash
+     /opt/venv/bin/flask --app app seed-admin
+     ```
 
 ## Переменные окружения для Этапа 1
 
@@ -84,6 +89,7 @@ flask --app app run         # http://127.0.0.1:5000
 | `ADMIN_EMAIL` | email админа для `seed-admin` |
 | `ADMIN_PASSWORD` | пароль админа для `seed-admin` |
 | `ADMIN_NAME` | (опц.) имя админа, по умолчанию «Администратор» |
+| `SEED_ADMIN_ON_START` | (опц.) `true` → создать админа при старте, затем убрать |
 | `TZ` | (опц.) таймзона, напр. `Europe/Moscow` |
 | `AUDIO_DIR` | (опц., но задать сразу) путь Volume, `/data` |
 
