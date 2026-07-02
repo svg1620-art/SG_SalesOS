@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SG SalesOS{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sg.css') }}">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+  <header class="sg-topbar">
+    <div class="sg-topbar__brand">
+      <span class="sg-logo">SG</span>
+      <span class="sg-logo__word">SalesOS</span>
+    </div>
+    <nav class="sg-topbar__nav">
+      {% if current_user.is_admin %}
+        <a href="{{ url_for('dashboard.index') }}">Дашборд</a>
+      {% else %}
+        <a href="{{ url_for('dashboard.manager_home') }}">Мои звонки</a>
+      {% endif %}
+    </nav>
+    <div class="sg-topbar__user">
+      <span class="sg-role sg-role--{{ current_user.role }}">{{ current_user.role }}</span>
+      <span class="sg-user__name">{{ current_user.full_name or current_user.email }}</span>
+      <a class="sg-btn sg-btn--ghost" href="{{ url_for('auth.logout') }}">Выйти</a>
+    </div>
+  </header>
+  {% endif %}
+
+  <main class="sg-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="sg-flashes">
+          {% for category, message in messages %}
+            <div class="sg-flash sg-flash--{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

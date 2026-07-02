@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Не найдено — SG SalesOS{% endblock %}
+{% block content %}
+<section class="sg-page sg-error">
+  <div class="sg-error__code sg-mono">404</div>
+  <div class="sg-error__msg">Страница не найдена.</div>
+  <a class="sg-btn sg-btn--primary" href="{{ url_for('dashboard.index') }}">На главную</a>
+</section>
+{% endblock %}

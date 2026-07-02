@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Flask / локальная БД
+instance/
+*.db
+*.sqlite3
+salesos_dev.db
+
+# Окружение
+.env
+.env.*
+!.env.example
+
+# Аудио (Volume, локальные записи)
+/data/
+audio/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
