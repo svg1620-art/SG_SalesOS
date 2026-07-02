@@ -13,17 +13,24 @@ def _bool(value: str, default: bool = False) -> bool:
 
 
 def _normalize_db_url(url: str) -> str:
-    """Приводим DATABASE_URL к драйверу psycopg и чистим невидимые символы.
+    """Приводим DATABASE_URL к драйверу psycopg v3 и чистим невидимые символы.
 
-    Railway иногда отдаёт `postgres://` (старый префикс) и может незаметно
-    протащить кириллицу/пробелы при копипасте — известный баг.
+    - Railway/старые провайдеры отдают `postgres://` — SQLAlchemy 2.0 такой
+      префикс не понимает.
+    - Голый `postgresql://` по умолчанию тянет драйвер psycopg2, которого у нас
+      нет: стоит psycopg v3 (`psycopg[binary]`). Явно указываем `+psycopg`.
+    - Может незаметно протащиться кириллица/пробелы/zero-width при копипасте
+      (известный баг) — чистим края.
     """
     if not url:
         return url
     # убираем случайные пробелы и BOM/zero-width по краям
     url = url.strip().strip("﻿​")
     if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
+        url = "postgresql://" + url[len("postgres://"):]
+    # только голый postgresql:// без явного драйвера → psycopg v3
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
     return url
 
 

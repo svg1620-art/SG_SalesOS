@@ -30,8 +30,7 @@ dashboard/        # заглушка дашборда РОПа и кабинет
 templates/        # Jinja2 (base, login, дашборд, ошибки)
 static/css/sg.css # бренд ServiceGuru
 migrations/       # Alembic, начальная миграция
-Procfile          # release: миграции; web: gunicorn
-railway.toml      # сборка/запуск Railway
+railway.toml      # сборка + startCommand (миграции при старте, затем gunicorn)
 ```
 
 Модели данных: `User`, `Checklist`, `Criterion`, `Client`, `Dialog`, `Call`,
@@ -66,8 +65,8 @@ flask --app app run         # http://127.0.0.1:5000
 4. **Выставить переменные окружения** — по одной через «New Variable»,
    **без кавычек** (копипаст блоком может склеить значения; в `DATABASE_URL`
    следить за кириллицей — известный баг). См. список ниже.
-5. **Деплой.** `Procfile`/`railway.toml` при старте прогоняют
-   `flask --app app db upgrade`, затем поднимают gunicorn. Healthcheck —
+5. **Деплой.** `railway.toml` при **старте контейнера** (не в билде) прогоняет
+   `flask --app app db upgrade`, затем поднимает gunicorn. Healthcheck —
    `/healthz`.
 6. **Создать админа** один раз — в Railway shell выполнить:
    ```bash
