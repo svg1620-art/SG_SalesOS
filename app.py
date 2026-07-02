@@ -39,9 +39,11 @@ def _init_extensions(app: Flask) -> None:
 def _register_blueprints(app: Flask) -> None:
     from auth import auth_bp
     from dashboard import dashboard_bp
+    from checklists import checklists_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(checklists_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:
@@ -107,6 +109,14 @@ def _register_cli(app: Flask) -> None:
                 "Не заданы ADMIN_EMAIL и/или ADMIN_PASSWORD в окружении."
             )
         _created, message = seed_admin(app)
+        click.echo(message)
+
+    @app.cli.command("seed-checklist")
+    def seed_checklist_cmd():
+        """Создать дефолтный чек-лист (Приложение A) и сделать активным."""
+        from checklists.seed import seed_default_checklist
+
+        _created, message = seed_default_checklist(app, activate=True)
         click.echo(message)
 
 

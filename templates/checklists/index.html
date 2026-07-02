@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Чек-листы — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-page__head">
+    <h1 class="sg-h1">Чек-листы</h1>
+    <div class="sg-actions">
+      <a class="sg-btn" href="{{ url_for('checklists.generate') }}">✨ Сгенерировать из описания</a>
+      <a class="sg-btn sg-btn--primary" href="{{ url_for('checklists.create') }}">+ Новый чек-лист</a>
+    </div>
+  </div>
+
+  {% if not checklists %}
+    <div class="sg-placeholder">
+      Пока нет ни одного чек-листа. Создайте вручную, сгенерируйте через AI
+      или залейте дефолтный командой <code class="sg-mono">flask --app app seed-checklist</code>.
+    </div>
+  {% else %}
+    <table class="sg-table">
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th>Сфера</th>
+          <th>Критериев</th>
+          <th>Σ весов</th>
+          <th>Пороги 🟢/🟡</th>
+          <th>Статус</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cl in checklists %}
+        {% set wsum = cl.criteria | sum(attribute='weight') %}
+        <tr>
+          <td>
+            <a href="{{ url_for('checklists.edit', checklist_id=cl.id) }}"><b>{{ cl.name }}</b></a>
+            {% if cl.description %}<div class="sg-muted sg-sm">{{ cl.description }}</div>{% endif %}
+          </td>
+          <td>{{ cl.domain or '—' }}</td>
+          <td class="sg-mono">{{ cl.criteria | length }}</td>
+          <td class="sg-mono {{ 'sg-warn' if wsum != 100 else '' }}">{{ wsum }}</td>
+          <td class="sg-mono">{{ cl.zone_green_min }} / {{ cl.zone_yellow_min }}</td>
+          <td>
+            {% if cl.is_active %}
+              <span class="sg-badge sg-badge--active">Активен</span>
+            {% else %}
+              <span class="sg-badge">Черновик</span>
+            {% endif %}
+          </td>
+          <td class="sg-row-actions">
+            <a class="sg-btn sg-btn--sm" href="{{ url_for('checklists.edit', checklist_id=cl.id) }}">Редактировать</a>
+            {% if not cl.is_active %}
+            <form method="post" action="{{ url_for('checklists.activate', checklist_id=cl.id) }}">
+              <button class="sg-btn sg-btn--sm sg-btn--primary" type="submit">Активировать</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="sg-muted sg-sm">Активным может быть только один чек-лист — по нему оцениваются новые звонки.</p>
+  {% endif %}
+</section>
+{% endblock %}
