@@ -72,3 +72,6 @@ class Config:
     ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
     ADMIN_NAME = os.environ.get("ADMIN_NAME", "Администратор")
+    # Если true — админ создаётся/обновляется при старте приложения
+    # (удобно на Railway без доступа к консоли; после первого старта убрать).
+    SEED_ADMIN_ON_START = _bool(os.environ.get("SEED_ADMIN_ON_START"), default=False)
