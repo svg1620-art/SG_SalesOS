@@ -215,3 +215,63 @@ a:hover { text-decoration: underline; }
 .sg-error { align-items: center; text-align: center; padding-top: 60px; }
 .sg-error__code { font-size: 72px; font-weight: 800; color: var(--sg-blue); }
 .sg-error__msg { color: var(--sg-muted); margin-bottom: 8px; }
+
+/* --- Заголовки/структура (Этап 2) --- */
+.sg-h2 { font-size: 20px; font-weight: 800; margin: 0; }
+.sg-h3 { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+.sg-sm { font-size: 12.5px; }
+.sg-page__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-top: 6px;
+}
+.sg-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.sg-breadcrumbs a { color: var(--sg-muted); }
+.sg-warn { color: var(--sg-yellow); }
+.sg-ok { color: var(--sg-green); }
+code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius: 6px; }
+
+/* --- Кнопки: размеры/варианты --- */
+.sg-btn--sm { padding: 6px 11px; font-size: 13px; }
+.sg-btn--danger { color: #FCA5A5; border-color: rgba(239,68,68,0.4); background: transparent; }
+.sg-btn--danger:hover { color: #fff; background: rgba(239,68,68,0.18); }
+
+/* --- Формы: сетки/ширина --- */
+.sg-form--wide { max-width: 720px; }
+.sg-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.sg-flex-1 { flex: 1; }
+.sg-field--narrow { width: 90px; flex: none; }
+.sg-check { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--sg-muted); white-space: nowrap; padding-top: 22px; }
+.sg-check input { width: 16px; height: 16px; accent-color: var(--sg-blue); }
+
+/* --- Таблица --- */
+.sg-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.sg-table th, .sg-table td {
+  text-align: left; padding: 11px 12px;
+  border-bottom: 1px solid var(--sg-border); vertical-align: top;
+}
+.sg-table th { color: var(--sg-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+.sg-table tbody tr:hover { background: var(--sg-surface); }
+.sg-row-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.sg-row-actions form { display: inline; }
+
+/* --- Бейджи --- */
+.sg-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px;
+  border-radius: 999px; border: 1px solid var(--sg-border); color: var(--sg-muted);
+  vertical-align: middle;
+}
+.sg-badge--active { color: var(--sg-green); border-color: rgba(34,197,94,0.45); }
+
+/* --- Карточки с паддингом / критерии --- */
+.sg-card--pad { padding: 18px; margin-top: 14px; }
+.sg-criterion { position: relative; }
+.sg-criterion--crit { border-left: 3px solid var(--sg-cyan); }
+.sg-crit-row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+.sg-weightsum { font-weight: 700; }
+
+@media (max-width: 640px) {
+  .sg-grid-2 { grid-template-columns: 1fr; }
+  .sg-crit-row { flex-direction: column; align-items: stretch; }
+  .sg-field--narrow { width: 100%; }
+  .sg-check { padding-top: 0; }
+}

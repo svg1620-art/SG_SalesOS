@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Новый чек-лист — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('checklists.index') }}">Чек-листы</a> / Новый
+  </div>
+  <h1 class="sg-h1">Новый чек-лист</h1>
+
+  <form method="post" class="sg-form sg-form--wide" action="{{ url_for('checklists.create') }}">
+    <label class="sg-field">
+      <span class="sg-field__label">Название</span>
+      <input class="sg-input" name="name" value="{{ form.get('name', '') }}" required autofocus>
+    </label>
+    <label class="sg-field">
+      <span class="sg-field__label">Сфера (домен)</span>
+      <input class="sg-input" name="domain" value="{{ form.get('domain', '') }}" placeholder="напр. HoReCa, медицина">
+    </label>
+    <label class="sg-field">
+      <span class="sg-field__label">Описание</span>
+      <textarea class="sg-input" name="description" rows="3">{{ form.get('description', '') }}</textarea>
+    </label>
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">🟢 Зелёный порог (≥)</span>
+        <input class="sg-input sg-mono" type="number" name="zone_green_min" min="0" max="100" value="{{ form.get('zone_green_min', '80') }}">
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">🟡 Жёлтый порог (≥)</span>
+        <input class="sg-input sg-mono" type="number" name="zone_yellow_min" min="0" max="100" value="{{ form.get('zone_yellow_min', '60') }}">
+      </label>
+    </div>
+    <div class="sg-actions">
+      <a class="sg-btn" href="{{ url_for('checklists.index') }}">Отмена</a>
+      <button class="sg-btn sg-btn--primary" type="submit">Создать и добавить критерии</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

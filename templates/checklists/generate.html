@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}AI-генерация чек-листа — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('checklists.index') }}">Чек-листы</a> / Генерация
+  </div>
+  <h1 class="sg-h1">✨ Сгенерировать чек-лист из описания</h1>
+  <p class="sg-muted">Опишите процесс продаж и специфику — Claude предложит критерии с весами.
+     Результат создастся как <b>черновик</b>: проверите, поправите и активируете.</p>
+
+  <form method="post" class="sg-form sg-form--wide" action="{{ url_for('checklists.generate') }}">
+    <label class="sg-field">
+      <span class="sg-field__label">Сфера (домен)</span>
+      <input class="sg-input" name="domain" value="{{ form.get('domain', '') }}" placeholder="напр. Стоматология, B2B-софт">
+    </label>
+    <label class="sg-field">
+      <span class="sg-field__label">Описание процесса продаж / что важно оценивать</span>
+      <textarea class="sg-input" name="description" rows="8" required
+        placeholder="Например: входящие звонки по услуге имплантации. Важно: выявить проблему и мотивацию, объяснить этапы и цены прозрачно, снять страх боли, записать на консультацию с конкретной датой...">{{ form.get('description', '') }}</textarea>
+    </label>
+    <div class="sg-actions">
+      <a class="sg-btn" href="{{ url_for('checklists.index') }}">Отмена</a>
+      <button class="sg-btn sg-btn--primary" type="submit">✨ Сгенерировать черновик</button>
+    </div>
+  </form>
+  <p class="sg-muted sg-sm">Требуются переменные окружения <code class="sg-mono">ANTHROPIC_API_KEY</code>
+     и <code class="sg-mono">CLAUDE_MODEL</code>.</p>
+</section>
+{% endblock %}

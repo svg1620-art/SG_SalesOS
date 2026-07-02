@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ checklist.name }} — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('checklists.index') }}">Чек-листы</a> / {{ checklist.name }}
+  </div>
+
+  <div class="sg-page__head">
+    <h1 class="sg-h1">
+      {{ checklist.name }}
+      {% if checklist.is_active %}<span class="sg-badge sg-badge--active">Активен</span>
+      {% else %}<span class="sg-badge">Черновик</span>{% endif %}
+    </h1>
+    <div class="sg-actions">
+      {% if not checklist.is_active %}
+      <form method="post" action="{{ url_for('checklists.activate', checklist_id=checklist.id) }}">
+        <button class="sg-btn sg-btn--primary" type="submit">Активировать</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('checklists.delete', checklist_id=checklist.id) }}"
+            onsubmit="return confirm('Удалить чек-лист со всеми критериями?');">
+        <button class="sg-btn sg-btn--danger" type="submit">Удалить</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Параметры чек-листа -->
+  <div class="sg-card sg-card--pad">
+    <form method="post" class="sg-form sg-form--wide" action="{{ url_for('checklists.update', checklist_id=checklist.id) }}">
+      <div class="sg-grid-2">
+        <label class="sg-field">
+          <span class="sg-field__label">Название</span>
+          <input class="sg-input" name="name" value="{{ checklist.name }}" required>
+        </label>
+        <label class="sg-field">
+          <span class="sg-field__label">Сфера (домен)</span>
+          <input class="sg-input" name="domain" value="{{ checklist.domain or '' }}">
+        </label>
+      </div>
+      <label class="sg-field">
+        <span class="sg-field__label">Описание</span>
+        <textarea class="sg-input" name="description" rows="2">{{ checklist.description or '' }}</textarea>
+      </label>
+      <div class="sg-grid-2">
+        <label class="sg-field">
+          <span class="sg-field__label">🟢 Зелёный порог (≥)</span>
+          <input class="sg-input sg-mono" type="number" name="zone_green_min" min="0" max="100" value="{{ checklist.zone_green_min }}">
+        </label>
+        <label class="sg-field">
+          <span class="sg-field__label">🟡 Жёлтый порог (≥)</span>
+          <input class="sg-input sg-mono" type="number" name="zone_yellow_min" min="0" max="100" value="{{ checklist.zone_yellow_min }}">
+        </label>
+      </div>
+      <div class="sg-actions">
+        <button class="sg-btn sg-btn--primary" type="submit">Сохранить параметры</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Критерии -->
+  <div class="sg-page__head">
+    <h2 class="sg-h2">Критерии ({{ checklist.criteria | length }})</h2>
+    <div class="sg-weightsum {{ 'sg-warn' if weight_sum != 100 else 'sg-ok' }}">
+      Σ весов: <span class="sg-mono">{{ weight_sum }}</span> / 100
+      {% if weight_sum != 100 %}<span class="sg-sm"> — рекомендуется ровно 100</span>{% endif %}
+    </div>
+  </div>
+
+  {% for c in checklist.criteria %}
+  <div class="sg-card sg-card--pad sg-criterion {{ 'sg-criterion--crit' if c.is_critical else '' }}">
+    <form method="post" class="sg-form" action="{{ url_for('checklists.update_criterion', criterion_id=c.id) }}">
+      <div class="sg-crit-row">
+        <label class="sg-field sg-flex-1">
+          <span class="sg-field__label">Заголовок</span>
+          <input class="sg-input" name="title" value="{{ c.title }}" required>
+        </label>
+        <label class="sg-field sg-field--narrow">
+          <span class="sg-field__label">Вес</span>
+          <input class="sg-input sg-mono" type="number" name="weight" min="0" max="100" value="{{ c.weight }}">
+        </label>
+        <label class="sg-check">
+          <input type="checkbox" name="is_critical" {{ 'checked' if c.is_critical }}>
+          <span>⚠️ Критичный</span>
+        </label>
+      </div>
+      <label class="sg-field">
+        <span class="sg-field__label">Что считается «хорошо»</span>
+        <textarea class="sg-input" name="description" rows="2">{{ c.description or '' }}</textarea>
+      </label>
+      <div class="sg-actions">
+        <button class="sg-btn sg-btn--sm sg-btn--primary" type="submit">Сохранить</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('checklists.delete_criterion', criterion_id=c.id) }}"
+          onsubmit="return confirm('Удалить критерий?');">
+      <button class="sg-btn sg-btn--sm sg-btn--danger" type="submit">Удалить</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="sg-placeholder">Ещё нет критериев. Добавьте первый ниже.</div>
+  {% endfor %}
+
+  <!-- Добавить критерий -->
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Добавить критерий</h3>
+    <form method="post" class="sg-form" action="{{ url_for('checklists.add_criterion', checklist_id=checklist.id) }}">
+      <div class="sg-crit-row">
+        <label class="sg-field sg-flex-1">
+          <span class="sg-field__label">Заголовок</span>
+          <input class="sg-input" name="title" required>
+        </label>
+        <label class="sg-field sg-field--narrow">
+          <span class="sg-field__label">Вес</span>
+          <input class="sg-input sg-mono" type="number" name="weight" min="0" max="100" value="0">
+        </label>
+        <label class="sg-check">
+          <input type="checkbox" name="is_critical">
+          <span>⚠️ Критичный</span>
+        </label>
+      </div>
+      <label class="sg-field">
+        <span class="sg-field__label">Что считается «хорошо»</span>
+        <textarea class="sg-input" name="description" rows="2"></textarea>
+      </label>
+      <div class="sg-actions">
+        <button class="sg-btn sg-btn--primary" type="submit">+ Добавить</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
