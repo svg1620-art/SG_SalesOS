@@ -1,0 +1,14 @@
+# Railway config для SG_SalesOS.
+# ВАЖНО: регион проекта — EU (обязательно для доступа к Anthropic API).
+# Регион и Volume (/data) настраиваются в UI Railway, здесь — сборка/запуск.
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+# Миграции применяются автоматически перед стартом веб-процесса.
+startCommand = "flask --app app db upgrade && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

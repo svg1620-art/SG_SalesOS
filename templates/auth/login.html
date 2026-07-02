@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Вход — SG SalesOS{% endblock %}
+
+{% block content %}
+<div class="sg-login">
+  <div class="sg-login__card">
+    <div class="sg-login__brand">
+      <span class="sg-logo sg-logo--lg">SG</span>
+      <div>
+        <div class="sg-login__title">SalesOS</div>
+        <div class="sg-login__subtitle">Контроль качества продаж ServiceGuru</div>
+      </div>
+    </div>
+
+    <form method="post" class="sg-form" action="{{ url_for('auth.login') }}">
+      <label class="sg-field">
+        <span class="sg-field__label">Email</span>
+        <input class="sg-input" type="email" name="email" value="{{ email or '' }}"
+               autocomplete="username" required autofocus>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Пароль</span>
+        <input class="sg-input" type="password" name="password"
+               autocomplete="current-password" required>
+      </label>
+      <button class="sg-btn sg-btn--primary sg-btn--block" type="submit">Войти</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

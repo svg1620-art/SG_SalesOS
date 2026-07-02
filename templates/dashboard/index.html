@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <h1 class="sg-h1">Дашборд РОПа</h1>
+  <p class="sg-muted">Каркас готов. KPI, распределение зон, лидерборд и лента звонков появятся на следующих этапах.</p>
+
+  <div class="sg-cards">
+    <div class="sg-card">
+      <div class="sg-card__label">Диалогов с клиентами</div>
+      <div class="sg-card__value sg-mono">—</div>
+    </div>
+    <div class="sg-card">
+      <div class="sg-card__label">Звонков за период</div>
+      <div class="sg-card__value sg-mono">—</div>
+    </div>
+    <div class="sg-card">
+      <div class="sg-card__label">Зелёная / Жёлтая / Красная</div>
+      <div class="sg-card__value">
+        <span class="sg-zone sg-zone--green">—</span>
+        <span class="sg-zone sg-zone--yellow">—</span>
+        <span class="sg-zone sg-zone--red">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sg-placeholder">
+    <span class="sg-placeholder__badge">Этап 6</span>
+    Здесь будут donut распределения зон, лидерборд менеджеров и лента звонков с фильтрами.
+  </div>
+</section>
+{% endblock %}
