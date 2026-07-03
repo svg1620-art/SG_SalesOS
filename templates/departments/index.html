@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Отделы — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <h1 class="sg-h1">Отделы</h1>
+  <p class="sg-muted sg-sm">Отделы для разделения данных на дашборде и в отчётах. Чек-листы общие для всех отделов.</p>
+
+  <table class="sg-table">
+    <thead><tr><th>Название</th><th>Сотрудников</th><th></th></tr></thead>
+    <tbody>
+      {% for d in departments %}
+      <tr>
+        <td>
+          <form method="post" action="{{ url_for('departments.edit', department_id=d.id) }}" class="sg-reproc">
+            <input class="sg-input sg-input--sm" name="name" value="{{ d.name }}">
+            <button class="sg-btn sg-btn--sm" type="submit">Сохранить</button>
+          </form>
+        </td>
+        <td class="sg-mono">{{ counts.get(d.id, 0) }}</td>
+        <td class="sg-row-actions">
+          <form method="post" action="{{ url_for('departments.delete', department_id=d.id) }}"
+                onsubmit="return confirm('Удалить отдел? Привязка сотрудников снимется.');">
+            <button class="sg-btn sg-btn--sm sg-btn--danger" type="submit">Удалить</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Новый отдел</h3>
+    <form method="post" action="{{ url_for('departments.create') }}" class="sg-reproc">
+      <input class="sg-input" name="name" placeholder="Название отдела" required>
+      <button class="sg-btn sg-btn--primary" type="submit">+ Создать</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

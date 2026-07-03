@@ -14,6 +14,21 @@ from extensions import db, login_manager
 
 # --- Пользователи и роли -------------------------------------------------
 
+class Department(db.Model):
+    """Отдел (напр. «Отдел продаж», «Отдел развития клиентов»)."""
+
+    __tablename__ = "departments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    users = db.relationship("User", back_populates="department")
+
+    def __repr__(self) -> str:
+        return f"<Department {self.name}>"
+
+
 class User(UserMixin, db.Model):
     __tablename__ = "users"
 
@@ -22,11 +37,15 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(255))
     role = db.Column(db.String(20), nullable=False, default="manager")  # admin|manager
+    department_id = db.Column(
+        db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True
+    )
     # для сопоставления с ответственным в amoCRM (Этап 8)
     amo_user_id = db.Column(db.BigInteger, nullable=True, index=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
+    department = db.relationship("Department", back_populates="users")
     # звонки, где этот пользователь — менеджер
     calls = db.relationship("Call", back_populates="manager", lazy="dynamic")
     dialogs = db.relationship("Dialog", back_populates="manager", lazy="dynamic")
