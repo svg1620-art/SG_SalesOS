@@ -102,6 +102,7 @@ def apply_analysis(call, checklist, data: dict) -> None:
                 transcript_span_end=_to_int(mm.get("span_end"), 0),
                 label=label[:255],
                 explanation=(mm.get("explanation") or "").strip(),
+                quote=(mm.get("quote") or "").strip(),
             )
         )
 

@@ -240,6 +240,8 @@ class MissedMoment(db.Model):
     transcript_span_end = db.Column(db.Integer)
     label = db.Column(db.String(255))
     explanation = db.Column(db.Text)
+    # точная цитата из транскрибации для инлайн-подсветки
+    quote = db.Column(db.Text)
 
     call = db.relationship("Call", back_populates="missed_moments")
 

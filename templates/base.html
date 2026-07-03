@@ -9,6 +9,51 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/sg.css') }}">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+  <script>
+    // Рисуем радары по <canvas class="sg-radar" data-call-id="N"> + JSON рядом.
+    function sgInitRadars() {
+      if (!window.Chart) return;
+      document.querySelectorAll('canvas.sg-radar').forEach(function (cv) {
+        if (cv.dataset.rendered) return;
+        var data = document.getElementById('radar-data-' + cv.dataset.callId);
+        if (!data) return;
+        var d;
+        try { d = JSON.parse(data.textContent); } catch (e) { return; }
+        if (!d.labels || !d.labels.length) return;
+        cv.dataset.rendered = '1';
+        var css = getComputedStyle(document.documentElement);
+        var cyan = (css.getPropertyValue('--sg-cyan') || '#00BFDC').trim();
+        var muted = (css.getPropertyValue('--sg-muted') || '#8A8A99').trim();
+        var grid = 'rgba(255,255,255,0.10)';
+        new Chart(cv, {
+          type: 'radar',
+          data: {
+            labels: d.labels,
+            datasets: [{
+              data: d.scores, label: 'Балл (0–10)',
+              borderColor: cyan, backgroundColor: 'rgba(0,191,220,0.18)',
+              pointBackgroundColor: cyan, borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { r: {
+              min: 0, max: 10, ticks: { stepSize: 2, color: muted, backdropColor: 'transparent' },
+              grid: { color: grid }, angleLines: { color: grid },
+              pointLabels: { color: muted, font: { size: 11 } }
+            } }
+          }
+        });
+      });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      sgInitRadars();
+      document.body.addEventListener('htmx:afterSwap', sgInitRadars);
+    });
+    window.addEventListener('load', sgInitRadars);
+  </script>
 </head>
 <body>
   {% if current_user.is_authenticated %}

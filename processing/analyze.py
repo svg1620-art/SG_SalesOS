@@ -63,7 +63,9 @@ def build_analysis_prompt(checklist, transcript: list[dict], diarization: str) -
 - overall_score (0–100) посчитай как взвешенную сумму: сумма (score/10 * вес).
 - summary — 3–5 предложений: как прошёл звонок в целом.
 - recommendations — коучинг по навыкам (2–5 шт.), priority: high|med|low.
-- missed_moments — упущенные моменты для подсветки (может быть пустым).
+- missed_moments — упущенные моменты (может быть пустым). Для каждого укажи
+  quote — ТОЧНУЮ дословную цитату из транскрибации (без «[Менеджер]»/«[Клиент]»),
+  рядом с которой менеджер упустил момент; по ней подсветим место в тексте.
 
 Верни СТРОГО JSON такого вида (criterion_id брать из чек-листа выше):
 {{
@@ -77,7 +79,8 @@ def build_analysis_prompt(checklist, transcript: list[dict], diarization: str) -
     {{"skill": "...", "priority": "high", "text": "..."}}
   ],
   "missed_moments": [
-    {{"span_start": 0, "span_end": 0, "label": "...", "explanation": "..."}}
+    {{"quote": "дословная цитата из транскрибации",
+      "label": "...", "explanation": "..."}}
   ]
 }}
 """
