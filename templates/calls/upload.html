@@ -8,17 +8,27 @@
   </div>
   <h1 class="sg-h1">Загрузить звонок</h1>
 
-  {% if not active_checklist %}
+  {% if not checklists %}
     <div class="sg-flash sg-flash--warning">
-      Нет активного чек-листа. <a href="{{ url_for('checklists.index') }}">Активируйте чек-лист</a>,
+      Нет ни одного чек-листа. <a href="{{ url_for('checklists.index') }}">Создайте чек-лист</a>,
       иначе звонок не по чему оценивать.
     </div>
-  {% else %}
-    <p class="sg-muted sg-sm">Оценка по активному чек-листу: <b>{{ active_checklist.name }}</b></p>
   {% endif %}
 
   <form method="post" enctype="multipart/form-data" class="sg-form sg-form--wide"
         action="{{ url_for('calls.upload') }}">
+    <label class="sg-field">
+      <span class="sg-field__label">Чек-лист для оценки</span>
+      <select class="sg-input" name="checklist_id" required>
+        {% for cl in checklists %}
+        {% set selected = (form.get('checklist_id')|string == cl.id|string)
+             or (not form.get('checklist_id') and cl.is_active) %}
+        <option value="{{ cl.id }}" {{ 'selected' if selected }}>
+          {{ cl.name }}{{ ' — активный' if cl.is_active }} ({{ cl.criteria|length }} крит.)
+        </option>
+        {% endfor %}
+      </select>
+    </label>
     <label class="sg-field">
       <span class="sg-field__label">Аудиофайл (mp3/wav/m4a…)</span>
       <input class="sg-input" type="file" name="audio" accept="audio/*" required>
@@ -74,7 +84,7 @@
 
     <div class="sg-actions">
       <a class="sg-btn" href="{{ url_for('calls.index') }}">Отмена</a>
-      <button class="sg-btn sg-btn--primary" type="submit" {{ 'disabled' if not active_checklist }}>
+      <button class="sg-btn sg-btn--primary" type="submit" {{ 'disabled' if not checklists }}>
         Загрузить и обработать
       </button>
     </div>
