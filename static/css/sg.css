@@ -392,6 +392,7 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
   background: var(--sg-surface); border: 1px solid var(--sg-border); border-radius: var(--sg-radius);
 }
 .sg-field--inline { flex-direction: column; gap: 4px; }
+.sg-filters__sep { flex: 1; }
 .sg-field--inline .sg-field__label { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
 
 .sg-dash-grid { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; align-items: start; }
@@ -414,3 +415,8 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 .sg-prio--high { color: var(--sg-red); }
 .sg-prio--med { color: var(--sg-yellow); }
 .sg-prio--low { color: var(--sg-cyan); }
+
+/* дневная сводка */
+.sg-digest { border-left: 3px solid var(--sg-blue); margin-top: 16px; }
+.sg-focuses { margin: 8px 0; padding-left: 4px; list-style: none; }
+.sg-focuses li { padding: 3px 0; }

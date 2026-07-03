@@ -90,18 +90,50 @@ def _maybe_seed_admin(app: Flask) -> None:
 
 
 def _maybe_start_scheduler(app: Flask) -> None:
-    """Запускаем планировщик только если явно включён (Этапы 8-9).
+    """Запускаем планировщик, если включён (SCHEDULER_ENABLED).
 
-    На Этапе 1 задач нет, но проверяем, чтобы не плодить процессы при
-    нескольких воркерах gunicorn.
+    Джобы: Telegram-пульс (TELEGRAM_HOUR, по умолч. 19:00) и дневная AI-сводка
+    (DIGEST_HOUR, по умолч. 20:00). Рассчитано на 1 gunicorn-воркер (иначе
+    задачи задвоятся) — см. railway.toml (--workers 1 --threads 4).
     """
     if not app.config.get("SCHEDULER_ENABLED"):
         return
     if scheduler.running:
         return
     # избегаем двойного старта в reloader'е dev-сервера
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+
+    from apscheduler.triggers.cron import CronTrigger
+
+    tz = app.config.get("TZ") or "UTC"
+
+    def _run_pulse():
+        with app.app_context():
+            from notify.telegram import send_daily_pulse
+            send_daily_pulse(app)
+
+    def _run_digest():
+        with app.app_context():
+            from digest.daily import generate_daily_digest
+            generate_daily_digest(app)
+
+    try:
+        scheduler.add_job(
+            _run_pulse, CronTrigger(hour=app.config["TELEGRAM_HOUR"], minute=0, timezone=tz),
+            id="telegram_pulse", replace_existing=True, max_instances=1, coalesce=True,
+        )
+        scheduler.add_job(
+            _run_digest, CronTrigger(hour=app.config["DIGEST_HOUR"], minute=0, timezone=tz),
+            id="daily_digest", replace_existing=True, max_instances=1, coalesce=True,
+        )
         scheduler.start()
+        app.logger.info(
+            "[scheduler] запущен: пульс %s:00, сводка %s:00 (%s)",
+            app.config["TELEGRAM_HOUR"], app.config["DIGEST_HOUR"], tz,
+        )
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning("[scheduler] не удалось запустить: %s", exc)
 
 
 def _register_cli(app: Flask) -> None:
@@ -132,6 +164,22 @@ def _register_cli(app: Flask) -> None:
 
         count = rebuild_all_dialogs()
         click.echo(f"Пересобрано диалогов: {count}")
+
+    @app.cli.command("run-digest")
+    def run_digest_cmd():
+        """Сформировать дневную AI-сводку за сегодня (вручную)."""
+        from digest.daily import generate_daily_digest
+
+        digest = generate_daily_digest(app)
+        click.echo(f"Сводка за {digest.date}: {(digest.content_json or {}).get('summary', '')[:120]}")
+
+    @app.cli.command("send-pulse")
+    def send_pulse_cmd():
+        """Отправить Telegram-пульс за сегодня (вручную, принудительно)."""
+        from notify.telegram import send_daily_pulse
+
+        sent = send_daily_pulse(app, force=True)
+        click.echo("Пульс отправлен." if sent else "Пульс не отправлен (проверьте TELEGRAM_*).")
 
 
 # Экземпляр для gunicorn: `gunicorn app:app`

@@ -1,6 +1,8 @@
-"""Звонки: ручная загрузка, список, карточка, polling-статус, отдача аудио."""
+"""Звонки: ручная загрузка, список, карточка, polling-статус, отдача аудио, экспорт."""
+import csv
+import io
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint,
@@ -11,6 +13,7 @@ from flask import (
     flash,
     abort,
     send_file,
+    Response,
 )
 from flask_login import login_required, current_user
 
@@ -19,6 +22,8 @@ from models import Call, Checklist, User
 from auth.decorators import admin_required
 from ingest.manual_upload import save_manual_call, DuplicateCallError
 from processing.worker import enqueue_call
+
+_SPEAKER_RU = {"manager": "Менеджер", "client": "Клиент", "unknown": "Говорящий"}
 
 calls_bp = Blueprint("calls", __name__, url_prefix="/calls")
 
@@ -257,3 +262,109 @@ def audio(call_id):
     if not call.audio_path or not os.path.exists(call.audio_path):
         abort(404)
     return send_file(call.audio_path, mimetype="audio/mpeg", conditional=True)
+
+
+# --- Экспорт (только админ) ---------------------------------------------
+
+def _parse_date(raw, default):
+    raw = (raw or "").strip()
+    if not raw:
+        return default
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        return default
+
+
+def _filtered_calls_from_args():
+    """Звонки по фильтрам из query (from/to/manager_id/zone/status)."""
+    now = datetime.utcnow()
+    date_from = _parse_date(request.args.get("from"), now - timedelta(days=90))
+    date_to = _parse_date(request.args.get("to"), now).replace(
+        hour=23, minute=59, second=59
+    )
+    query = Call.query.filter(
+        Call.started_at >= date_from, Call.started_at <= date_to
+    )
+    manager_id = request.args.get("manager_id")
+    if manager_id and manager_id.isdigit():
+        query = query.filter(Call.manager_id == int(manager_id))
+    zone = request.args.get("zone")
+    if zone in {"green", "yellow", "red"}:
+        query = query.filter(Call.zone == zone)
+    status = request.args.get("status")
+    if status:
+        query = query.filter(Call.status == status)
+    calls = query.all()
+    calls.sort(key=lambda c: c.started_at or c.created_at)
+    return calls
+
+
+def _transcript_text(call):
+    lines = []
+    for seg in call.transcript_json or []:
+        who = _SPEAKER_RU.get(seg.get("speaker"), "Говорящий")
+        text = (seg.get("text") or "").strip()
+        if text:
+            lines.append(f"{who}: {text}")
+    return "\n".join(lines)
+
+
+@calls_bp.route("/export.csv")
+@admin_required
+def export_csv():
+    calls = _filtered_calls_from_args()
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow([
+        "id", "дата", "менеджер", "телефон клиента", "имя клиента",
+        "направление", "длительность_сек", "статус", "чек-лист",
+        "балл", "зона", "саммери", "транскрибация",
+    ])
+    for c in calls:
+        writer.writerow([
+            c.id,
+            c.started_at.strftime("%Y-%m-%d %H:%M") if c.started_at else "",
+            (c.manager.full_name or c.manager.email) if c.manager else "",
+            c.client.phone_normalized if c.client else "",
+            (c.client.name or "") if c.client else "",
+            c.direction or "",
+            c.duration_sec or 0,
+            c.status,
+            c.checklist.name if c.checklist else "",
+            c.overall_score if c.overall_score is not None else "",
+            c.zone or "",
+            (c.summary or "").replace("\r", " "),
+            _transcript_text(c),
+        ])
+    data = "﻿" + buf.getvalue()  # BOM для Excel
+    return Response(
+        data,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=calls_export.csv"},
+    )
+
+
+@calls_bp.route("/export.txt")
+@admin_required
+def export_txt():
+    calls = _filtered_calls_from_args()
+    blocks = []
+    for c in calls:
+        header = (
+            f"=== Звонок #{c.id} | "
+            f"{c.started_at.strftime('%Y-%m-%d %H:%M') if c.started_at else '—'} | "
+            f"Менеджер: {(c.manager.full_name or c.manager.email) if c.manager else '—'} | "
+            f"Клиент: {c.client.phone_normalized if c.client else '—'} | "
+            f"Балл: {c.overall_score if c.overall_score is not None else '—'} "
+            f"({c.zone or '—'})"
+        )
+        body = _transcript_text(c) or "(нет транскрибации)"
+        summary = f"\nСаммери: {c.summary}" if c.summary else ""
+        blocks.append(f"{header}\n{'-' * 60}\n{body}{summary}\n")
+    text = "\n".join(blocks) or "Нет звонков под выбранные фильтры."
+    return Response(
+        text,
+        mimetype="text/plain; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=transcripts_export.txt"},
+    )

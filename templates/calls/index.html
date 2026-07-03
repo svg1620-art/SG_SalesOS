@@ -7,7 +7,11 @@
   <div class="sg-page__head">
     <h1 class="sg-h1">{{ 'Звонки' if current_user.is_admin else 'Мои звонки' }}</h1>
     {% if current_user.is_admin %}
-    <a class="sg-btn sg-btn--primary" href="{{ url_for('calls.upload') }}">+ Загрузить звонок</a>
+    <div class="sg-actions">
+      <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_csv') }}">⭳ CSV</a>
+      <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_txt') }}">⭳ TXT</a>
+      <a class="sg-btn sg-btn--primary" href="{{ url_for('calls.upload') }}">+ Загрузить звонок</a>
+    </div>
     {% endif %}
   </div>
 

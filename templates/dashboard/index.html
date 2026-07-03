@@ -42,6 +42,9 @@
     </label>
     <button class="sg-btn sg-btn--primary sg-btn--sm" type="submit">Применить</button>
     <a class="sg-btn sg-btn--sm" href="{{ url_for('dashboard.index') }}">Сброс</a>
+    <span class="sg-filters__sep"></span>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_csv') }}?{{ request.query_string.decode() }}">⭳ CSV</a>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_txt') }}?{{ request.query_string.decode() }}">⭳ TXT транскрипты</a>
   </form>
 
   {# --- KPI --- #}
@@ -63,6 +66,36 @@
       </div>
       <div class="sg-muted sg-sm">{{ kpi.zone_pct.green }}% / {{ kpi.zone_pct.yellow }}% / {{ kpi.zone_pct.red }}%</div>
     </div>
+  </div>
+
+  {# --- Дневная AI-сводка --- #}
+  <div class="sg-card sg-card--pad sg-digest">
+    <div class="sg-page__head">
+      <h3 class="sg-h3">🧠 Сводка на сегодня
+        {% if digest %}<span class="sg-muted sg-sm">— {{ digest.date.strftime('%d.%m.%Y') }}</span>{% endif %}
+      </h3>
+      <form method="post" action="{{ url_for('dashboard.digest_refresh') }}">
+        <button class="sg-btn sg-btn--sm" type="submit">↻ Обновить</button>
+      </form>
+    </div>
+    {% if digest and digest.content_json %}
+      {% set dj = digest.content_json %}
+      <p>{{ dj.summary or 'Сводка пуста.' }}</p>
+      {% if dj.focuses %}
+      <ul class="sg-focuses">
+        {% for f in dj.focuses %}<li>🎯 {{ f }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      {% if dj.stats and dj.stats.red_calls %}
+      <div class="sg-muted sg-sm">Красные звонки:
+        {% for rc in dj.stats.red_calls %}
+        <a href="{{ url_for('calls.detail', call_id=rc.id) }}">#{{ rc.id }} ({{ rc.score }})</a>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      <p class="sg-muted">Сводка ещё не сформирована. Нажмите «Обновить» или дождитесь {{ '' }}вечернего запуска.</p>
+    {% endif %}
   </div>
 
   <div class="sg-dash-grid">
