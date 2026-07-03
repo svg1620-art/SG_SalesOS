@@ -53,7 +53,7 @@ def generate_checklist_draft(description: str, domain: str = "") -> dict:
     prompt = _PROMPT_TEMPLATE.format(
         domain=(domain or "не указана").strip(), description=description
     )
-    raw = claude_complete(prompt, system=_SYSTEM, max_tokens=2000, temperature=0.4)
+    raw = claude_complete(prompt, system=_SYSTEM, max_tokens=2000)
     data = extract_json(raw)
 
     if not isinstance(data, dict) or not isinstance(data.get("criteria"), list):

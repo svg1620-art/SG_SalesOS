@@ -20,12 +20,16 @@ def claude_complete(
     system: str | None = None,
     max_tokens: int = 4096,
     model: str | None = None,
-    temperature: float = 0.2,
+    temperature: float | None = None,
 ) -> str:
     """Один вызов Claude, возвращает склеенный текст ответа.
 
     model=None → берём CLAUDE_MODEL из конфига (для сводки можно передать
     CLAUDE_MODEL_DIGEST явно).
+
+    temperature по умолчанию НЕ передаётся: новые модели (claude-sonnet-5 и др.)
+    не принимают этот параметр — используем дефолт модели. Передавать явно только
+    если модель точно его поддерживает.
     """
     resolved_model = model or current_app.config.get("CLAUDE_MODEL")
     if not resolved_model:
@@ -35,11 +39,12 @@ def claude_complete(
     kwargs = {
         "model": resolved_model,
         "max_tokens": max_tokens,
-        "temperature": temperature,
         "messages": [{"role": "user", "content": prompt}],
     }
     if system:
         kwargs["system"] = system
+    if temperature is not None:
+        kwargs["temperature"] = temperature
 
     message = client.messages.create(**kwargs)
     return "".join(
