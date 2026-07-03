@@ -315,6 +315,8 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 .sg-scorehead__num { font-size: 44px; font-weight: 800; line-height: 1; }
 .sg-scorehead__max { font-size: 18px; color: var(--sg-muted); font-weight: 600; }
 .sg-scorehead__re { margin-left: auto; }
+.sg-reproc { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sg-input--sm { padding: 6px 10px; font-size: 13px; max-width: 260px; }
 .sg-crit-tag { color: var(--sg-cyan); }
 .sg-evidence { font-style: italic; color: var(--sg-text); }
 

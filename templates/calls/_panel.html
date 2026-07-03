@@ -26,7 +26,14 @@
       <div class="sg-fail__title">🔴 Обработка не удалась</div>
       <pre class="sg-error-text">{{ call.error or 'Неизвестная ошибка.' }}</pre>
       {% if current_user.is_admin %}
-      <form method="post" action="{{ url_for('calls.reprocess', call_id=call.id) }}">
+      <form method="post" action="{{ url_for('calls.reprocess', call_id=call.id) }}" class="sg-reproc">
+        {% if checklists %}
+        <select class="sg-input sg-input--sm" name="checklist_id" title="Чек-лист для оценки">
+          {% for cl in checklists %}
+          <option value="{{ cl.id }}" {{ 'selected' if call.checklist_id == cl.id }}>{{ cl.name }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
         <button class="sg-btn sg-btn--primary" type="submit">Повторить обработку</button>
       </form>
       {% endif %}
@@ -36,9 +43,17 @@
     {# done #}
     <div class="sg-scorehead">
       <div class="sg-scorehead__num sg-mono">{{ call.overall_score if call.overall_score is not none else '—' }}<span class="sg-scorehead__max">/100</span></div>
-      <div>{{ zone_badge(call.zone) }}</div>
-      {% if current_user.is_admin %}
-      <form method="post" action="{{ url_for('calls.reprocess', call_id=call.id) }}" class="sg-scorehead__re">
+      <div>
+        {{ zone_badge(call.zone) }}
+        {% if call.checklist %}<div class="sg-muted sg-sm">по чек-листу «{{ call.checklist.name }}»</div>{% endif %}
+      </div>
+      {% if current_user.is_admin and checklists %}
+      <form method="post" action="{{ url_for('calls.reprocess', call_id=call.id) }}" class="sg-scorehead__re sg-reproc">
+        <select class="sg-input sg-input--sm" name="checklist_id" title="Чек-лист для переоценки">
+          {% for cl in checklists %}
+          <option value="{{ cl.id }}" {{ 'selected' if call.checklist_id == cl.id }}>{{ cl.name }}</option>
+          {% endfor %}
+        </select>
         <button class="sg-btn sg-btn--sm" type="submit">↻ Переоценить</button>
       </form>
       {% endif %}
