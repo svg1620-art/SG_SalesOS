@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_macros.html" import zone_badge, status_label %}
+{% block title %}Звонок #{{ call.id }} — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('calls.index') }}">Звонки</a> / Звонок #{{ call.id }}
+  </div>
+
+  <div class="sg-page__head">
+    <h1 class="sg-h1">
+      {{ call.client.name or call.client.phone_normalized if call.client else 'Звонок' }}
+      <span class="sg-sm sg-muted">#{{ call.id }}</span>
+    </h1>
+    <div>{{ zone_badge(call.zone) }}</div>
+  </div>
+
+  <div class="sg-card sg-card--pad sg-meta">
+    <div><span class="sg-meta__k">Менеджер</span>{{ call.manager.full_name or call.manager.email if call.manager else '—' }}</div>
+    <div><span class="sg-meta__k">Клиент</span>{{ call.client.phone_normalized if call.client else '—' }}</div>
+    <div><span class="sg-meta__k">Дата</span><span class="sg-mono">{{ call.started_at.strftime('%d.%m.%Y %H:%M') if call.started_at else '—' }}</span></div>
+    <div><span class="sg-meta__k">Направление</span>{{ 'Входящий' if call.direction == 'in' else 'Исходящий' if call.direction == 'out' else '—' }}</div>
+    <div><span class="sg-meta__k">Длит.</span><span class="sg-mono">{{ '%d:%02d'|format(call.duration_sec // 60, call.duration_sec % 60) if call.duration_sec else '—' }}</span></div>
+    <div><span class="sg-meta__k">Диаризация</span>{{ 'стерео' if call.diarization == 'stereo' else 'эвристика' if call.diarization == 'heuristic' else '—' }}</div>
+  </div>
+
+  {% if call.audio_path %}
+  <audio class="sg-audio" controls preload="none" src="{{ url_for('calls.audio', call_id=call.id) }}"></audio>
+  {% endif %}
+
+  {# Динамическая часть: статус во время обработки, результат по готовности #}
+  {% include "calls/_panel.html" %}
+</section>
+{% endblock %}

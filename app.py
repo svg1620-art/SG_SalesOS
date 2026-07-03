@@ -40,10 +40,12 @@ def _register_blueprints(app: Flask) -> None:
     from auth import auth_bp
     from dashboard import dashboard_bp
     from checklists import checklists_bp
+    from calls import calls_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(checklists_bp)
+    app.register_blueprint(calls_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:
