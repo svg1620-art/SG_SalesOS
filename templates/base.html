@@ -71,7 +71,41 @@
         });
       });
     }
-    function sgInitCharts() { sgInitRadars(); sgInitDonuts(); }
+    // Линия тренда по <canvas class="sg-linechart" data-line="...json...">.
+    function sgInitLines() {
+      if (!window.Chart) return;
+      document.querySelectorAll('canvas.sg-linechart').forEach(function (cv) {
+        if (cv.dataset.rendered) return;
+        var d;
+        try { d = JSON.parse(cv.dataset.line); } catch (e) { return; }
+        if (!d.labels || !d.labels.length) return;
+        cv.dataset.rendered = '1';
+        var css = getComputedStyle(document.documentElement);
+        var cyan = (css.getPropertyValue('--sg-cyan') || '#00BFDC').trim();
+        var muted = (css.getPropertyValue('--sg-muted') || '#8A8A99').trim();
+        var grid = 'rgba(255,255,255,0.08)';
+        new Chart(cv, {
+          type: 'line',
+          data: {
+            labels: d.labels,
+            datasets: [{
+              data: d.scores, label: 'Балл', borderColor: cyan,
+              backgroundColor: 'rgba(0,191,220,0.15)', fill: true, tension: 0.3,
+              pointBackgroundColor: cyan, pointRadius: 3
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { min: 0, max: 100, ticks: { color: muted, stepSize: 20 }, grid: { color: grid } },
+              x: { ticks: { color: muted }, grid: { color: grid } }
+            }
+          }
+        });
+      });
+    }
+    function sgInitCharts() { sgInitRadars(); sgInitDonuts(); sgInitLines(); }
     document.addEventListener('DOMContentLoaded', function () {
       sgInitCharts();
       document.body.addEventListener('htmx:afterSwap', sgInitCharts);
@@ -94,6 +128,7 @@
         <a href="{{ url_for('checklists.index') }}">Чек-листы</a>
         <a href="{{ url_for('users.index') }}">Пользователи</a>
       {% else %}
+        <a href="{{ url_for('dashboard.manager_home') }}">Кабинет</a>
         <a href="{{ url_for('calls.index') }}">Мои звонки</a>
         <a href="{{ url_for('dialogs.index') }}">Диалоги</a>
       {% endif %}

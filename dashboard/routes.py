@@ -7,8 +7,10 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, request
 from flask_login import login_required, current_user
 
+from collections import defaultdict
+
 from extensions import db
-from models import Call, User
+from models import Call, User, Recommendation, MissedMoment
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -133,7 +135,69 @@ def index():
     )
 
 
+_PRIORITY_WEIGHT = {"high": 3, "med": 2, "low": 1}
+
+
 @dashboard_bp.route("/me")
 @login_required
 def manager_home():
-    return render_template("dashboard/manager.html")
+    """Кабинет менеджера: свои звонки, тренд, рекомендации, что улучшить."""
+    calls = Call.query.filter_by(manager_id=current_user.id, status="done").all()
+    calls.sort(key=lambda c: c.started_at or c.created_at)
+
+    scored = [c for c in calls if c.overall_score is not None]
+    avg_score = round(sum(c.overall_score for c in scored) / len(scored), 1) if scored else None
+    zones = _zone_counts(scored)
+
+    # тренд балла: точки по датам
+    trend = {
+        "labels": [
+            (c.started_at or c.created_at).strftime("%d.%m") for c in scored
+        ],
+        "scores": [c.overall_score for c in scored],
+    }
+
+    call_ids = [c.id for c in calls]
+
+    # агрегированные рекомендации по навыкам
+    skills = defaultdict(lambda: {"skill": "", "count": 0, "weight": 0, "priority": "low", "example": ""})
+    if call_ids:
+        recs = Recommendation.query.filter(Recommendation.call_id.in_(call_ids)).all()
+        for r in recs:
+            key = (r.skill or "Общее").strip() or "Общее"
+            item = skills[key]
+            item["skill"] = key
+            item["count"] += 1
+            item["weight"] += _PRIORITY_WEIGHT.get(r.priority, 1)
+            if _PRIORITY_WEIGHT.get(r.priority, 1) >= _PRIORITY_WEIGHT.get(item["priority"], 1):
+                item["priority"] = r.priority or item["priority"]
+            if not item["example"] and r.text:
+                item["example"] = r.text
+    skills_list = sorted(skills.values(), key=lambda s: s["weight"], reverse=True)
+
+    # «что улучшить на этой неделе» — топ-3 навыка по весу
+    focus = skills_list[:3]
+
+    # недавние упущенные моменты
+    missed = []
+    if call_ids:
+        missed = (
+            MissedMoment.query.filter(MissedMoment.call_id.in_(call_ids))
+            .order_by(MissedMoment.id.desc())
+            .limit(15)
+            .all()
+        )
+
+    recent_calls = list(reversed(calls))[:20]
+
+    return render_template(
+        "dashboard/manager.html",
+        avg_score=avg_score,
+        zones=zones,
+        calls_count=len(calls),
+        trend=trend,
+        skills=skills_list,
+        focus=focus,
+        missed=missed,
+        recent_calls=recent_calls,
+    )
