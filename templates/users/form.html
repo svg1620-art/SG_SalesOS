@@ -42,12 +42,23 @@
         </select>
       </label>
       <label class="sg-field">
-        <span class="sg-field__label">amoCRM user_id (необязательно)</span>
-        <input class="sg-input sg-mono" name="amo_user_id"
-               value="{{ cur.get('amo_user_id', user.amo_user_id if is_edit else '') or '' }}"
-               placeholder="для авто-привязки на Этапе 8">
+        <span class="sg-field__label">Отдел</span>
+        {% set dep_val = cur.get('department_id', user.department_id if is_edit else '') %}
+        <select class="sg-input" name="department_id">
+          <option value="">— без отдела —</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {{ 'selected' if dep_val and dep_val|string == d.id|string }}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
       </label>
     </div>
+
+    <label class="sg-field">
+      <span class="sg-field__label">amoCRM user_id (необязательно)</span>
+      <input class="sg-input sg-mono" name="amo_user_id"
+             value="{{ cur.get('amo_user_id', user.amo_user_id if is_edit else '') or '' }}"
+             placeholder="для авто-привязки на Этапе 8">
+    </label>
 
     <label class="sg-field">
       <span class="sg-field__label">

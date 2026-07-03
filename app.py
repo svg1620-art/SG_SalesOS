@@ -22,6 +22,7 @@ def create_app(config_object: type = Config) -> Flask:
     _register_error_handlers(app)
     _register_cli(app)
     _maybe_seed_admin(app)
+    _ensure_departments(app)
     _maybe_start_scheduler(app)
 
     return app
@@ -43,6 +44,7 @@ def _register_blueprints(app: Flask) -> None:
     from calls import calls_bp
     from users import users_bp
     from dialogs import dialogs_bp
+    from departments import departments_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -50,6 +52,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(calls_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(dialogs_bp)
+    app.register_blueprint(departments_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:
@@ -87,6 +90,21 @@ def _maybe_seed_admin(app: Flask) -> None:
             app.logger.warning(
                 "[seed-admin] пропущен (возможно, миграции ещё не применены): %s", exc
             )
+
+
+def _ensure_departments(app: Flask) -> None:
+    """Создать отделы по умолчанию при старте (идемпотентно).
+
+    Обёрнуто в try/except: во время `flask db upgrade` таблиц ещё нет.
+    """
+    with app.app_context():
+        try:
+            from departments.seed import seed_default_departments
+
+            seed_default_departments(app)
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            app.logger.warning("[departments] сид пропущен: %s", exc)
 
 
 def _maybe_start_scheduler(app: Flask) -> None:
@@ -164,6 +182,14 @@ def _register_cli(app: Flask) -> None:
 
         count = rebuild_all_dialogs()
         click.echo(f"Пересобрано диалогов: {count}")
+
+    @app.cli.command("seed-departments")
+    def seed_departments_cmd():
+        """Создать отделы по умолчанию (Отдел продаж / развития клиентов)."""
+        from departments.seed import seed_default_departments
+
+        _created, message = seed_default_departments(app)
+        click.echo(message)
 
     @app.cli.command("run-digest")
     def run_digest_cmd():

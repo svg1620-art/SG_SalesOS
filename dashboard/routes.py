@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from collections import defaultdict
 
 from extensions import db
-from models import Call, User, Recommendation, MissedMoment, DailyDigest
+from models import Call, User, Recommendation, MissedMoment, DailyDigest, Department
 from auth.decorators import admin_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -69,7 +69,21 @@ def index():
     manager_id = int(manager_id) if manager_id and manager_id.isdigit() else None
     zone = request.args.get("zone") or ""
 
-    managers = User.query.order_by(User.full_name, User.email).all()
+    # --- отдел (вкладки) ---
+    departments = Department.query.order_by(Department.name).all()
+    department_id = request.args.get("department_id")
+    department_id = int(department_id) if department_id and department_id.isdigit() else None
+    dept_manager_ids = None
+    if department_id is not None:
+        dept_manager_ids = {
+            u.id for u in User.query.filter_by(department_id=department_id).all()
+        }
+
+    # менеджеры для фильтра: все или только выбранного отдела
+    mgr_query = User.query
+    if department_id is not None:
+        mgr_query = mgr_query.filter(User.department_id == department_id)
+    managers = mgr_query.order_by(User.full_name, User.email).all()
 
     # --- звонки за период (done) ---
     period_q = Call.query.filter(
@@ -78,6 +92,9 @@ def index():
         Call.started_at <= date_to,
     )
     period_calls = period_q.all()
+    # ограничение отделом (по менеджеру звонка)
+    if dept_manager_ids is not None:
+        period_calls = [c for c in period_calls if c.manager_id in dept_manager_ids]
 
     # набор с учётом фильтра менеджера (для KPI/donut)
     scoped = [c for c in period_calls if manager_id is None or c.manager_id == manager_id]
@@ -131,11 +148,13 @@ def index():
         feed=feed,
         managers=managers,
         digest=digest,
+        departments=departments,
         filters={
             "from": date_from.strftime("%Y-%m-%d"),
             "to": date_to_raw.strftime("%Y-%m-%d"),
             "manager_id": manager_id,
             "zone": zone,
+            "department_id": department_id,
         },
     )
 

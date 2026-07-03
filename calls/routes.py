@@ -289,6 +289,10 @@ def _filtered_calls_from_args():
     manager_id = request.args.get("manager_id")
     if manager_id and manager_id.isdigit():
         query = query.filter(Call.manager_id == int(manager_id))
+    department_id = request.args.get("department_id")
+    if department_id and department_id.isdigit():
+        dept_ids = [u.id for u in User.query.filter_by(department_id=int(department_id)).all()]
+        query = query.filter(Call.manager_id.in_(dept_ids or [-1]))
     zone = request.args.get("zone")
     if zone in {"green", "yellow", "red"}:
         query = query.filter(Call.zone == zone)
@@ -317,7 +321,7 @@ def export_csv():
     buf = io.StringIO()
     writer = csv.writer(buf, delimiter=";")
     writer.writerow([
-        "id", "дата", "менеджер", "телефон клиента", "имя клиента",
+        "id", "дата", "менеджер", "отдел", "телефон клиента", "имя клиента",
         "направление", "длительность_сек", "статус", "чек-лист",
         "балл", "зона", "саммери", "транскрибация",
     ])
@@ -326,6 +330,7 @@ def export_csv():
             c.id,
             c.started_at.strftime("%Y-%m-%d %H:%M") if c.started_at else "",
             (c.manager.full_name or c.manager.email) if c.manager else "",
+            (c.manager.department.name if c.manager and c.manager.department else ""),
             c.client.phone_normalized if c.client else "",
             (c.client.name or "") if c.client else "",
             c.direction or "",

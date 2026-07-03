@@ -15,7 +15,7 @@ from flask import (
 from flask_login import current_user
 
 from extensions import db
-from models import User
+from models import User, Department
 from auth.decorators import admin_required
 
 users_bp = Blueprint("users", __name__, url_prefix="/users")
@@ -32,6 +32,17 @@ def _parse_amo_user_id(raw):
         return int(raw)
     except ValueError:
         return None
+
+
+def _parse_department_id(raw):
+    raw = (raw or "").strip()
+    if raw.isdigit() and db.session.get(Department, int(raw)):
+        return int(raw)
+    return None
+
+
+def _departments():
+    return Department.query.order_by(Department.name).all()
 
 
 @users_bp.route("/")
@@ -62,13 +73,15 @@ def create():
 
         if error:
             flash(error, "error")
-            return render_template("users/form.html", user=None, form=request.form), 400
+            return render_template("users/form.html", user=None, form=request.form,
+                                   departments=_departments()), 400
 
         user = User(
             email=email,
             full_name=full_name or None,
             role=role,
             is_active=True,
+            department_id=_parse_department_id(request.form.get("department_id")),
             amo_user_id=_parse_amo_user_id(request.form.get("amo_user_id")),
         )
         user.set_password(password)
@@ -77,7 +90,7 @@ def create():
         flash(f"Пользователь {email} создан.", "success")
         return redirect(url_for("users.index"))
 
-    return render_template("users/form.html", user=None, form={})
+    return render_template("users/form.html", user=None, form={}, departments=_departments())
 
 
 @users_bp.route("/<int:user_id>/edit", methods=["GET", "POST"])
@@ -93,16 +106,19 @@ def edit(user_id):
 
         if role not in ROLES:
             flash("Некорректная роль.", "error")
-            return render_template("users/form.html", user=user, form=request.form), 400
+            return render_template("users/form.html", user=user, form=request.form,
+                                   departments=_departments()), 400
 
         # защита от самоблокировки
         if user.id == current_user.id:
             if role != "admin":
                 flash("Нельзя понизить собственную роль.", "error")
-                return render_template("users/form.html", user=user, form=request.form), 400
+                return render_template("users/form.html", user=user, form=request.form,
+                                   departments=_departments()), 400
             if not is_active:
                 flash("Нельзя деактивировать собственную учётку.", "error")
-                return render_template("users/form.html", user=user, form=request.form), 400
+                return render_template("users/form.html", user=user, form=request.form,
+                                   departments=_departments()), 400
 
         # не оставить систему без активных админов
         if user.role == "admin" and (role != "admin" or not is_active):
@@ -111,20 +127,23 @@ def edit(user_id):
             ).count()
             if other_admins == 0:
                 flash("Это последний активный админ — изменение заблокировано.", "error")
-                return render_template("users/form.html", user=user, form=request.form), 400
+                return render_template("users/form.html", user=user, form=request.form,
+                                   departments=_departments()), 400
 
         if password:
             if len(password) < MIN_PASSWORD:
                 flash(f"Пароль не короче {MIN_PASSWORD} символов.", "error")
-                return render_template("users/form.html", user=user, form=request.form), 400
+                return render_template("users/form.html", user=user, form=request.form,
+                                   departments=_departments()), 400
             user.set_password(password)
 
         user.full_name = full_name or None
         user.role = role
         user.is_active = is_active
+        user.department_id = _parse_department_id(request.form.get("department_id"))
         user.amo_user_id = _parse_amo_user_id(request.form.get("amo_user_id"))
         db.session.commit()
         flash("Пользователь сохранён.", "success")
         return redirect(url_for("users.index"))
 
-    return render_template("users/form.html", user=user, form={})
+    return render_template("users/form.html", user=user, form={}, departments=_departments())

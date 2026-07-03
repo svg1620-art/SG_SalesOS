@@ -393,6 +393,19 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 }
 .sg-field--inline { flex-direction: column; gap: 4px; }
 .sg-filters__sep { flex: 1; }
+
+/* вкладки отделов */
+.sg-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 12px 0 4px; border-bottom: 1px solid var(--sg-border); }
+.sg-tab {
+  padding: 9px 16px; color: var(--sg-muted); font-weight: 600; font-size: 14px;
+  border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+}
+.sg-tab:hover { color: var(--sg-text); text-decoration: none; }
+.sg-tab--active {
+  color: var(--sg-text); background: var(--sg-surface);
+  border-color: var(--sg-border); border-bottom: 1px solid var(--sg-bg);
+}
 .sg-field--inline .sg-field__label { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
 
 .sg-dash-grid { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; align-items: start; }

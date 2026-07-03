@@ -12,8 +12,21 @@
 <section class="sg-page">
   <h1 class="sg-h1">Дашборд РОПа</h1>
 
+  {# --- Вкладки отделов --- #}
+  {% if departments %}
+  <div class="sg-tabs">
+    <a class="sg-tab {{ 'sg-tab--active' if not filters.department_id }}"
+       href="{{ url_for('dashboard.index') }}">Все отделы</a>
+    {% for d in departments %}
+    <a class="sg-tab {{ 'sg-tab--active' if filters.department_id == d.id }}"
+       href="{{ url_for('dashboard.index', department_id=d.id) }}">{{ d.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {# --- Фильтры --- #}
   <form method="get" class="sg-filters" action="{{ url_for('dashboard.index') }}">
+    {% if filters.department_id %}<input type="hidden" name="department_id" value="{{ filters.department_id }}">{% endif %}
     <label class="sg-field sg-field--inline">
       <span class="sg-field__label">С</span>
       <input class="sg-input sg-input--sm" type="date" name="from" value="{{ filters.from }}">

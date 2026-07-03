@@ -14,6 +14,7 @@
         <th>Имя</th>
         <th>Email</th>
         <th>Роль</th>
+        <th>Отдел</th>
         <th>amoCRM ID</th>
         <th>Статус</th>
         <th></th>
@@ -25,6 +26,7 @@
         <td><b>{{ u.full_name or '—' }}</b>{% if u.id == current_user.id %} <span class="sg-badge">вы</span>{% endif %}</td>
         <td class="sg-mono sg-sm">{{ u.email }}</td>
         <td><span class="sg-role sg-role--{{ u.role }}">{{ u.role }}</span></td>
+        <td class="sg-sm">{{ u.department.name if u.department else '—' }}</td>
         <td class="sg-mono sg-sm">{{ u.amo_user_id or '—' }}</td>
         <td>
           {% if u.is_active %}<span class="sg-badge sg-badge--active">Активен</span>

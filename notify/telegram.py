@@ -64,14 +64,11 @@ def build_pulse(app, day) -> str:
     if not calls:
         return header + "\n\nЗа день нет обработанных звонков."
 
-    blocks = [header]
-    # сортируем по среднему баллу (сначала кто просел)
     def _avg(mcalls):
         s = [c.overall_score for c in mcalls if c.overall_score is not None]
         return sum(s) / len(s) if s else 0
 
-    for mid, mcalls in sorted(by_manager.items(), key=lambda kv: _avg(kv[1])):
-        manager = db.session.get(User, mid) if mid else None
+    def _manager_line(manager, mcalls):
         name = (manager.full_name or manager.email) if manager else "Не назначен"
         dialogs = len({c.client_id for c in mcalls if c.client_id})
         durations = [c.duration_sec for c in mcalls if c.duration_sec]
@@ -83,17 +80,33 @@ def build_pulse(app, day) -> str:
             if c.zone:
                 zone_counts[c.zone] += 1
         emoji = _zone_for_score(avg_score, zone_counts)
-        rec = _recommendation_line([c.id for c in mcalls])
-
-        block = (
+        line = (
             f"\n👤 <b>{escape(name)}</b> — {dialogs} диал., "
             f"ср. {avg_dur}, балл {avg_score} {emoji}"
         )
+        rec = _recommendation_line([c.id for c in mcalls])
         if rec:
-            block += f"\n   💡 {escape(rec)}"
-        blocks.append(block)
+            line += f"\n   💡 {escape(rec)}"
+        return line
 
-    return "\n".join(blocks)
+    # группировка менеджеров по отделам
+    managers = {mid: db.session.get(User, mid) if mid else None for mid in by_manager}
+    dept_groups = defaultdict(list)  # dept_name -> [(manager, mcalls)]
+    for mid, mcalls in by_manager.items():
+        manager = managers[mid]
+        dept_name = (
+            manager.department.name if manager and manager.department else "Без отдела"
+        )
+        dept_groups[dept_name].append((manager, mcalls))
+
+    blocks = [header]
+    for dept_name in sorted(dept_groups.keys()):
+        rows = sorted(dept_groups[dept_name], key=lambda mm: _avg(mm[1]))
+        blocks.append(f"\n\n🏢 <b>{escape(dept_name)}</b>")
+        for manager, mcalls in rows:
+            blocks.append(_manager_line(manager, mcalls))
+
+    return "".join(blocks)
 
 
 def _send_message(app, text: str) -> bool:
