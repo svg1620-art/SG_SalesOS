@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Пользователи — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-page__head">
+    <h1 class="sg-h1">Пользователи</h1>
+    <a class="sg-btn sg-btn--primary" href="{{ url_for('users.create') }}">+ Новый пользователь</a>
+  </div>
+
+  <table class="sg-table">
+    <thead>
+      <tr>
+        <th>Имя</th>
+        <th>Email</th>
+        <th>Роль</th>
+        <th>amoCRM ID</th>
+        <th>Статус</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td><b>{{ u.full_name or '—' }}</b>{% if u.id == current_user.id %} <span class="sg-badge">вы</span>{% endif %}</td>
+        <td class="sg-mono sg-sm">{{ u.email }}</td>
+        <td><span class="sg-role sg-role--{{ u.role }}">{{ u.role }}</span></td>
+        <td class="sg-mono sg-sm">{{ u.amo_user_id or '—' }}</td>
+        <td>
+          {% if u.is_active %}<span class="sg-badge sg-badge--active">Активен</span>
+          {% else %}<span class="sg-badge">Отключён</span>{% endif %}
+        </td>
+        <td class="sg-row-actions">
+          <a class="sg-btn sg-btn--sm" href="{{ url_for('users.edit', user_id=u.id) }}">Редактировать</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="sg-muted sg-sm">Активные пользователи доступны для выбора в поле «Менеджер» при загрузке звонка.</p>
+</section>
+{% endblock %}

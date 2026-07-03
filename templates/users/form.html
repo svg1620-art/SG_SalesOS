@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Пользователь' if user else 'Новый пользователь' }} — SG SalesOS{% endblock %}
+
+{% set is_edit = user is not none %}
+{% set cur = form if form else {} %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('users.index') }}">Пользователи</a> /
+    {{ user.email if is_edit else 'Новый' }}
+  </div>
+  <h1 class="sg-h1">{{ 'Редактирование пользователя' if is_edit else 'Новый пользователь' }}</h1>
+
+  <form method="post" class="sg-form sg-form--wide"
+        action="{{ url_for('users.edit', user_id=user.id) if is_edit else url_for('users.create') }}">
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Имя</span>
+        <input class="sg-input" name="full_name"
+               value="{{ cur.get('full_name', user.full_name if is_edit else '') or '' }}"
+               placeholder="Иван Петров">
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Email {% if not is_edit %}<span class="sg-req">*</span>{% endif %}</span>
+        {% if is_edit %}
+          <input class="sg-input" value="{{ user.email }}" disabled>
+        {% else %}
+          <input class="sg-input" type="email" name="email" value="{{ cur.get('email', '') }}" required>
+        {% endif %}
+      </label>
+    </div>
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Роль</span>
+        {% set role_val = cur.get('role', user.role if is_edit else 'manager') %}
+        <select class="sg-input" name="role">
+          <option value="manager" {{ 'selected' if role_val == 'manager' }}>Менеджер</option>
+          <option value="admin" {{ 'selected' if role_val == 'admin' }}>Администратор</option>
+        </select>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">amoCRM user_id (необязательно)</span>
+        <input class="sg-input sg-mono" name="amo_user_id"
+               value="{{ cur.get('amo_user_id', user.amo_user_id if is_edit else '') or '' }}"
+               placeholder="для авто-привязки на Этапе 8">
+      </label>
+    </div>
+
+    <label class="sg-field">
+      <span class="sg-field__label">
+        Пароль {% if not is_edit %}<span class="sg-req">*</span>{% else %}<span class="sg-muted sg-sm">(оставьте пустым, чтобы не менять)</span>{% endif %}
+      </span>
+      <input class="sg-input" type="password" name="password" autocomplete="new-password"
+             {{ 'required' if not is_edit }} minlength="6">
+    </label>
+
+    {% if is_edit %}
+    <label class="sg-check sg-check--inline">
+      <input type="checkbox" name="is_active" {{ 'checked' if (cur.get('is_active') if form else user.is_active) }}>
+      <span>Учётка активна</span>
+    </label>
+    {% endif %}
+
+    <div class="sg-actions">
+      <a class="sg-btn" href="{{ url_for('users.index') }}">Отмена</a>
+      <button class="sg-btn sg-btn--primary" type="submit">{{ 'Сохранить' if is_edit else 'Создать' }}</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

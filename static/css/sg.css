@@ -317,6 +317,9 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 .sg-scorehead__re { margin-left: auto; }
 .sg-reproc { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .sg-input--sm { padding: 6px 10px; font-size: 13px; max-width: 260px; }
+.sg-req { color: var(--sg-red); }
+.sg-check--inline { padding-top: 0; }
+.sg-input:disabled { opacity: 0.6; cursor: not-allowed; }
 .sg-crit-tag { color: var(--sg-cyan); }
 .sg-evidence { font-style: italic; color: var(--sg-text); }
 
