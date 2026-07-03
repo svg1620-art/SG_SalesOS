@@ -54,6 +54,11 @@ def process_call(call_id: int) -> None:
 
         call.status = "done"
         call.processed_at = datetime.utcnow()
+
+        # 3) агрегация диалога по клиенту
+        from processing.aggregate import recompute_dialog_for_call
+
+        recompute_dialog_for_call(call)
         db.session.commit()
     except Exception as exc:  # noqa: BLE001 — изоляция сбоя по звонку
         db.session.rollback()

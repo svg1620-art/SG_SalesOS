@@ -42,12 +42,14 @@ def _register_blueprints(app: Flask) -> None:
     from checklists import checklists_bp
     from calls import calls_bp
     from users import users_bp
+    from dialogs import dialogs_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(checklists_bp)
     app.register_blueprint(calls_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(dialogs_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:
@@ -122,6 +124,14 @@ def _register_cli(app: Flask) -> None:
 
         _created, message = seed_default_checklist(app, activate=True)
         click.echo(message)
+
+    @app.cli.command("rebuild-dialogs")
+    def rebuild_dialogs_cmd():
+        """Пересобрать агрегаты диалогов по всем звонкам (backfill)."""
+        from processing.aggregate import rebuild_all_dialogs
+
+        count = rebuild_all_dialogs()
+        click.echo(f"Пересобрано диалогов: {count}")
 
 
 # Экземпляр для gunicorn: `gunicorn app:app`

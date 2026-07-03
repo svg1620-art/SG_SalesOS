@@ -48,11 +48,35 @@
         });
       });
     }
+    // Donut распределения зон по <canvas class="sg-donut" data-donut="...json...">.
+    function sgInitDonuts() {
+      if (!window.Chart) return;
+      document.querySelectorAll('canvas.sg-donut').forEach(function (cv) {
+        if (cv.dataset.rendered) return;
+        var d;
+        try { d = JSON.parse(cv.dataset.donut); } catch (e) { return; }
+        var total = (d.values || []).reduce(function (a, b) { return a + b; }, 0);
+        if (!total) return;
+        cv.dataset.rendered = '1';
+        new Chart(cv, {
+          type: 'doughnut',
+          data: {
+            labels: d.labels,
+            datasets: [{ data: d.values, backgroundColor: d.colors, borderWidth: 0 }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, cutout: '62%',
+            plugins: { legend: { display: false } }
+          }
+        });
+      });
+    }
+    function sgInitCharts() { sgInitRadars(); sgInitDonuts(); }
     document.addEventListener('DOMContentLoaded', function () {
-      sgInitRadars();
-      document.body.addEventListener('htmx:afterSwap', sgInitRadars);
+      sgInitCharts();
+      document.body.addEventListener('htmx:afterSwap', sgInitCharts);
     });
-    window.addEventListener('load', sgInitRadars);
+    window.addEventListener('load', sgInitCharts);
   </script>
 </head>
 <body>
@@ -66,10 +90,12 @@
       {% if current_user.is_admin %}
         <a href="{{ url_for('dashboard.index') }}">Дашборд</a>
         <a href="{{ url_for('calls.index') }}">Звонки</a>
+        <a href="{{ url_for('dialogs.index') }}">Диалоги</a>
         <a href="{{ url_for('checklists.index') }}">Чек-листы</a>
         <a href="{{ url_for('users.index') }}">Пользователи</a>
       {% else %}
         <a href="{{ url_for('calls.index') }}">Мои звонки</a>
+        <a href="{{ url_for('dialogs.index') }}">Диалоги</a>
       {% endif %}
     </nav>
     <div class="sg-topbar__user">

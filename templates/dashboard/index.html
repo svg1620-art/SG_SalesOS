@@ -1,33 +1,141 @@
 {% extends "base.html" %}
+{% from "_macros.html" import zone_badge, status_label %}
 {% block title %}Дашборд — SG SalesOS{% endblock %}
+
+{% macro trend_arrow(t) %}
+  {% if t == 'up' %}<span class="sg-trend sg-trend--up">▲</span>
+  {% elif t == 'down' %}<span class="sg-trend sg-trend--down">▼</span>
+  {% else %}<span class="sg-trend sg-trend--flat">▬</span>{% endif %}
+{% endmacro %}
 
 {% block content %}
 <section class="sg-page">
   <h1 class="sg-h1">Дашборд РОПа</h1>
-  <p class="sg-muted">Каркас готов. KPI, распределение зон, лидерборд и лента звонков появятся на следующих этапах.</p>
 
+  {# --- Фильтры --- #}
+  <form method="get" class="sg-filters" action="{{ url_for('dashboard.index') }}">
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">С</span>
+      <input class="sg-input sg-input--sm" type="date" name="from" value="{{ filters.from }}">
+    </label>
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">По</span>
+      <input class="sg-input sg-input--sm" type="date" name="to" value="{{ filters.to }}">
+    </label>
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">Менеджер</span>
+      <select class="sg-input sg-input--sm" name="manager_id">
+        <option value="">Все</option>
+        {% for m in managers %}
+        <option value="{{ m.id }}" {{ 'selected' if filters.manager_id == m.id }}>{{ m.full_name or m.email }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">Зона</span>
+      <select class="sg-input sg-input--sm" name="zone">
+        <option value="">Все</option>
+        <option value="green" {{ 'selected' if filters.zone == 'green' }}>🟢 Зелёная</option>
+        <option value="yellow" {{ 'selected' if filters.zone == 'yellow' }}>🟡 Жёлтая</option>
+        <option value="red" {{ 'selected' if filters.zone == 'red' }}>🔴 Красная</option>
+      </select>
+    </label>
+    <button class="sg-btn sg-btn--primary sg-btn--sm" type="submit">Применить</button>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('dashboard.index') }}">Сброс</a>
+  </form>
+
+  {# --- KPI --- #}
   <div class="sg-cards">
     <div class="sg-card">
       <div class="sg-card__label">Диалогов с клиентами</div>
-      <div class="sg-card__value sg-mono">—</div>
+      <div class="sg-card__value sg-mono">{{ kpi.dialogs }}</div>
     </div>
     <div class="sg-card">
       <div class="sg-card__label">Звонков за период</div>
-      <div class="sg-card__value sg-mono">—</div>
+      <div class="sg-card__value sg-mono">{{ kpi.calls }}</div>
     </div>
     <div class="sg-card">
-      <div class="sg-card__label">Зелёная / Жёлтая / Красная</div>
+      <div class="sg-card__label">Распределение зон</div>
       <div class="sg-card__value">
-        <span class="sg-zone sg-zone--green">—</span>
-        <span class="sg-zone sg-zone--yellow">—</span>
-        <span class="sg-zone sg-zone--red">—</span>
+        <span class="sg-zone sg-zone--green">{{ kpi.zones.green }}</span>
+        <span class="sg-zone sg-zone--yellow">{{ kpi.zones.yellow }}</span>
+        <span class="sg-zone sg-zone--red">{{ kpi.zones.red }}</span>
       </div>
+      <div class="sg-muted sg-sm">{{ kpi.zone_pct.green }}% / {{ kpi.zone_pct.yellow }}% / {{ kpi.zone_pct.red }}%</div>
     </div>
   </div>
 
-  <div class="sg-placeholder">
-    <span class="sg-placeholder__badge">Этап 6</span>
-    Здесь будут donut распределения зон, лидерборд менеджеров и лента звонков с фильтрами.
+  <div class="sg-dash-grid">
+    {# --- Donut --- #}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Зоны</h3>
+      {% if kpi.calls %}
+      <div class="sg-donut-wrap">
+        <canvas class="sg-donut" data-donut='{{ {"labels": ["Зелёная","Жёлтая","Красная"], "values": [kpi.zones.green, kpi.zones.yellow, kpi.zones.red], "colors": ["#22C55E","#EAB308","#EF4444"]} | tojson }}'></canvas>
+      </div>
+      <div class="sg-legend">
+        <span><i class="sg-dot" style="background:#22C55E"></i>Зелёная — {{ kpi.zones.green }}</span>
+        <span><i class="sg-dot" style="background:#EAB308"></i>Жёлтая — {{ kpi.zones.yellow }}</span>
+        <span><i class="sg-dot" style="background:#EF4444"></i>Красная — {{ kpi.zones.red }}</span>
+      </div>
+      {% else %}
+      <p class="sg-muted">Нет данных за период.</p>
+      {% endif %}
+    </div>
+
+    {# --- Лидерборд --- #}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Лидерборд менеджеров</h3>
+      {% if leaderboard %}
+      <table class="sg-table">
+        <thead><tr><th>Менеджер</th><th>Ср. балл</th><th>Тренд</th><th>Звонков</th><th>🟢/🟡/🔴</th></tr></thead>
+        <tbody>
+          {% for row in leaderboard %}
+          <tr>
+            <td>{{ row.manager.full_name or row.manager.email if row.manager else 'Не назначен' }}</td>
+            <td class="sg-mono"><b>{{ row.avg_score if row.avg_score is not none else '—' }}</b></td>
+            <td>{{ trend_arrow(row.trend) }}</td>
+            <td class="sg-mono">{{ row.calls }}</td>
+            <td class="sg-mono sg-sm">
+              <span class="sg-zone--green">{{ row.zones.green }}</span> /
+              <span class="sg-zone--yellow">{{ row.zones.yellow }}</span> /
+              <span class="sg-zone--red">{{ row.zones.red }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="sg-muted">Нет обработанных звонков за период.</p>
+      {% endif %}
+    </div>
   </div>
+
+  {# --- Лента звонков --- #}
+  <div class="sg-page__head" style="margin-top:20px">
+    <h3 class="sg-h3">Лента звонков</h3>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.upload') }}">+ Загрузить</a>
+  </div>
+  {% if feed %}
+  <table class="sg-table">
+    <thead>
+      <tr><th>Дата</th><th>Менеджер</th><th>Клиент</th><th>Балл</th><th>Зона</th></tr>
+    </thead>
+    <tbody>
+      {% for c in feed %}
+      <tr class="{{ 'sg-row--red' if c.zone == 'red' else '' }}"
+          onclick="location.href='{{ url_for('calls.detail', call_id=c.id) }}'">
+        <td class="sg-mono sg-sm">{{ c.started_at.strftime('%d.%m %H:%M') if c.started_at else '—' }}</td>
+        <td>{{ c.manager.full_name or c.manager.email if c.manager else '—' }}</td>
+        <td>{{ c.client.name or c.client.phone_normalized if c.client else '—' }}</td>
+        <td class="sg-mono">{{ c.overall_score if c.overall_score is not none else '—' }}</td>
+        <td>{{ zone_badge(c.zone) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="sg-placeholder">Нет звонков под выбранные фильтры.</div>
+  {% endif %}
 </section>
 {% endblock %}
