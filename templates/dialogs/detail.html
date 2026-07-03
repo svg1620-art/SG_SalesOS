@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import zone_badge, status_label %}
+{% block title %}Диалог — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('dialogs.index') }}">Диалоги</a> /
+    {{ dialog.client.name or dialog.client.phone_normalized if dialog.client else 'Диалог' }}
+  </div>
+
+  <div class="sg-page__head">
+    <h1 class="sg-h1">{{ dialog.client.name or dialog.client.phone_normalized if dialog.client else 'Диалог' }}</h1>
+    <div>{{ zone_badge(dialog.last_zone) }}</div>
+  </div>
+
+  <div class="sg-card sg-card--pad sg-meta">
+    <div><span class="sg-meta__k">Телефон</span><span class="sg-mono">{{ dialog.client.phone_normalized if dialog.client else '—' }}</span></div>
+    <div><span class="sg-meta__k">Звонков</span><span class="sg-mono">{{ dialog.calls_count }}</span></div>
+    <div><span class="sg-meta__k">Ср. балл</span><span class="sg-mono">{{ dialog.avg_score if dialog.avg_score is not none else '—' }}</span></div>
+    <div><span class="sg-meta__k">Ответственный</span>{{ dialog.manager.full_name or dialog.manager.email if dialog.manager else '—' }}</div>
+  </div>
+
+  <h2 class="sg-h2" style="margin-top:18px">Звонки клиента</h2>
+  <table class="sg-table">
+    <thead>
+      <tr><th>Дата</th><th>Напр.</th><th>Статус</th><th>Балл</th><th>Зона</th></tr>
+    </thead>
+    <tbody>
+      {% for c in calls %}
+      <tr class="{{ 'sg-row--red' if c.zone == 'red' else '' }}"
+          onclick="location.href='{{ url_for('calls.detail', call_id=c.id) }}'">
+        <td class="sg-mono sg-sm">{{ c.started_at.strftime('%d.%m.%Y %H:%M') if c.started_at else '—' }}</td>
+        <td class="sg-sm">{{ 'вх' if c.direction == 'in' else 'исх' if c.direction == 'out' else '—' }}</td>
+        <td>{{ status_label(c.status) }}</td>
+        <td class="sg-mono">{{ c.overall_score if c.overall_score is not none else '—' }}</td>
+        <td>{{ zone_badge(c.zone) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

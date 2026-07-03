@@ -1,0 +1,39 @@
+"""Диалоги: агрегаты звонков по клиенту. Список и карточка диалога."""
+from flask import Blueprint, render_template, abort
+from flask_login import login_required, current_user
+
+from extensions import db
+from models import Dialog, Call
+
+dialogs_bp = Blueprint("dialogs", __name__, url_prefix="/dialogs")
+
+
+@dialogs_bp.route("/")
+@login_required
+def index():
+    query = Dialog.query
+    if not current_user.is_admin:
+        # только диалоги, где у менеджера есть звонки
+        query = query.join(Call, Call.dialog_id == Dialog.id).filter(
+            Call.manager_id == current_user.id
+        ).distinct()
+    dialogs = query.all()
+    # сортировка: по времени последнего обновления
+    dialogs.sort(key=lambda d: d.updated_at or d.id, reverse=True)
+    return render_template("dialogs/index.html", dialogs=dialogs)
+
+
+@dialogs_bp.route("/<int:dialog_id>")
+@login_required
+def detail(dialog_id):
+    dialog = db.session.get(Dialog, dialog_id) or abort(404)
+
+    calls = Call.query.filter_by(dialog_id=dialog.id).all()
+    calls.sort(key=lambda c: c.started_at or c.created_at, reverse=True)
+
+    if not current_user.is_admin:
+        # менеджер видит диалог, только если в нём есть его звонки
+        if not any(c.manager_id == current_user.id for c in calls):
+            abort(403)
+
+    return render_template("dialogs/detail.html", dialog=dialog, calls=calls)

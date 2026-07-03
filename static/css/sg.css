@@ -376,3 +376,30 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
 .sg-mark:hover::after, .sg-mark:focus::after { opacity: 1; visibility: visible; }
+
+/* --- Диалоги / Дашборд (Этапы 5-6) --- */
+.sg-trend { font-weight: 800; }
+.sg-trend--up { color: var(--sg-green); }
+.sg-trend--down { color: var(--sg-red); }
+.sg-trend--flat { color: var(--sg-muted); }
+.sg-zone--green { color: var(--sg-green); }
+.sg-zone--yellow { color: var(--sg-yellow); }
+.sg-zone--red { color: var(--sg-red); }
+
+.sg-filters {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  padding: 14px; margin: 8px 0 18px;
+  background: var(--sg-surface); border: 1px solid var(--sg-border); border-radius: var(--sg-radius);
+}
+.sg-field--inline { flex-direction: column; gap: 4px; }
+.sg-field--inline .sg-field__label { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+
+.sg-dash-grid { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; align-items: start; }
+.sg-donut-wrap { height: 220px; margin: 0 auto; max-width: 260px; }
+.sg-donut-wrap canvas { width: 100% !important; height: 100% !important; }
+.sg-legend { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; font-size: 13px; color: var(--sg-muted); }
+.sg-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+
+@media (max-width: 780px) {
+  .sg-dash-grid { grid-template-columns: 1fr; }
+}

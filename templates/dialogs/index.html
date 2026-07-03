@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_macros.html" import zone_badge %}
+{% block title %}Диалоги — SG SalesOS{% endblock %}
+
+{% macro trend_arrow(t) %}
+  {% if t == 'up' %}<span class="sg-trend sg-trend--up">▲</span>
+  {% elif t == 'down' %}<span class="sg-trend sg-trend--down">▼</span>
+  {% else %}<span class="sg-trend sg-trend--flat">▬</span>{% endif %}
+{% endmacro %}
+
+{% block content %}
+<section class="sg-page">
+  <h1 class="sg-h1">Диалоги</h1>
+  <p class="sg-muted sg-sm">Звонки, сгруппированные по клиенту (нормализованному номеру телефона).</p>
+
+  {% if not dialogs %}
+    <div class="sg-placeholder">Пока нет диалогов. Они появляются после обработки звонков.</div>
+  {% else %}
+    <table class="sg-table">
+      <thead>
+        <tr>
+          <th>Клиент</th>
+          {% if current_user.is_admin %}<th>Менеджер</th>{% endif %}
+          <th>Звонков</th>
+          <th>Ср. балл</th>
+          <th>Тренд</th>
+          <th>Посл. зона</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in dialogs %}
+        <tr class="{{ 'sg-row--red' if d.last_zone == 'red' else '' }}"
+            onclick="location.href='{{ url_for('dialogs.detail', dialog_id=d.id) }}'">
+          <td><b>{{ d.client.name or d.client.phone_normalized if d.client else '—' }}</b>
+            {% if d.client and d.client.name %}<div class="sg-muted sg-sm sg-mono">{{ d.client.phone_normalized }}</div>{% endif %}
+          </td>
+          {% if current_user.is_admin %}<td>{{ d.manager.full_name or d.manager.email if d.manager else '—' }}</td>{% endif %}
+          <td class="sg-mono">{{ d.calls_count }}</td>
+          <td class="sg-mono">{{ d.avg_score if d.avg_score is not none else '—' }}</td>
+          <td>{{ trend_arrow(d.trend) }}</td>
+          <td>{{ zone_badge(d.last_zone) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}
