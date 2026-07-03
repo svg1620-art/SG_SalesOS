@@ -140,14 +140,78 @@ def _all_checklists_for(call):
     return Checklist.query.order_by(Checklist.is_active.desc(), Checklist.name).all()
 
 
+def _radar_data(call):
+    """Данные для радара: критерии + оценки, нормированные к 10."""
+    labels, scores = [], []
+    for cs in call.criterion_scores:
+        labels.append(cs.criterion.title if cs.criterion else "—")
+        max_score = cs.max_score or 10
+        scores.append(round((cs.score or 0) / max_score * 10, 1))
+    return {"labels": labels, "scores": scores}
+
+
+def _split_text_by_quotes(text, quotes):
+    """Разбить строку на части, помечая совпадения с цитатами упущений.
+
+    quotes: список (quote_lower, moment). Возвращает список
+    {text, missed(None|MissedMoment)}. Регистронезависимый поиск.
+    """
+    if not quotes:
+        return [{"text": text, "missed": None}]
+    parts = []
+    low = text.lower()
+    i = 0
+    while i < len(text):
+        best_pos, best = None, None
+        for q, moment in quotes:
+            pos = low.find(q, i)
+            if pos != -1 and (best_pos is None or pos < best_pos):
+                best_pos, best = pos, (q, moment)
+        if best is None:
+            parts.append({"text": text[i:], "missed": None})
+            break
+        q, moment = best
+        if best_pos > i:
+            parts.append({"text": text[i:best_pos], "missed": None})
+        parts.append({"text": text[best_pos:best_pos + len(q)], "missed": moment})
+        i = best_pos + len(q)
+    return parts
+
+
+def _annotate_transcript(call):
+    """Транскрипт с разметкой упущенных моментов для инлайн-подсветки."""
+    quotes = []
+    for moment in call.missed_moments:
+        q = (moment.quote or "").strip().lower()
+        if q:
+            quotes.append((q, moment))
+    annotated = []
+    for seg in call.transcript_json or []:
+        annotated.append(
+            {
+                "speaker": seg.get("speaker"),
+                "parts": _split_text_by_quotes(seg.get("text") or "", quotes),
+            }
+        )
+    return annotated
+
+
+def _panel_context(call):
+    """Общий контекст для карточки/панели."""
+    return {
+        "call": call,
+        "in_progress": IN_PROGRESS,
+        "checklists": _all_checklists_for(call),
+        "radar": _radar_data(call),
+        "annotated": _annotate_transcript(call),
+    }
+
+
 @calls_bp.route("/<int:call_id>")
 @login_required
 def detail(call_id):
     call = _get_call_or_404(call_id)
-    return render_template(
-        "calls/detail.html", call=call, in_progress=IN_PROGRESS,
-        checklists=_all_checklists_for(call),
-    )
+    return render_template("calls/detail.html", **_panel_context(call))
 
 
 @calls_bp.route("/<int:call_id>/panel")
@@ -155,10 +219,7 @@ def detail(call_id):
 def panel(call_id):
     """HTMX-фрагмент: статус во время обработки, результат по готовности."""
     call = _get_call_or_404(call_id)
-    return render_template(
-        "calls/_panel.html", call=call, in_progress=IN_PROGRESS,
-        checklists=_all_checklists_for(call),
-    )
+    return render_template("calls/_panel.html", **_panel_context(call))
 
 
 @calls_bp.route("/<int:call_id>/reprocess", methods=["POST"])

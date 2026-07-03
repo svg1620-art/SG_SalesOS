@@ -69,6 +69,12 @@
     {% if call.criterion_scores %}
     <div class="sg-card sg-card--pad">
       <h3 class="sg-h3">Скоркарта по критериям</h3>
+      {% if radar and radar.labels|length >= 3 %}
+      <div class="sg-radar-wrap">
+        <canvas class="sg-radar" data-call-id="{{ call.id }}"></canvas>
+        <script type="application/json" id="radar-data-{{ call.id }}">{{ radar | tojson }}</script>
+      </div>
+      {% endif %}
       <table class="sg-table">
         <thead><tr><th>Критерий</th><th>Балл</th><th>Доказательство / комментарий</th></tr></thead>
         <tbody>
@@ -114,14 +120,19 @@
     </div>
     {% endif %}
 
-    {% if call.transcript_json %}
+    {% if annotated %}
     <div class="sg-card sg-card--pad">
-      <h3 class="sg-h3">Транскрибация</h3>
+      <h3 class="sg-h3">Транскрибация
+        {% if call.missed_moments %}<span class="sg-muted sg-sm">— упущения подсвечены</span>{% endif %}
+      </h3>
       <div class="sg-transcript">
-        {% for seg in call.transcript_json %}
+        {% for seg in annotated %}
         <div class="sg-line sg-line--{{ seg.speaker }}">
           <span class="sg-line__who">{{ speaker_name(seg.speaker) }}</span>
-          <span class="sg-line__text">{{ seg.text }}</span>
+          <span class="sg-line__text">{%- for p in seg.parts -%}
+            {%- if p.missed -%}<mark class="sg-mark" tabindex="0" data-tip="{{ p.missed.label }}{% if p.missed.explanation %} — {{ p.missed.explanation }}{% endif %}">{{ p.text }}</mark>
+            {%- else -%}{{ p.text }}{%- endif -%}
+          {%- endfor -%}</span>
         </div>
         {% endfor %}
       </div>
