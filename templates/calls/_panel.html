@@ -1,0 +1,116 @@
+{% from "_macros.html" import zone_badge, status_label, speaker_name %}
+<div id="call-panel"
+     {% if call.status in in_progress %}
+       hx-get="{{ url_for('calls.panel', call_id=call.id) }}"
+       hx-trigger="every 3s"
+       hx-swap="outerHTML"
+     {% endif %}>
+
+  {% if call.status in in_progress %}
+    <div class="sg-card sg-card--pad sg-processing">
+      <div class="sg-spinner"></div>
+      <div>
+        <div class="sg-processing__title">Обработка звонка…</div>
+        <div class="sg-muted sg-sm">Текущий шаг: {{ status_label(call.status) }}</div>
+      </div>
+    </div>
+    <ol class="sg-steps">
+      {% set order = ['transcribing', 'analyzing', 'done'] %}
+      <li class="{{ 'sg-step--active' if call.status == 'transcribing' else 'sg-step--done' if call.status in ['analyzing'] else '' }}">Транскрибация</li>
+      <li class="{{ 'sg-step--active' if call.status == 'analyzing' else '' }}">Анализ Claude</li>
+      <li>Готово</li>
+    </ol>
+
+  {% elif call.status == 'failed' %}
+    <div class="sg-card sg-card--pad sg-fail">
+      <div class="sg-fail__title">🔴 Обработка не удалась</div>
+      <pre class="sg-error-text">{{ call.error or 'Неизвестная ошибка.' }}</pre>
+      {% if current_user.is_admin %}
+      <form method="post" action="{{ url_for('calls.reprocess', call_id=call.id) }}">
+        <button class="sg-btn sg-btn--primary" type="submit">Повторить обработку</button>
+      </form>
+      {% endif %}
+    </div>
+
+  {% else %}
+    {# done #}
+    <div class="sg-scorehead">
+      <div class="sg-scorehead__num sg-mono">{{ call.overall_score if call.overall_score is not none else '—' }}<span class="sg-scorehead__max">/100</span></div>
+      <div>{{ zone_badge(call.zone) }}</div>
+      {% if current_user.is_admin %}
+      <form method="post" action="{{ url_for('calls.reprocess', call_id=call.id) }}" class="sg-scorehead__re">
+        <button class="sg-btn sg-btn--sm" type="submit">↻ Переоценить</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if call.summary %}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Саммери</h3>
+      <p>{{ call.summary }}</p>
+    </div>
+    {% endif %}
+
+    {% if call.criterion_scores %}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Скоркарта по критериям</h3>
+      <table class="sg-table">
+        <thead><tr><th>Критерий</th><th>Балл</th><th>Доказательство / комментарий</th></tr></thead>
+        <tbody>
+          {% for cs in call.criterion_scores %}
+          <tr class="{{ 'sg-row--red' if cs.is_missed else '' }}">
+            <td>
+              {{ cs.criterion.title if cs.criterion else '—' }}
+              {% if cs.criterion and cs.criterion.is_critical %}<span class="sg-crit-tag">⚠️</span>{% endif %}
+            </td>
+            <td class="sg-mono">{{ cs.score }}/{{ cs.max_score }}</td>
+            <td class="sg-sm">
+              {% if cs.evidence %}<div class="sg-evidence">«{{ cs.evidence }}»</div>{% endif %}
+              {% if cs.comment %}<div class="sg-muted">{{ cs.comment }}</div>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if call.recommendations %}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Рекомендации по навыкам</h3>
+      {% for r in call.recommendations %}
+      <div class="sg-rec sg-rec--{{ r.priority }}">
+        <span class="sg-rec__prio">{{ {'high':'Высокий','med':'Средний','low':'Низкий'}.get(r.priority, r.priority) }}</span>
+        {% if r.skill %}<b>{{ r.skill }}.</b>{% endif %} {{ r.text }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if call.missed_moments %}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Упущенные моменты</h3>
+      {% for m in call.missed_moments %}
+      <div class="sg-missed">
+        <b>{{ m.label }}</b>
+        {% if m.explanation %}<div class="sg-muted sg-sm">{{ m.explanation }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if call.transcript_json %}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Транскрибация</h3>
+      <div class="sg-transcript">
+        {% for seg in call.transcript_json %}
+        <div class="sg-line sg-line--{{ seg.speaker }}">
+          <span class="sg-line__who">{{ speaker_name(seg.speaker) }}</span>
+          <span class="sg-line__text">{{ seg.text }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  {% endif %}
+</div>

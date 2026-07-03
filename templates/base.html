@@ -20,9 +20,10 @@
     <nav class="sg-topbar__nav">
       {% if current_user.is_admin %}
         <a href="{{ url_for('dashboard.index') }}">Дашборд</a>
+        <a href="{{ url_for('calls.index') }}">Звонки</a>
         <a href="{{ url_for('checklists.index') }}">Чек-листы</a>
       {% else %}
-        <a href="{{ url_for('dashboard.manager_home') }}">Мои звонки</a>
+        <a href="{{ url_for('calls.index') }}">Мои звонки</a>
       {% endif %}
     </nav>
     <div class="sg-topbar__user">

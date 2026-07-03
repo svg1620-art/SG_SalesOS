@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import zone_badge, status_label %}
+{% block title %}Звонки — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-page__head">
+    <h1 class="sg-h1">{{ 'Звонки' if current_user.is_admin else 'Мои звонки' }}</h1>
+    {% if current_user.is_admin %}
+    <a class="sg-btn sg-btn--primary" href="{{ url_for('calls.upload') }}">+ Загрузить звонок</a>
+    {% endif %}
+  </div>
+
+  {% if not calls %}
+    <div class="sg-placeholder">
+      Пока нет звонков.
+      {% if current_user.is_admin %}Загрузите первый через «+ Загрузить звонок».{% endif %}
+    </div>
+  {% else %}
+    <table class="sg-table">
+      <thead>
+        <tr>
+          <th>Дата</th>
+          {% if current_user.is_admin %}<th>Менеджер</th>{% endif %}
+          <th>Клиент</th>
+          <th>Напр.</th>
+          <th>Статус</th>
+          <th>Балл</th>
+          <th>Зона</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in calls %}
+        <tr class="{{ 'sg-row--red' if c.zone == 'red' else '' }}"
+            onclick="location.href='{{ url_for('calls.detail', call_id=c.id) }}'">
+          <td class="sg-mono sg-sm">{{ c.started_at.strftime('%d.%m %H:%M') if c.started_at else '—' }}</td>
+          {% if current_user.is_admin %}
+          <td>{{ c.manager.full_name or c.manager.email if c.manager else '—' }}</td>
+          {% endif %}
+          <td>{{ c.client.name or c.client.phone_normalized if c.client else '—' }}</td>
+          <td class="sg-sm">{{ 'вх' if c.direction == 'in' else 'исх' if c.direction == 'out' else '—' }}</td>
+          <td>{{ status_label(c.status) }}</td>
+          <td class="sg-mono">{{ c.overall_score if c.overall_score is not none else '—' }}</td>
+          <td>{{ zone_badge(c.zone) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

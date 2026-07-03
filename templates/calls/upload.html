@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Загрузка звонка — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('calls.index') }}">Звонки</a> / Загрузка
+  </div>
+  <h1 class="sg-h1">Загрузить звонок</h1>
+
+  {% if not active_checklist %}
+    <div class="sg-flash sg-flash--warning">
+      Нет активного чек-листа. <a href="{{ url_for('checklists.index') }}">Активируйте чек-лист</a>,
+      иначе звонок не по чему оценивать.
+    </div>
+  {% else %}
+    <p class="sg-muted sg-sm">Оценка по активному чек-листу: <b>{{ active_checklist.name }}</b></p>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="sg-form sg-form--wide"
+        action="{{ url_for('calls.upload') }}">
+    <label class="sg-field">
+      <span class="sg-field__label">Аудиофайл (mp3/wav/m4a…)</span>
+      <input class="sg-input" type="file" name="audio" accept="audio/*" required>
+    </label>
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Менеджер</span>
+        <select class="sg-input" name="manager_id">
+          <option value="">— не указан —</option>
+          {% for m in managers %}
+          <option value="{{ m.id }}" {{ 'selected' if form.get('manager_id')|string == m.id|string }}>
+            {{ m.full_name or m.email }} ({{ m.role }})
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Направление</span>
+        <select class="sg-input" name="direction">
+          <option value="in" {{ 'selected' if form.get('direction') != 'out' }}>Входящий</option>
+          <option value="out" {{ 'selected' if form.get('direction') == 'out' }}>Исходящий</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Телефон клиента</span>
+        <input class="sg-input" name="phone" value="{{ form.get('phone', '') }}"
+               placeholder="+7 912 345-67-89" required>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Имя клиента (необязательно)</span>
+        <input class="sg-input" name="client_name" value="{{ form.get('client_name', '') }}">
+      </label>
+    </div>
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Дата и время звонка</span>
+        <input class="sg-input" type="datetime-local" name="started_at" value="{{ form.get('started_at', '') }}">
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Канал менеджера (для стерео)</span>
+        <select class="sg-input" name="manager_channel">
+          <option value="">Авто (по направлению)</option>
+          <option value="0" {{ 'selected' if form.get('manager_channel') == '0' }}>Левый (L)</option>
+          <option value="1" {{ 'selected' if form.get('manager_channel') == '1' }}>Правый (R)</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="sg-actions">
+      <a class="sg-btn" href="{{ url_for('calls.index') }}">Отмена</a>
+      <button class="sg-btn sg-btn--primary" type="submit" {{ 'disabled' if not active_checklist }}>
+        Загрузить и обработать
+      </button>
+    </div>
+  </form>
+</section>
+{% endblock %}

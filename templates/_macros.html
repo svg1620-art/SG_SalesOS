@@ -1,0 +1,22 @@
+{# Общие макросы отображения #}
+
+{% macro zone_badge(zone) %}
+  {% if zone == 'green' %}<span class="sg-zone-badge sg-zone-badge--green">🟢 Зелёная</span>
+  {% elif zone == 'yellow' %}<span class="sg-zone-badge sg-zone-badge--yellow">🟡 Жёлтая</span>
+  {% elif zone == 'red' %}<span class="sg-zone-badge sg-zone-badge--red">🔴 Красная</span>
+  {% else %}<span class="sg-zone-badge">—</span>{% endif %}
+{% endmacro %}
+
+{% macro status_label(status) %}
+  {% set map = {
+    'new': 'В очереди', 'downloading': 'Загрузка',
+    'transcribing': 'Транскрибация', 'analyzing': 'Анализ',
+    'done': 'Готово', 'failed': 'Ошибка'} %}
+  <span class="sg-status sg-status--{{ status }}">{{ map.get(status, status) }}</span>
+{% endmacro %}
+
+{% macro speaker_name(sp) %}
+  {%- if sp == 'manager' -%}Менеджер
+  {%- elif sp == 'client' -%}Клиент
+  {%- else -%}Говорящий{%- endif -%}
+{% endmacro %}
