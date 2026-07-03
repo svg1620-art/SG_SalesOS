@@ -1,14 +1,118 @@
 {% extends "base.html" %}
-{% block title %}Мои звонки — SG SalesOS{% endblock %}
+{% from "_macros.html" import zone_badge %}
+{% block title %}Кабинет — SG SalesOS{% endblock %}
 
 {% block content %}
 <section class="sg-page">
-  <h1 class="sg-h1">Кабинет менеджера</h1>
-  <p class="sg-muted">Здесь будут ваши звонки, тренд балла и рекомендации по навыкам (Этап 7).</p>
+  <h1 class="sg-h1">Мой кабинет</h1>
 
-  <div class="sg-placeholder">
-    <span class="sg-placeholder__badge">Этап 7</span>
-    Свои звонки, упущенные моменты и блок «что улучшить на этой неделе».
+  {# --- KPI --- #}
+  <div class="sg-cards">
+    <div class="sg-card">
+      <div class="sg-card__label">Мой средний балл</div>
+      <div class="sg-card__value sg-mono">{{ avg_score if avg_score is not none else '—' }}</div>
+    </div>
+    <div class="sg-card">
+      <div class="sg-card__label">Звонков оценено</div>
+      <div class="sg-card__value sg-mono">{{ calls_count }}</div>
+    </div>
+    <div class="sg-card">
+      <div class="sg-card__label">Мои зоны</div>
+      <div class="sg-card__value">
+        <span class="sg-zone sg-zone--green">{{ zones.green }}</span>
+        <span class="sg-zone sg-zone--yellow">{{ zones.yellow }}</span>
+        <span class="sg-zone sg-zone--red">{{ zones.red }}</span>
+      </div>
+    </div>
   </div>
+
+  {# --- Что улучшить на этой неделе --- #}
+  {% if focus %}
+  <div class="sg-card sg-card--pad sg-focus">
+    <h3 class="sg-h3">🎯 Что улучшить на этой неделе</h3>
+    <div class="sg-focus-list">
+      {% for f in focus %}
+      <div class="sg-focus-item">
+        <div class="sg-focus-skill">{{ f.skill }} <span class="sg-muted sg-sm">×{{ f.count }}</span></div>
+        {% if f.example %}<div class="sg-muted sg-sm">{{ f.example }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="sg-dash-grid">
+    {# --- Тренд балла --- #}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Тренд балла</h3>
+      {% if trend.labels|length >= 2 %}
+      <div class="sg-line-wrap">
+        <canvas class="sg-linechart" data-line='{{ trend | tojson }}'></canvas>
+      </div>
+      {% else %}
+      <p class="sg-muted">Нужно ≥2 оценённых звонка для графика.</p>
+      {% endif %}
+    </div>
+
+    {# --- Рекомендации по навыкам --- #}
+    <div class="sg-card sg-card--pad">
+      <h3 class="sg-h3">Рекомендации по навыкам</h3>
+      {% if skills %}
+      <table class="sg-table">
+        <thead><tr><th>Навык</th><th>Повторов</th><th>Приоритет</th></tr></thead>
+        <tbody>
+          {% for s in skills %}
+          <tr>
+            <td>{{ s.skill }}
+              {% if s.example %}<div class="sg-muted sg-sm">{{ s.example }}</div>{% endif %}
+            </td>
+            <td class="sg-mono">{{ s.count }}</td>
+            <td><span class="sg-rec__prio sg-prio--{{ s.priority }}">{{ {'high':'Высокий','med':'Средний','low':'Низкий'}.get(s.priority, s.priority) }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="sg-muted">Пока нет рекомендаций.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- Упущенные моменты --- #}
+  {% if missed %}
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Частые упущенные моменты</h3>
+    {% for m in missed %}
+    <div class="sg-missed">
+      <b>{{ m.label }}</b>
+      {% if m.explanation %}<div class="sg-muted sg-sm">{{ m.explanation }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# --- Мои последние звонки --- #}
+  <div class="sg-page__head" style="margin-top:20px">
+    <h3 class="sg-h3">Мои последние звонки</h3>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.index') }}">Все мои звонки</a>
+  </div>
+  {% if recent_calls %}
+  <table class="sg-table">
+    <thead><tr><th>Дата</th><th>Клиент</th><th>Балл</th><th>Зона</th></tr></thead>
+    <tbody>
+      {% for c in recent_calls %}
+      <tr class="{{ 'sg-row--red' if c.zone == 'red' else '' }}"
+          onclick="location.href='{{ url_for('calls.detail', call_id=c.id) }}'">
+        <td class="sg-mono sg-sm">{{ c.started_at.strftime('%d.%m %H:%M') if c.started_at else '—' }}</td>
+        <td>{{ c.client.name or c.client.phone_normalized if c.client else '—' }}</td>
+        <td class="sg-mono">{{ c.overall_score if c.overall_score is not none else '—' }}</td>
+        <td>{{ zone_badge(c.zone) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="sg-placeholder">У вас пока нет обработанных звонков.</div>
+  {% endif %}
 </section>
 {% endblock %}

@@ -403,3 +403,14 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 @media (max-width: 780px) {
   .sg-dash-grid { grid-template-columns: 1fr; }
 }
+
+/* --- Кабинет менеджера (Этап 7) --- */
+.sg-line-wrap { height: 240px; }
+.sg-line-wrap canvas { width: 100% !important; height: 100% !important; }
+.sg-focus { border-left: 3px solid var(--sg-cyan); }
+.sg-focus-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
+.sg-focus-item { padding: 12px; background: var(--sg-surface-2); border-radius: var(--sg-radius-sm); }
+.sg-focus-skill { font-weight: 700; margin-bottom: 4px; }
+.sg-prio--high { color: var(--sg-red); }
+.sg-prio--med { color: var(--sg-yellow); }
+.sg-prio--low { color: var(--sg-cyan); }
