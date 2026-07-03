@@ -92,7 +92,7 @@ def analyze_call(call, checklist) -> dict:
     prompt = build_analysis_prompt(
         checklist, call.transcript_json or [], call.diarization or "heuristic"
     )
-    raw = claude_complete(prompt, system=_SYSTEM, max_tokens=4000, temperature=0.2)
+    raw = claude_complete(prompt, system=_SYSTEM, max_tokens=4000)
     data = extract_json(raw)
     if not isinstance(data, dict):
         raise ValueError("Модель вернула не JSON-объект анализа.")
