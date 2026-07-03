@@ -4,13 +4,14 @@
 """
 from datetime import datetime, timedelta
 
-from flask import Blueprint, render_template, redirect, url_for, request
+from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 
 from collections import defaultdict
 
 from extensions import db
-from models import Call, User, Recommendation, MissedMoment
+from models import Call, User, Recommendation, MissedMoment, DailyDigest
+from auth.decorators import admin_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -120,12 +121,16 @@ def index():
     feed.sort(key=lambda c: c.started_at or c.created_at, reverse=True)
     feed = feed[:100]
 
+    # --- дневная сводка (последняя) ---
+    digest = DailyDigest.query.order_by(DailyDigest.date.desc()).first()
+
     return render_template(
         "dashboard/index.html",
         kpi=kpi,
         leaderboard=leaderboard,
         feed=feed,
         managers=managers,
+        digest=digest,
         filters={
             "from": date_from.strftime("%Y-%m-%d"),
             "to": date_to_raw.strftime("%Y-%m-%d"),
@@ -133,6 +138,21 @@ def index():
             "zone": zone,
         },
     )
+
+
+@dashboard_bp.route("/digest/refresh", methods=["POST"])
+@admin_required
+def digest_refresh():
+    """Сформировать/обновить дневную сводку прямо сейчас."""
+    from flask import current_app
+    from digest.daily import generate_daily_digest
+
+    try:
+        generate_daily_digest(current_app._get_current_object())
+        flash("Сводка обновлена.", "success")
+    except Exception as exc:  # noqa: BLE001
+        flash(f"Не удалось сформировать сводку: {exc}", "error")
+    return redirect(url_for("dashboard.index"))
 
 
 _PRIORITY_WEIGHT = {"high": 3, "med": 2, "low": 1}

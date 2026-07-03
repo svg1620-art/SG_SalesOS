@@ -10,7 +10,12 @@
 
 {% block content %}
 <section class="sg-page">
-  <h1 class="sg-h1">Диалоги</h1>
+  <div class="sg-page__head">
+    <h1 class="sg-h1">Диалоги</h1>
+    {% if current_user.is_admin %}
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('dialogs.export_csv') }}">⭳ Экспорт CSV</a>
+    {% endif %}
+  </div>
   <p class="sg-muted sg-sm">Звонки, сгруппированные по клиенту (нормализованному номеру телефона).</p>
 
   {% if not dialogs %}

@@ -58,8 +58,14 @@ class Config:
     # --- Фон/расписание ---
     POLL_INTERVAL_MIN = int(os.environ.get("POLL_INTERVAL_MIN", "15"))
     DIGEST_HOUR = int(os.environ.get("DIGEST_HOUR", "20"))
+    TELEGRAM_HOUR = int(os.environ.get("TELEGRAM_HOUR", "19"))
     TZ = os.environ.get("TZ", "Europe/Moscow")
     SCHEDULER_ENABLED = _bool(os.environ.get("SCHEDULER_ENABLED"), default=False)
+
+    # --- Telegram (дневной пульс) ---
+    TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+    # получатели: chat_id через запятую (РОП, владелец)
+    TELEGRAM_CHAT_IDS = os.environ.get("TELEGRAM_CHAT_IDS", "")
 
     # --- amoCRM (используется с Этапа 8, читаем заранее) ---
     AMO_BASE_DOMAIN = os.environ.get("AMO_BASE_DOMAIN")

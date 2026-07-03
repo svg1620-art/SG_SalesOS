@@ -7,7 +7,8 @@ builder = "NIXPACKS"
 
 [deploy]
 # Миграции применяются автоматически перед стартом веб-процесса.
-startCommand = "flask --app app db upgrade && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+# 1 воркер + потоки: APScheduler (пульс/сводка) не должен дублироваться.
+startCommand = "flask --app app db upgrade && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120"
 healthcheckPath = "/healthz"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"

@@ -1,9 +1,13 @@
-"""Диалоги: агрегаты звонков по клиенту. Список и карточка диалога."""
-from flask import Blueprint, render_template, abort
+"""Диалоги: агрегаты звонков по клиенту. Список, карточка, экспорт."""
+import csv
+import io
+
+from flask import Blueprint, render_template, abort, Response
 from flask_login import login_required, current_user
 
 from extensions import db
 from models import Dialog, Call
+from auth.decorators import admin_required
 
 dialogs_bp = Blueprint("dialogs", __name__, url_prefix="/dialogs")
 
@@ -37,3 +41,36 @@ def detail(dialog_id):
             abort(403)
 
     return render_template("dialogs/detail.html", dialog=dialog, calls=calls)
+
+
+@dialogs_bp.route("/export.csv")
+@admin_required
+def export_csv():
+    """Выгрузка всех диалогов в CSV (для анализа)."""
+    dialogs = Dialog.query.all()
+    dialogs.sort(key=lambda d: d.updated_at or d.id, reverse=True)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow([
+        "id", "телефон клиента", "имя клиента", "менеджер",
+        "звонков", "средний_балл", "последняя_зона", "тренд", "обновлён",
+    ])
+    for d in dialogs:
+        writer.writerow([
+            d.id,
+            d.client.phone_normalized if d.client else "",
+            (d.client.name or "") if d.client else "",
+            (d.manager.full_name or d.manager.email) if d.manager else "",
+            d.calls_count,
+            d.avg_score if d.avg_score is not None else "",
+            d.last_zone or "",
+            d.trend or "",
+            d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "",
+        ])
+    data = "﻿" + buf.getvalue()
+    return Response(
+        data,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=dialogs_export.csv"},
+    )
