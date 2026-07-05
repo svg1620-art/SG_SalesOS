@@ -98,3 +98,12 @@ def amo_entity(app=None) -> str:
 
 def amo_configured(app=None) -> bool:
     return bool(amo_base_domain(app) and amo_access_token(app))
+
+
+def amo_since_days(app=None) -> int:
+    """За сколько последних дней брать звонки на ПЕРВОМ опросе (без курсора)."""
+    val = get_setting("amo_since_days")
+    try:
+        return max(1, int(val))
+    except (TypeError, ValueError):
+        return 3

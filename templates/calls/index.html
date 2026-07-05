@@ -10,6 +10,10 @@
     <div class="sg-actions">
       <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_csv') }}">⭳ CSV</a>
       <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_txt') }}">⭳ TXT</a>
+      <form method="post" action="{{ url_for('calls.delete_failed') }}"
+            onsubmit="return confirm('Удалить все звонки со статусом «ошибка»?');">
+        <button class="sg-btn sg-btn--sm sg-btn--danger" type="submit">Удалить неуспешные</button>
+      </form>
       <a class="sg-btn sg-btn--primary" href="{{ url_for('calls.upload') }}">+ Загрузить звонок</a>
     </div>
     {% endif %}
