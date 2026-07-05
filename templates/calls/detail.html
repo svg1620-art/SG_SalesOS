@@ -13,7 +13,10 @@
       {{ call.client.name or call.client.phone_normalized if call.client else 'Звонок' }}
       <span class="sg-sm sg-muted">#{{ call.id }}</span>
     </h1>
-    <div>{{ zone_badge(call.zone) }}</div>
+    <div class="sg-actions">
+      {% if amo_url %}<a class="sg-btn sg-btn--sm" href="{{ amo_url }}" target="_blank" rel="noopener">↗ Открыть в amoCRM</a>{% endif %}
+      {{ zone_badge(call.zone) }}
+    </div>
   </div>
 
   <div class="sg-card sg-card--pad sg-meta">

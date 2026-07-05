@@ -237,6 +237,8 @@ def poll_amo(app=None) -> dict:
 
             call = Call(
                 amo_note_id=note_id,
+                amo_entity_type=entity,
+                amo_entity_id=note.get("entity_id"),
                 manager_id=manager.id if manager else None,
                 client_id=client_obj.id,
                 checklist_id=active.id if active else None,
@@ -246,6 +248,10 @@ def poll_amo(app=None) -> dict:
                 source_link=link,
                 status="new",
             )
+
+            # сохраняем id контакта amoCRM на клиента (для ссылки в CRM)
+            if entity == "contacts" and note.get("entity_id") and not client_obj.amo_contact_id:
+                client_obj.amo_contact_id = note.get("entity_id")
 
             # запись НЕ качаем здесь (иначе опрос упирается в таймаут запроса) —
             # скачает фоновый worker перед транскрибацией

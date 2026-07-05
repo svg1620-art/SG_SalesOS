@@ -168,6 +168,9 @@ class Call(db.Model):
     checklist_id = db.Column(db.Integer, db.ForeignKey("checklists.id"), nullable=True)
 
     amo_note_id = db.Column(db.BigInteger, unique=True, nullable=True)
+    # сущность amoCRM, к которой привязано примечание-звонок (для ссылки в CRM)
+    amo_entity_type = db.Column(db.String(20))  # contacts|leads
+    amo_entity_id = db.Column(db.BigInteger)
     direction = db.Column(db.String(3))  # in|out
     started_at = db.Column(db.DateTime)
     duration_sec = db.Column(db.Integer)

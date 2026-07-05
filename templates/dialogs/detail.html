@@ -11,7 +11,10 @@
 
   <div class="sg-page__head">
     <h1 class="sg-h1">{{ dialog.client.name or dialog.client.phone_normalized if dialog.client else 'Диалог' }}</h1>
-    <div>{{ zone_badge(dialog.last_zone) }}</div>
+    <div class="sg-actions">
+      {% if amo_url %}<a class="sg-btn sg-btn--sm" href="{{ amo_url }}" target="_blank" rel="noopener">↗ Открыть в amoCRM</a>{% endif %}
+      {{ zone_badge(dialog.last_zone) }}
+    </div>
   </div>
 
   <div class="sg-card sg-card--pad sg-meta">

@@ -80,6 +80,16 @@ def extract_json(text: str):
     raise ValueError("Не удалось извлечь валидный JSON из ответа модели.")
 
 
+def amo_entity_url(domain, entity_type, entity_id):
+    """Прямая ссылка на карточку сущности amoCRM (контакт/сделка) или None."""
+    if not (domain and entity_type and entity_id):
+        return None
+    domain = str(domain).replace("https://", "").replace("http://", "").strip("/")
+    # amoCRM: /contacts/detail/{id}, /leads/detail/{id}
+    path = "leads" if entity_type == "leads" else "contacts"
+    return f"https://{domain}/{path}/detail/{entity_id}"
+
+
 _PHONE_RE = re.compile(r"\D")
 
 
