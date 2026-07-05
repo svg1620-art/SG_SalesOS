@@ -14,6 +14,10 @@ _KEYS = {
     "telegram_chat_ids": "TELEGRAM_CHAT_IDS",
     "telegram_hour": "TELEGRAM_HOUR",
     "digest_hour": "DIGEST_HOUR",
+    "amo_base_domain": "AMO_BASE_DOMAIN",
+    "amo_access_token": "AMO_ACCESS_TOKEN",
+    "amo_entity": "AMO_ENTITY",
+    # amo_last_sync — только в БД, без env
 }
 
 
@@ -73,3 +77,24 @@ def telegram_hour(app=None) -> int:
 
 def digest_hour(app=None) -> int:
     return _int_setting("digest_hour", app, 20)
+
+
+def amo_base_domain(app=None):
+    val = effective("amo_base_domain", app)
+    if not val:
+        return None
+    # нормализуем: без схемы и слэшей
+    return val.strip().replace("https://", "").replace("http://", "").strip("/")
+
+
+def amo_access_token(app=None):
+    return effective("amo_access_token", app)
+
+
+def amo_entity(app=None) -> str:
+    val = effective("amo_entity", app)
+    return (val or "contacts").strip()
+
+
+def amo_configured(app=None) -> bool:
+    return bool(amo_base_domain(app) and amo_access_token(app))

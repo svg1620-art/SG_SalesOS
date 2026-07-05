@@ -4,7 +4,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from auth.decorators import admin_required
 from settings_store import (
     get_setting, set_setting, telegram_chat_ids, telegram_hour, digest_hour,
-    telegram_token,
+    telegram_token, amo_base_domain, amo_access_token, amo_entity, amo_configured,
 )
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
@@ -30,6 +30,12 @@ def index():
         digest_hour=digest_hour(),
         scheduler_running=scheduler.running,
         scheduler_enabled=bool(current_app.config.get("SCHEDULER_ENABLED")),
+        amo_domain=amo_base_domain() or "",
+        amo_token_set=bool(amo_access_token()),
+        amo_entity=amo_entity(),
+        amo_configured=amo_configured(),
+        amo_last_sync=get_setting("amo_last_sync"),
+        poll_min=current_app.config.get("POLL_INTERVAL_MIN"),
     )
 
 
@@ -53,6 +59,57 @@ def save():
     reschedule_jobs(current_app._get_current_object())
 
     flash("Настройки сохранены.", "success")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/amo", methods=["POST"])
+@admin_required
+def save_amo():
+    domain = (request.form.get("amo_base_domain") or "").strip()
+    domain = domain.replace("https://", "").replace("http://", "").strip("/")
+    set_setting("amo_base_domain", domain)
+
+    token = (request.form.get("amo_access_token") or "").strip()
+    if token == "__clear__":
+        set_setting("amo_access_token", "")
+    elif token:
+        set_setting("amo_access_token", token)
+
+    entity = request.form.get("amo_entity") or "contacts"
+    set_setting("amo_entity", entity if entity in ("contacts", "leads") else "contacts")
+
+    flash("Настройки amoCRM сохранены.", "success")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/amo/test", methods=["POST"])
+@admin_required
+def amo_test():
+    from ingest.amo_source import test_connection
+
+    ok, message = test_connection(current_app._get_current_object())
+    flash(message, "success" if ok else "error")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/amo/poll", methods=["POST"])
+@admin_required
+def amo_poll():
+    from ingest.amo_source import poll_amo
+
+    try:
+        result = poll_amo(current_app._get_current_object())
+    except Exception as exc:  # noqa: BLE001
+        flash(f"Ошибка опроса: {exc}", "error")
+        return redirect(url_for("settings.index"))
+
+    if result.get("ok"):
+        flash(
+            f"Опрос выполнен: новых звонков {result['new']}, ошибок {result['errors']}.",
+            "success",
+        )
+    else:
+        flash(f"Опрос не выполнен: {result.get('error')}", "error")
     return redirect(url_for("settings.index"))
 
 
