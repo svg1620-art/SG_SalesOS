@@ -61,6 +61,8 @@ class Config:
     TELEGRAM_HOUR = int(os.environ.get("TELEGRAM_HOUR", "19"))
     TZ = os.environ.get("TZ", "Europe/Moscow")
     SCHEDULER_ENABLED = _bool(os.environ.get("SCHEDULER_ENABLED"), default=False)
+    # сколько звонков обрабатывать параллельно (ограниченный пул воркеров)
+    WORKER_CONCURRENCY = int(os.environ.get("WORKER_CONCURRENCY", "2"))
 
     # --- Telegram (дневной пульс) ---
     TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
