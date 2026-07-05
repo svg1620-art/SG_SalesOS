@@ -124,46 +124,19 @@ def _maybe_start_scheduler(app: Flask) -> None:
     if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
         return
 
-    def _run_pulse():
-        with app.app_context():
-            from notify.telegram import send_daily_pulse
-            send_daily_pulse(app)
-
-    def _run_digest():
-        with app.app_context():
-            from digest.daily import generate_daily_digest
-            generate_daily_digest(app)
-
     try:
         with app.app_context():
-            _add_schedule_jobs(app, _run_pulse, _run_digest)
+            _add_schedule_jobs(app)
         scheduler.start()
     except Exception as exc:  # noqa: BLE001
         app.logger.warning("[scheduler] не удалось запустить: %s", exc)
 
 
-def _add_schedule_jobs(app: Flask, pulse_fn, digest_fn) -> None:
-    """(Пере)регистрация джоб с часами из настроек (БД→env)."""
+def _add_schedule_jobs(app: Flask) -> None:
+    """(Пере)регистрация джоб: пульс/сводка (часы из настроек) + опрос amoCRM."""
     from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
     from settings_store import telegram_hour, digest_hour
-
-    tz = app.config.get("TZ") or "UTC"
-    t_hour, d_hour = telegram_hour(app), digest_hour(app)
-    scheduler.add_job(
-        pulse_fn, CronTrigger(hour=t_hour, minute=0, timezone=tz),
-        id="telegram_pulse", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        digest_fn, CronTrigger(hour=d_hour, minute=0, timezone=tz),
-        id="daily_digest", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    app.logger.info("[scheduler] пульс %s:00, сводка %s:00 (%s)", t_hour, d_hour, tz)
-
-
-def reschedule_jobs(app: Flask) -> None:
-    """Перепланировать джобы после изменения часов в настройках."""
-    if not scheduler.running:
-        return
 
     def _run_pulse():
         with app.app_context():
@@ -175,9 +148,43 @@ def reschedule_jobs(app: Flask) -> None:
             from digest.daily import generate_daily_digest
             generate_daily_digest(app)
 
+    def _run_amo():
+        with app.app_context():
+            from settings_store import amo_configured
+            if not amo_configured(app):
+                return
+            from ingest.amo_source import poll_amo
+            poll_amo(app)
+
+    tz = app.config.get("TZ") or "UTC"
+    t_hour, d_hour = telegram_hour(app), digest_hour(app)
+    poll_min = max(1, int(app.config.get("POLL_INTERVAL_MIN") or 15))
+
+    scheduler.add_job(
+        _run_pulse, CronTrigger(hour=t_hour, minute=0, timezone=tz),
+        id="telegram_pulse", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _run_digest, CronTrigger(hour=d_hour, minute=0, timezone=tz),
+        id="daily_digest", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _run_amo, IntervalTrigger(minutes=poll_min),
+        id="amo_poll", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    app.logger.info(
+        "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",
+        t_hour, d_hour, poll_min, tz,
+    )
+
+
+def reschedule_jobs(app: Flask) -> None:
+    """Перепланировать джобы после изменения настроек."""
+    if not scheduler.running:
+        return
     try:
         with app.app_context():
-            _add_schedule_jobs(app, _run_pulse, _run_digest)
+            _add_schedule_jobs(app)
     except Exception as exc:  # noqa: BLE001
         app.logger.warning("[scheduler] не удалось перепланировать: %s", exc)
 
@@ -234,6 +241,22 @@ def _register_cli(app: Flask) -> None:
 
         sent = send_daily_pulse(app, force=True)
         click.echo("Пульс отправлен." if sent else "Пульс не отправлен (проверьте TELEGRAM_*).")
+
+    @app.cli.command("amo-test")
+    def amo_test_cmd():
+        """Проверить подключение к amoCRM."""
+        from ingest.amo_source import test_connection
+
+        ok, message = test_connection(app)
+        click.echo(message)
+
+    @app.cli.command("amo-poll")
+    def amo_poll_cmd():
+        """Опросить amoCRM и завести новые звонки (вручную)."""
+        from ingest.amo_source import poll_amo
+
+        result = poll_amo(app)
+        click.echo(str(result))
 
 
 # Экземпляр для gunicorn: `gunicorn app:app`

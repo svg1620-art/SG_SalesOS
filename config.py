@@ -67,8 +67,12 @@ class Config:
     # получатели: chat_id через запятую (РОП, владелец)
     TELEGRAM_CHAT_IDS = os.environ.get("TELEGRAM_CHAT_IDS", "")
 
-    # --- amoCRM (используется с Этапа 8, читаем заранее) ---
+    # --- amoCRM (Этап 8) ---
     AMO_BASE_DOMAIN = os.environ.get("AMO_BASE_DOMAIN")
+    # долгосрочный токен (упрощённый путь вместо OAuth-обмена кодом)
+    AMO_ACCESS_TOKEN = os.environ.get("AMO_ACCESS_TOKEN")
+    AMO_ENTITY = os.environ.get("AMO_ENTITY")  # contacts|leads
+    # OAuth-переменные (запасной путь, если понадобится)
     AMO_CLIENT_ID = os.environ.get("AMO_CLIENT_ID")
     AMO_CLIENT_SECRET = os.environ.get("AMO_CLIENT_SECRET")
     AMO_REDIRECT_URI = os.environ.get("AMO_REDIRECT_URI")

@@ -67,5 +67,58 @@
       <button class="sg-btn" type="submit">📨 Отправить тестовый пульс</button>
     </form>
   </div>
+
+  {# --- amoCRM --- #}
+  <form method="post" action="{{ url_for('settings.save_amo') }}" class="sg-card sg-card--pad">
+    <h3 class="sg-h3">amoCRM (авто-импорт звонков)
+      {% if amo_configured %}<span class="sg-badge sg-badge--active">настроено</span>{% else %}<span class="sg-badge">не настроено</span>{% endif %}
+    </h3>
+    <p class="sg-muted sg-sm">
+      Долгосрочный токен из интеграции amoCRM («Ключи и доступы» → «Сгенерировать токен»).
+      Опрос звонков — каждые {{ poll_min }} мин (нужен <code class="sg-mono">SCHEDULER_ENABLED=true</code>).
+      {% if amo_last_sync %}<br>Последняя синхронизация (unix): <span class="sg-mono">{{ amo_last_sync }}</span>{% endif %}
+    </p>
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Домен аккаунта</span>
+        <input class="sg-input sg-mono" name="amo_base_domain" value="{{ amo_domain }}"
+               placeholder="serviceguru.amocrm.ru">
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Сущность для опроса</span>
+        <select class="sg-input" name="amo_entity">
+          <option value="contacts" {{ 'selected' if amo_entity == 'contacts' }}>Контакты</option>
+          <option value="leads" {{ 'selected' if amo_entity == 'leads' }}>Сделки</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="sg-field">
+      <span class="sg-field__label">Долгосрочный токен
+        {% if amo_token_set %}<span class="sg-badge sg-badge--active">задан</span>{% else %}<span class="sg-badge">не задан</span>{% endif %}
+      </span>
+      <input class="sg-input sg-mono" name="amo_access_token" autocomplete="off"
+             placeholder="{{ 'оставьте пустым, чтобы не менять' if amo_token_set else 'eyJ0eXAiOiJKV1Qi...' }}">
+      {% if amo_token_set %}<span class="sg-muted sg-sm">Чтобы удалить токен, впишите <code class="sg-mono">__clear__</code>.</span>{% endif %}
+    </label>
+
+    <div class="sg-actions">
+      <button class="sg-btn sg-btn--primary" type="submit">Сохранить amoCRM</button>
+    </div>
+  </form>
+
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Проверка amoCRM</h3>
+    <div class="sg-actions">
+      <form method="post" action="{{ url_for('settings.amo_test') }}">
+        <button class="sg-btn" type="submit">🔌 Проверить подключение</button>
+      </form>
+      <form method="post" action="{{ url_for('settings.amo_poll') }}">
+        <button class="sg-btn" type="submit">⬇️ Опросить звонки сейчас</button>
+      </form>
+    </div>
+    <p class="sg-muted sg-sm">Привязка звонка к менеджеру — по полю <b>amoCRM user_id</b> в карточке пользователя.</p>
+  </div>
 </section>
 {% endblock %}
