@@ -18,12 +18,39 @@
     Рейтинг менеджеров отдела продаж по выручке за месяц.
     За каждые {{ '{:,}'.format(xp_step).replace(',', ' ') }} руб — <b>+{{ xp_per_step }} XP</b>.
     Всего выручки за месяц: <b class="sg-mono">{{ total_revenue_fmt }} ₽</b>.
+    <span class="sg-muted sg-sm">Сделок за месяц: {{ deals_this_month }}, всего в базе: {{ total_deals }}.</span>
   </p>
+
+  {% if unattributed %}
+    <div class="sg-flash sg-flash--error">
+      ⚠️ {{ unattributed }} сделок за месяц не привязаны к менеджеру (нет совпадения
+      по amoCRM user_id). Зайдите в «Настройки» → «Синхронизировать пользователей»,
+      затем «Пересобрать сделки».
+    </div>
+  {% endif %}
+
+  {# подсказка: за выбранный месяц пусто, но данные есть в других месяцах #}
+  {% if deals_this_month == 0 and months_with_data %}
+    <div class="sg-flash sg-flash--warning">
+      За {{ month_label }} сделок нет. Данные есть в других месяцах — выберите:
+      <div class="sg-actions" style="margin-top:10px">
+        {% for mo in months_with_data %}
+        <a class="sg-btn sg-btn--sm" href="{{ url_for('leaderboard.index', month=mo.value) }}">{{ mo.label }} ({{ mo.count }})</a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
 
   {% if not has_department %}
     <div class="sg-placeholder">Отдел «Отдел продаж» не найден. Создайте его в разделе «Отделы».</div>
   {% elif not rows %}
-    <div class="sg-placeholder">В отделе продаж пока нет активных менеджеров.</div>
+    <div class="sg-placeholder">
+      {% if total_deals %}
+        За {{ month_label }} сделок нет{% if not months_with_data %}, и в отделе продаж нет активных менеджеров{% endif %}.
+      {% else %}
+        Сделок в базе пока нет. Зайдите в «Настройки» → «Опросить сделки сейчас».
+      {% endif %}
+    </div>
   {% else %}
     {% set leader = rows[0] if rows[0].is_leader else none %}
     {% if leader %}
@@ -63,6 +90,7 @@
           <td>
             {{ r.name }}
             {% if r.is_leader %}<span class="sg-badge sg-badge--leader">лидер</span>{% endif %}
+            {% if not r.in_sales %}<span class="sg-badge sg-badge--excluded" title="Не привязан к отделу продаж — назначьте отдел в разделе «Пользователи»">вне отдела</span>{% endif %}
           </td>
           <td class="sg-mono"><b>{{ r.revenue_fmt }} ₽</b></td>
           <td class="sg-mono">{{ r.deals }}</td>

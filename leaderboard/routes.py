@@ -9,6 +9,7 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, abort
 from flask_login import login_required, current_user
 
+from extensions import db
 from models import Deal, User, Department
 from ingest.amo_deals import xp_for_revenue, XP_STEP_RUB, XP_PER_STEP
 
@@ -71,15 +72,27 @@ def index():
     # выручка за месяц по менеджеру
     deals = Deal.query.filter(Deal.won_at >= start, Deal.won_at < end).all()
     revenue_by_mgr, deals_by_mgr = {}, {}
+    unattributed = 0  # сделки без привязки к менеджеру (нет amo_user_id)
     for d in deals:
         if d.manager_id is None:
+            unattributed += 1
             continue
         revenue_by_mgr[d.manager_id] = revenue_by_mgr.get(d.manager_id, 0) + (d.price or 0)
         deals_by_mgr[d.manager_id] = deals_by_mgr.get(d.manager_id, 0) + 1
 
+    # показываем не только формально привязанных к отделу, но и любого менеджера,
+    # у кого есть сделки за месяц (частая ситуация: продавец не отмечен в отделе)
+    shown_ids = {m.id for m in managers}
+    extra_ids = [mid for mid in revenue_by_mgr if mid not in shown_ids]
+    extra_managers = (
+        User.query.filter(User.id.in_(extra_ids)).all() if extra_ids else []
+    )
+    all_managers = list(managers) + list(extra_managers)
+
     rows = []
-    for m in managers:
+    for m in all_managers:
         revenue = revenue_by_mgr.get(m.id, 0)
+        in_sales = dept is not None and m.department_id == dept.id
         rows.append({
             "manager": m,
             "name": m.full_name or m.email,
@@ -87,6 +100,7 @@ def index():
             "revenue_fmt": _fmt_money(revenue),
             "deals": deals_by_mgr.get(m.id, 0),
             "xp": xp_for_revenue(revenue),
+            "in_sales": in_sales,
         })
 
     # рейтинг по выручке (по убыванию), затем по имени
@@ -97,6 +111,21 @@ def index():
 
     total_revenue = sum(r["revenue"] for r in rows)
 
+    # диагностика: сколько всего сделок в базе и в каких месяцах есть данные
+    total_deals = Deal.query.count()
+    months_with_data = []
+    if not deals and total_deals:
+        seen = {}
+        for (d_won,) in db.session.query(Deal.won_at).all():
+            if d_won:
+                key = (d_won.year, d_won.month)
+                seen[key] = seen.get(key, 0) + 1
+        months_with_data = [
+            {"value": f"{y:04d}-{mo:02d}",
+             "label": f"{_RU_MONTHS[mo]} {y}", "count": cnt}
+            for (y, mo), cnt in sorted(seen.items(), reverse=True)
+        ]
+
     return render_template(
         "leaderboard/index.html",
         rows=rows,
@@ -106,4 +135,8 @@ def index():
         xp_step=XP_STEP_RUB,
         xp_per_step=XP_PER_STEP,
         has_department=dept is not None,
+        unattributed=unattributed,
+        total_deals=total_deals,
+        deals_this_month=len(deals),
+        months_with_data=months_with_data,
     )
