@@ -25,15 +25,16 @@
   <div class="sg-card sg-card--pad">
     <table class="sg-table">
       <thead>
-        <tr><th>ID</th><th>Тип</th><th>responsible</th><th>Поля params</th><th>phone</th><th>link</th><th>duration</th></tr>
+        <tr><th>ID</th><th>Тип</th><th>Дата звонка</th><th>updated_at</th><th>responsible</th><th>phone</th><th>link</th><th>длит.</th></tr>
       </thead>
       <tbody>
         {% for n in result.notes %}
         <tr>
           <td class="sg-mono sg-sm">{{ n.id }}</td>
           <td class="sg-sm">{{ n.type }}</td>
+          <td class="sg-mono sg-sm">{{ n.call_date }}</td>
+          <td class="sg-mono sg-sm">{{ n.updated_date }}</td>
           <td class="sg-mono sg-sm">{{ n.responsible or '—' }}</td>
-          <td class="sg-sm">{{ n.param_keys or '—' }}</td>
           <td class="sg-mono sg-sm {{ 'sg-warn' if not n.phone }}">{{ n.phone or 'НЕТ' }}</td>
           <td class="sg-mono sg-sm {{ 'sg-warn' if not n.link }}">{{ 'есть' if n.link else 'НЕТ' }}</td>
           <td class="sg-mono sg-sm">{{ n.duration or '—' }}</td>
@@ -41,7 +42,7 @@
         {% endfor %}
       </tbody>
     </table>
-    <p class="sg-muted sg-sm">Если в столбцах <b>phone</b> или <b>link</b> стоит «НЕТ» — значит поле называется иначе; пришлите столбец «Поля params», подстроим извлечение.</p>
+    <p class="sg-muted sg-sm">«Дата звонка» (created_at) — по ней фильтруем окно. Если она старая, а updated_at свежий — звонок пропустится.</p>
   </div>
   {% endif %}
 
