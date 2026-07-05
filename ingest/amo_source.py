@@ -16,7 +16,7 @@ from models import Call, Client, User, Checklist
 from utils import normalize_phone
 from settings_store import (
     amo_base_domain, amo_access_token, amo_entity, amo_configured, amo_since_days,
-    get_setting, set_setting,
+    amo_min_duration, get_setting, set_setting,
 )
 from ingest.amo_client import AmoClient, AmoError
 from processing.worker import enqueue_call
@@ -186,6 +186,12 @@ def poll_amo(app=None) -> dict:
     active = Checklist.query.filter_by(is_active=True).first()
     new_calls, errors, max_updated = 0, 0, since_ts or 0
 
+    # окно по ДАТЕ ЗВОНКА (created_at) — чтобы не тянуть старые звонки,
+    # у которых недавно обновился updated_at
+    now_ts = int(datetime.utcnow().timestamp())
+    window_start = now_ts - amo_since_days(app) * 86400
+    min_dur = amo_min_duration(app)
+
     try:
         notes = list(client.iter_call_notes(entity, since_ts))
     except AmoError as exc:
@@ -200,19 +206,25 @@ def poll_amo(app=None) -> dict:
             if note_id and Call.query.filter_by(amo_note_id=note_id).first():
                 continue
 
+            created_ts = int(note.get("created_at") or updated or 0)
+            if created_ts and created_ts < window_start:
+                continue  # звонок старше окна (по дате звонка) — пропускаем
+
             params = note.get("params") or {}
             link = params.get("link")
             if not link:
                 continue  # нет записи (старые/служебные) — пропускаем, курсор двигается
 
+            duration = int(params.get("duration") or 0)
+            if duration < min_dur:
+                continue  # слишком короткий (недозвон/сброс) — не анализируем
+
             phone_norm = normalize_phone(params.get("phone"))
             if not phone_norm:
                 continue  # без телефона не привязать клиента
 
-            duration = int(params.get("duration") or 0)
             direction = "out" if note.get("note_type") == "call_out" else "in"
-            started_at = datetime.utcfromtimestamp(int(note.get("created_at") or updated or 0)) \
-                if (note.get("created_at") or updated) else datetime.utcnow()
+            started_at = datetime.utcfromtimestamp(created_ts) if created_ts else datetime.utcnow()
 
             responsible = note.get("responsible_user_id")
             manager = (

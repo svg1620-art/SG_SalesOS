@@ -94,11 +94,18 @@
       </label>
     </div>
 
-    <label class="sg-field">
-      <span class="sg-field__label">На первом опросе брать звонки за последние (дней)</span>
-      <input class="sg-input sg-mono" type="number" name="amo_since_days" min="1" max="365" value="{{ amo_since_days }}">
-      <span class="sg-muted sg-sm">Чтобы не тянуть всю историю amoCRM. Дальше опрос идёт по курсору — только новые.</span>
-    </label>
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Брать звонки за последние (дней)</span>
+        <input class="sg-input sg-mono" type="number" name="amo_since_days" min="1" max="365" value="{{ amo_since_days }}">
+        <span class="sg-muted sg-sm">По дате самого звонка. Старые не тянутся, даже если у них обновился updated_at.</span>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Мин. длительность звонка (сек)</span>
+        <input class="sg-input sg-mono" type="number" name="amo_min_duration" min="0" max="3600" value="{{ amo_min_duration }}">
+        <span class="sg-muted sg-sm">Короче — пропускаем (недозвоны, сбросы).</span>
+      </label>
+    </div>
 
     <label class="sg-field">
       <span class="sg-field__label">Долгосрочный токен

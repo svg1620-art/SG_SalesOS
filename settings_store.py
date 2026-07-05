@@ -101,9 +101,18 @@ def amo_configured(app=None) -> bool:
 
 
 def amo_since_days(app=None) -> int:
-    """За сколько последних дней брать звонки на ПЕРВОМ опросе (без курсора)."""
+    """За сколько последних дней брать звонки (по дате самого звонка)."""
     val = get_setting("amo_since_days")
     try:
         return max(1, int(val))
     except (TypeError, ValueError):
         return 3
+
+
+def amo_min_duration(app=None) -> int:
+    """Минимальная длительность звонка (сек); короче — пропускаем (недозвоны)."""
+    val = get_setting("amo_min_duration")
+    try:
+        return max(0, int(val))
+    except (TypeError, ValueError):
+        return 10
