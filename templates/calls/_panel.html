@@ -36,6 +36,10 @@
         {% endif %}
         <button class="sg-btn sg-btn--primary" type="submit">Повторить обработку</button>
       </form>
+      <form method="post" action="{{ url_for('calls.delete', call_id=call.id) }}"
+            onsubmit="return confirm('Удалить этот звонок?');" style="margin-top:8px">
+        <button class="sg-btn sg-btn--sm sg-btn--danger" type="submit">Удалить звонок</button>
+      </form>
       {% endif %}
     </div>
 

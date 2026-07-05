@@ -255,6 +255,37 @@ def reprocess(call_id):
     return redirect(url_for("calls.detail", call_id=call.id))
 
 
+def _remove_audio(call):
+    if call.audio_path and os.path.exists(call.audio_path):
+        try:
+            os.remove(call.audio_path)
+        except OSError:
+            pass
+
+
+@calls_bp.route("/<int:call_id>/delete", methods=["POST"])
+@admin_required
+def delete(call_id):
+    call = db.session.get(Call, call_id) or abort(404)
+    _remove_audio(call)
+    db.session.delete(call)
+    db.session.commit()
+    flash("Звонок удалён.", "success")
+    return redirect(url_for("calls.index"))
+
+
+@calls_bp.route("/delete-failed", methods=["POST"])
+@admin_required
+def delete_failed():
+    calls = Call.query.filter_by(status="failed").all()
+    for c in calls:
+        _remove_audio(c)
+        db.session.delete(c)
+    db.session.commit()
+    flash(f"Удалено звонков со статусом «ошибка»: {len(calls)}.", "success")
+    return redirect(url_for("calls.index"))
+
+
 @calls_bp.route("/<int:call_id>/audio")
 @login_required
 def audio(call_id):

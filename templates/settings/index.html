@@ -95,6 +95,12 @@
     </div>
 
     <label class="sg-field">
+      <span class="sg-field__label">На первом опросе брать звонки за последние (дней)</span>
+      <input class="sg-input sg-mono" type="number" name="amo_since_days" min="1" max="365" value="{{ amo_since_days }}">
+      <span class="sg-muted sg-sm">Чтобы не тянуть всю историю amoCRM. Дальше опрос идёт по курсору — только новые.</span>
+    </label>
+
+    <label class="sg-field">
       <span class="sg-field__label">Долгосрочный токен
         {% if amo_token_set %}<span class="sg-badge sg-badge--active">задан</span>{% else %}<span class="sg-badge">не задан</span>{% endif %}
       </span>
@@ -119,6 +125,10 @@
       </form>
       <form method="post" action="{{ url_for('settings.amo_sync_users') }}">
         <button class="sg-btn" type="submit">👥 Синхронизировать пользователей</button>
+      </form>
+      <form method="post" action="{{ url_for('settings.amo_reset_cursor') }}"
+            onsubmit="return confirm('Сбросить курсор? Следующий опрос возьмёт только звонки с текущего момента.');">
+        <button class="sg-btn" type="submit">↺ Сбросить курсор</button>
       </form>
     </div>
     <p class="sg-muted sg-sm">«Синхронизировать пользователей» подтянет ID из amoCRM и

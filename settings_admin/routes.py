@@ -5,6 +5,7 @@ from auth.decorators import admin_required
 from settings_store import (
     get_setting, set_setting, telegram_chat_ids, telegram_hour, digest_hour,
     telegram_token, amo_base_domain, amo_access_token, amo_entity, amo_configured,
+    amo_since_days,
 )
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
@@ -35,6 +36,7 @@ def index():
         amo_entity=amo_entity(),
         amo_configured=amo_configured(),
         amo_last_sync=get_setting("amo_last_sync"),
+        amo_since_days=amo_since_days(),
         poll_min=current_app.config.get("POLL_INTERVAL_MIN"),
     )
 
@@ -78,7 +80,23 @@ def save_amo():
     entity = request.form.get("amo_entity") or "contacts"
     set_setting("amo_entity", entity if entity in ("contacts", "leads") else "contacts")
 
+    try:
+        since_days = max(1, int(request.form.get("amo_since_days") or 3))
+    except ValueError:
+        since_days = 3
+    set_setting("amo_since_days", since_days)
+
     flash("Настройки amoCRM сохранены.", "success")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/amo/reset-cursor", methods=["POST"])
+@admin_required
+def amo_reset_cursor():
+    from datetime import datetime
+
+    set_setting("amo_last_sync", int(datetime.utcnow().timestamp()))
+    flash("Курсор сброшен: следующий опрос возьмёт только новые звонки (с этого момента).", "success")
     return redirect(url_for("settings.index"))
 
 

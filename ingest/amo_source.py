@@ -7,7 +7,7 @@
 """
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import current_app
 
@@ -15,7 +15,7 @@ from extensions import db
 from models import Call, Client, User, Checklist
 from utils import normalize_phone
 from settings_store import (
-    amo_base_domain, amo_access_token, amo_entity, amo_configured,
+    amo_base_domain, amo_access_token, amo_entity, amo_configured, amo_since_days,
     get_setting, set_setting,
 )
 from ingest.amo_client import AmoClient, AmoError
@@ -114,6 +114,11 @@ def poll_amo(app=None) -> dict:
     entity = amo_entity(app)
     since = get_setting("amo_last_sync")
     since_ts = int(since) if since and str(since).isdigit() else None
+    # первый опрос без курсора — берём только последние N дней (не всю историю)
+    if since_ts is None:
+        days = amo_since_days(app)
+        since_ts = int((datetime.utcnow() - timedelta(days=days)).timestamp())
+        app.logger.info("[amo] первый опрос: беру звонки за последние %s дн.", days)
 
     active = Checklist.query.filter_by(is_active=True).first()
     new_calls, errors, max_updated = 0, 0, since_ts or 0
@@ -133,11 +138,14 @@ def poll_amo(app=None) -> dict:
                 continue
 
             params = note.get("params") or {}
+            link = params.get("link")
+            if not link:
+                continue  # нет записи (старые/служебные) — пропускаем, курсор двигается
+
             phone_norm = normalize_phone(params.get("phone"))
             if not phone_norm:
                 continue  # без телефона не привязать клиента
 
-            link = params.get("link")
             duration = int(params.get("duration") or 0)
             direction = "out" if note.get("note_type") == "call_out" else "in"
             started_at = datetime.utcfromtimestamp(int(note.get("created_at") or updated or 0)) \
