@@ -40,7 +40,24 @@ def detail(dialog_id):
         if not any(c.manager_id == current_user.id for c in calls):
             abort(403)
 
-    return render_template("dialogs/detail.html", dialog=dialog, calls=calls)
+    # ссылка на сущность amoCRM (по последнему звонку с привязкой)
+    from settings_store import amo_base_domain
+    from utils import amo_entity_url
+
+    amo_url = None
+    domain = amo_base_domain()
+    for c in calls:
+        if c.amo_entity_id:
+            amo_url = amo_entity_url(domain, c.amo_entity_type, c.amo_entity_id)
+            if amo_url:
+                break
+    # запасной вариант — контакт клиента
+    if not amo_url and dialog.client and dialog.client.amo_contact_id:
+        amo_url = amo_entity_url(domain, "contacts", dialog.client.amo_contact_id)
+
+    return render_template(
+        "dialogs/detail.html", dialog=dialog, calls=calls, amo_url=amo_url
+    )
 
 
 @dialogs_bp.route("/export.csv")

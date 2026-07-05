@@ -203,12 +203,18 @@ def _annotate_transcript(call):
 
 def _panel_context(call):
     """Общий контекст для карточки/панели."""
+    from settings_store import amo_base_domain
+    from utils import amo_entity_url
+
     return {
         "call": call,
         "in_progress": IN_PROGRESS,
         "checklists": _all_checklists_for(call),
         "radar": _radar_data(call),
         "annotated": _annotate_transcript(call),
+        "amo_url": amo_entity_url(
+            amo_base_domain(), call.amo_entity_type, call.amo_entity_id
+        ),
     }
 
 
