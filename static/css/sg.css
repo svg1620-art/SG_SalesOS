@@ -262,6 +262,24 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 }
 .sg-badge--active { color: var(--sg-green); border-color: rgba(34,197,94,0.45); }
 .sg-badge--excluded { color: var(--sg-muted); border-color: var(--sg-border); text-transform: none; letter-spacing: 0; }
+.sg-badge--leader { color: #0A0A0D; background: #EAB308; border-color: #EAB308; margin-left: 8px; }
+
+/* --- Leaderboard / геймификация --- */
+.sg-xp { color: var(--sg-cyan); font-weight: 700; }
+.sg-lead-hero {
+  display: flex; align-items: center; gap: 20px; margin-top: 16px; padding: 20px 24px;
+  border-radius: var(--sg-radius);
+  border: 1px solid rgba(234,179,8,0.5);
+  background: linear-gradient(135deg, rgba(234,179,8,0.14), rgba(20,103,245,0.10));
+}
+.sg-lead-hero__crown { font-size: 46px; line-height: 1; }
+.sg-lead-hero__label { color: var(--sg-yellow); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.sg-lead-hero__name { font-size: 26px; font-weight: 800; margin: 2px 0 6px; }
+.sg-lead-hero__stats { display: flex; align-items: baseline; gap: 16px; font-size: 18px; }
+.sg-lead-hero__stats .sg-mono { font-weight: 700; }
+.sg-lead-rank { font-size: 18px; text-align: center; width: 52px; }
+.sg-lead-row--first { background: rgba(234,179,8,0.08); }
+.sg-lead-row--first td { font-weight: 600; }
 
 /* --- Карточки с паддингом / критерии --- */
 .sg-card--pad { padding: 18px; margin-top: 14px; }

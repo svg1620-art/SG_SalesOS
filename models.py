@@ -283,6 +283,24 @@ class DailyDigest(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class Deal(db.Model):
+    """Успешная сделка из amoCRM (для рейтинга по выручке / геймификации)."""
+
+    __tablename__ = "deals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    amo_lead_id = db.Column(db.BigInteger, unique=True, nullable=False, index=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    price = db.Column(db.Integer, default=0)  # сумма сделки, руб
+    name = db.Column(db.String(500))
+    pipeline_id = db.Column(db.BigInteger)
+    status_id = db.Column(db.Integer)
+    won_at = db.Column(db.DateTime, index=True)  # когда закрыта успешно
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    manager = db.relationship("User")
+
+
 class Setting(db.Model):
     """Настройки приложения (key-value), редактируемые из интерфейса.
 

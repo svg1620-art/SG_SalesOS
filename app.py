@@ -46,6 +46,7 @@ def _register_blueprints(app: Flask) -> None:
     from dialogs import dialogs_bp
     from departments import departments_bp
     from settings_admin import settings_bp
+    from leaderboard import leaderboard_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -55,6 +56,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(dialogs_bp)
     app.register_blueprint(departments_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(leaderboard_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:
@@ -175,6 +177,12 @@ def _add_schedule_jobs(app: Flask) -> None:
                 return
             from ingest.amo_source import poll_amo
             poll_amo(app)
+            # успешные сделки (выручка/геймификация)
+            try:
+                from ingest.amo_deals import poll_deals
+                poll_deals(app)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[deals] опрос сделок пропущен: %s", exc)
 
     tz = app.config.get("TZ") or "UTC"
     t_hour, d_hour = telegram_hour(app), digest_hour(app)
@@ -276,6 +284,14 @@ def _register_cli(app: Flask) -> None:
         from ingest.amo_source import poll_amo
 
         result = poll_amo(app)
+        click.echo(str(result))
+
+    @app.cli.command("amo-poll-deals")
+    def amo_poll_deals_cmd():
+        """Опросить успешные сделки amoCRM (выручка/XP) вручную."""
+        from ingest.amo_deals import poll_deals
+
+        result = poll_deals(app)
         click.echo(str(result))
 
 

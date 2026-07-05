@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-page__head">
+    <h1 class="sg-h1">🏆 Leaderboard <span class="sg-muted sg-sm">— {{ month_label }}</span></h1>
+    <form method="get" class="sg-filters" action="{{ url_for('leaderboard.index') }}">
+      <label class="sg-field sg-field--inline">
+        <span class="sg-field__label">Месяц</span>
+        <input class="sg-input sg-input--sm" type="month" name="month" value="{{ month_value }}">
+      </label>
+      <button class="sg-btn sg-btn--primary sg-btn--sm" type="submit">Показать</button>
+    </form>
+  </div>
+
+  <p class="sg-muted sg-sm">
+    Рейтинг менеджеров отдела продаж по выручке за месяц.
+    За каждые {{ '{:,}'.format(xp_step).replace(',', ' ') }} руб — <b>+{{ xp_per_step }} XP</b>.
+    Всего выручки за месяц: <b class="sg-mono">{{ total_revenue_fmt }} ₽</b>.
+  </p>
+
+  {% if not has_department %}
+    <div class="sg-placeholder">Отдел «Отдел продаж» не найден. Создайте его в разделе «Отделы».</div>
+  {% elif not rows %}
+    <div class="sg-placeholder">В отделе продаж пока нет активных менеджеров.</div>
+  {% else %}
+    {% set leader = rows[0] if rows[0].is_leader else none %}
+    {% if leader %}
+    <div class="sg-lead-hero">
+      <div class="sg-lead-hero__crown">🏆</div>
+      <div class="sg-lead-hero__body">
+        <div class="sg-lead-hero__label">Лидер месяца</div>
+        <div class="sg-lead-hero__name">{{ leader.name }}</div>
+        <div class="sg-lead-hero__stats">
+          <span class="sg-mono">{{ leader.revenue_fmt }} ₽</span>
+          <span class="sg-xp">+{{ leader.xp }} XP</span>
+          <span class="sg-muted sg-sm">{{ leader.deals }} сдел.</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <table class="sg-table sg-lead-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Менеджер</th>
+          <th>Выручка</th>
+          <th>Сделок</th>
+          <th>XP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="{{ 'sg-lead-row--first' if r.is_leader else '' }}">
+          <td class="sg-mono sg-lead-rank">
+            {% if r.rank == 1 and r.is_leader %}🥇
+            {% elif r.rank == 2 %}🥈
+            {% elif r.rank == 3 %}🥉
+            {% else %}{{ r.rank }}{% endif %}
+          </td>
+          <td>
+            {{ r.name }}
+            {% if r.is_leader %}<span class="sg-badge sg-badge--leader">лидер</span>{% endif %}
+          </td>
+          <td class="sg-mono"><b>{{ r.revenue_fmt }} ₽</b></td>
+          <td class="sg-mono">{{ r.deals }}</td>
+          <td class="sg-mono sg-xp">+{{ r.xp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

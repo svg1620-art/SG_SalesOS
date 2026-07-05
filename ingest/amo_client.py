@@ -93,6 +93,35 @@ class AmoClient:
             page += 1
         return users
 
+    def iter_leads(self, since_ts: int | None = None, max_pages: int = 50):
+        """Итератор по сделкам (leads), обновлённым с since_ts."""
+        page = 1
+        while page <= max_pages:
+            params = [
+                ("order[updated_at]", "asc"),
+                ("page", page),
+                ("limit", 250),
+            ]
+            if since_ts:
+                params.append(("filter[updated_at][from]", int(since_ts)))
+            r = httpx.get(
+                f"{self.base}/api/v4/leads",
+                headers=self._headers(), params=params, timeout=30,
+            )
+            if r.status_code == 204:
+                return
+            if r.status_code != 200:
+                raise AmoError(f"leads HTTP {r.status_code}: {r.text[:200]}")
+            data = r.json()
+            leads = (data.get("_embedded") or {}).get("leads") or []
+            if not leads:
+                return
+            for lead in leads:
+                yield lead
+            if not (data.get("_links") or {}).get("next"):
+                return
+            page += 1
+
     def _try(self, url, headers, follow=True, proxy=None):
         try:
             with httpx.Client(proxy=proxy, timeout=30, follow_redirects=follow) as cl:
