@@ -2,6 +2,7 @@
 
 Менеджер редиректится в свой кабинет (Этап 7 — пока заглушка).
 """
+from calendar import monthrange
 from datetime import datetime, timedelta
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash
@@ -16,6 +17,64 @@ from auth.decorators import admin_required
 dashboard_bp = Blueprint("dashboard", __name__)
 
 _TREND_EPS = 3
+
+# палитра цветов для столбиков менеджеров
+_MANAGER_COLORS = [
+    "#1467F5", "#00BFDC", "#22C55E", "#EAB308", "#EF4444", "#A855F7",
+    "#EC4899", "#14B8A6", "#F97316", "#84CC16", "#6366F1", "#F43F5E",
+]
+_RU_MONTHS = [
+    "", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+]
+
+
+def _build_month_bars(month_year, month_num, dept_manager_ids):
+    """Сгруппированная диаграмма: звонки по дням месяца, датасет на менеджера."""
+    days_in = monthrange(month_year, month_num)[1]
+    start = datetime(month_year, month_num, 1)
+    end = (
+        datetime(month_year + 1, 1, 1)
+        if month_num == 12
+        else datetime(month_year, month_num + 1, 1)
+    )
+
+    query = Call.query.filter(Call.started_at >= start, Call.started_at < end)
+    calls = query.all()
+    if dept_manager_ids is not None:
+        calls = [c for c in calls if c.manager_id in dept_manager_ids]
+
+    # counts[manager_id][day-1]
+    counts = defaultdict(lambda: [0] * days_in)
+    for c in calls:
+        day = (c.started_at or c.created_at).day
+        if 1 <= day <= days_in:
+            counts[c.manager_id][day - 1] += 1
+
+    # имена менеджеров
+    datasets = []
+    idx = 0
+    # стабильный порядок: по имени
+    def _name(mid):
+        if mid is None:
+            return "Не назначен"
+        u = db.session.get(User, mid)
+        return (u.full_name or u.email) if u else f"#{mid}"
+
+    for mid in sorted(counts.keys(), key=lambda m: _name(m).lower()):
+        datasets.append({
+            "label": _name(mid),
+            "data": counts[mid],
+            "color": _MANAGER_COLORS[idx % len(_MANAGER_COLORS)],
+        })
+        idx += 1
+
+    return {
+        "labels": [str(d) for d in range(1, days_in + 1)],
+        "datasets": datasets,
+        "month_label": f"{_RU_MONTHS[month_num]} {month_year}",
+        "total": sum(sum(v) for v in counts.values()),
+    }
 
 
 def _parse_date(raw, default):
@@ -141,6 +200,15 @@ def index():
     # --- дневная сводка (последняя) ---
     digest = DailyDigest.query.order_by(DailyDigest.date.desc()).first()
 
+    # --- диаграмма звонков по дням месяца (по менеджерам) ---
+    month_raw = (request.args.get("month") or "").strip()
+    try:
+        m_year, m_num = map(int, month_raw.split("-"))
+        assert 1 <= m_num <= 12
+    except Exception:  # noqa: BLE001
+        m_year, m_num = now.year, now.month
+    bars = _build_month_bars(m_year, m_num, dept_manager_ids)
+
     return render_template(
         "dashboard/index.html",
         kpi=kpi,
@@ -149,12 +217,14 @@ def index():
         managers=managers,
         digest=digest,
         departments=departments,
+        bars=bars,
         filters={
             "from": date_from.strftime("%Y-%m-%d"),
             "to": date_to_raw.strftime("%Y-%m-%d"),
             "manager_id": manager_id,
             "zone": zone,
             "department_id": department_id,
+            "month": f"{m_year:04d}-{m_num:02d}",
         },
     )
 
