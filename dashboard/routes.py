@@ -39,7 +39,9 @@ def _build_month_bars(month_year, month_num, dept_manager_ids):
         else datetime(month_year, month_num + 1, 1)
     )
 
-    query = Call.query.filter(Call.started_at >= start, Call.started_at < end)
+    query = Call.query.filter(
+        Call.started_at >= start, Call.started_at < end, Call.excluded.isnot(True)
+    )
     calls = query.all()
     if dept_manager_ids is not None:
         calls = [c for c in calls if c.manager_id in dept_manager_ids]
@@ -144,9 +146,10 @@ def index():
         mgr_query = mgr_query.filter(User.department_id == department_id)
     managers = mgr_query.order_by(User.full_name, User.email).all()
 
-    # --- звонки за период (done) ---
+    # --- звонки за период (done, не исключённые из рейтинга) ---
     period_q = Call.query.filter(
         Call.status == "done",
+        Call.excluded.isnot(True),
         Call.started_at >= date_from,
         Call.started_at <= date_to,
     )

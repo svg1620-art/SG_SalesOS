@@ -52,7 +52,9 @@
           {% if current_user.is_admin %}
           <td>{{ c.manager.full_name or c.manager.email if c.manager else '—' }}</td>
           {% endif %}
-          <td>{{ c.client.name or c.client.phone_normalized if c.client else '—' }}</td>
+          <td>{{ c.client.name or c.client.phone_normalized if c.client else '—' }}
+            {% if c.excluded %}<span class="sg-badge sg-badge--excluded sg-sm">вне рейтинга</span>{% endif %}
+          </td>
           <td class="sg-sm">{{ 'вх' if c.direction == 'in' else 'исх' if c.direction == 'out' else '—' }}</td>
           <td>{{ status_label(c.status) }}</td>
           <td class="sg-mono">{{ c.overall_score if c.overall_score is not none else '—' }}</td>

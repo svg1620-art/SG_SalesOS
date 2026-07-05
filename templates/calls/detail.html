@@ -14,7 +14,15 @@
       <span class="sg-sm sg-muted">#{{ call.id }}</span>
     </h1>
     <div class="sg-actions">
+      {% if call.excluded %}<span class="sg-badge sg-badge--excluded">Исключён из рейтинга</span>{% endif %}
       {% if amo_url %}<a class="sg-btn sg-btn--sm" href="{{ amo_url }}" target="_blank" rel="noopener">↗ Открыть в amoCRM</a>{% endif %}
+      {% if current_user.is_admin %}
+      <form method="post" action="{{ url_for('calls.toggle_exclude', call_id=call.id) }}">
+        <button class="sg-btn sg-btn--sm {{ 'sg-btn--primary' if call.excluded else '' }}" type="submit">
+          {{ '↩ Вернуть в рейтинг' if call.excluded else '⊘ Исключить из рейтинга' }}
+        </button>
+      </form>
+      {% endif %}
       {{ zone_badge(call.zone) }}
     </div>
   </div>

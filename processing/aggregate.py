@@ -37,7 +37,8 @@ def recompute_dialog_for_call(call: Call):
     calls.sort(key=lambda c: c.started_at or c.created_at)
 
     done_scored = [
-        c for c in calls if c.status == "done" and c.overall_score is not None
+        c for c in calls
+        if c.status == "done" and c.overall_score is not None and not c.excluded
     ]
     dialog.calls_count = len(calls)
     if done_scored:

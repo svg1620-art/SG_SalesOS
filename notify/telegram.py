@@ -52,6 +52,7 @@ def build_pulse(app, day) -> str:
 
     calls = Call.query.filter(
         Call.status == "done",
+        Call.excluded.isnot(True),
         Call.started_at >= start,
         Call.started_at < end,
     ).all()

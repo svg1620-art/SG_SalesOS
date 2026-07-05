@@ -261,6 +261,7 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
   vertical-align: middle;
 }
 .sg-badge--active { color: var(--sg-green); border-color: rgba(34,197,94,0.45); }
+.sg-badge--excluded { color: var(--sg-muted); border-color: var(--sg-border); text-transform: none; letter-spacing: 0; }
 
 /* --- Карточки с паддингом / критерии --- */
 .sg-card--pad { padding: 18px; margin-top: 14px; }
