@@ -50,9 +50,9 @@ def process_call(call_id: int) -> None:
             db.session.commit()
             from ingest.amo_source import download_recording_to_volume
 
-            path = download_recording_to_volume(current_app, call.source_link)
+            path, diag = download_recording_to_volume(current_app, call.source_link)
             if not path:
-                raise RuntimeError("Не удалось скачать запись по ссылке из amoCRM.")
+                raise RuntimeError(f"Не удалось скачать запись из amoCRM [{diag}].")
             call.audio_path = path
             db.session.commit()
 

@@ -139,20 +139,20 @@ def _save_recording(content: bytes) -> str:
     return path
 
 
-def download_recording_to_volume(app, url: str) -> str | None:
-    """Скачать запись по ссылке в Volume. Возвращает путь или None.
+def download_recording_to_volume(app, url: str):
+    """Скачать запись по ссылке в Volume. Возвращает (path|None, diag:str).
 
     Пробуем без авторизации (внешняя ссылка Мегафона) и с Bearer amoCRM.
     Вызывается фоновым worker'ом перед транскрибацией.
     """
     if not url:
-        return None
+        return None, "нет ссылки"
     token = amo_access_token(app)
     client = AmoClient(amo_base_domain(app) or "x", token or "")
-    content = client.download_recording(url)
+    content, diag = client.download_recording(url)
     if not content:
-        return None
-    return _save_recording(content)
+        return None, diag
+    return _save_recording(content), diag
 
 
 def _get_or_create_client(phone_norm: str, started_at: datetime) -> Client:

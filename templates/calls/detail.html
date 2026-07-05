@@ -23,6 +23,11 @@
     <div><span class="sg-meta__k">Направление</span>{{ 'Входящий' if call.direction == 'in' else 'Исходящий' if call.direction == 'out' else '—' }}</div>
     <div><span class="sg-meta__k">Длит.</span><span class="sg-mono">{{ '%d:%02d'|format(call.duration_sec // 60, call.duration_sec % 60) if call.duration_sec else '—' }}</span></div>
     <div><span class="sg-meta__k">Диаризация</span>{{ 'стерео' if call.diarization == 'stereo' else 'эвристика' if call.diarization == 'heuristic' else '—' }}</div>
+    {% if current_user.is_admin and call.source_link %}
+    <div style="flex-basis:100%"><span class="sg-meta__k">Ссылка на запись (amoCRM)</span>
+      <a class="sg-mono sg-sm" href="{{ call.source_link }}" target="_blank" rel="noopener">{{ call.source_link }}</a>
+    </div>
+    {% endif %}
   </div>
 
   {% if call.audio_path %}
