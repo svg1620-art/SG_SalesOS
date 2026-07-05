@@ -17,6 +17,7 @@ _KEYS = {
     "amo_base_domain": "AMO_BASE_DOMAIN",
     "amo_access_token": "AMO_ACCESS_TOKEN",
     "amo_entity": "AMO_ENTITY",
+    "recording_proxy": "RECORDING_PROXY",
     # amo_last_sync — только в БД, без env
 }
 
@@ -98,6 +99,11 @@ def amo_entity(app=None) -> str:
 
 def amo_configured(app=None) -> bool:
     return bool(amo_base_domain(app) and amo_access_token(app))
+
+
+def recording_proxy(app=None):
+    val = effective("recording_proxy", app)
+    return val.strip() if val else None
 
 
 def amo_since_days(app=None) -> int:

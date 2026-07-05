@@ -108,6 +108,14 @@
     </div>
 
     <label class="sg-field">
+      <span class="sg-field__label">Прокси для скачивания записей (RU-IP)</span>
+      <input class="sg-input sg-mono" name="recording_proxy" value="{{ recording_proxy }}"
+             placeholder="http://user:pass@ru-proxy-host:port">
+      <span class="sg-muted sg-sm">Мегафон (megapbx.ru) блокирует иностранные IP. Укажите РФ-прокси —
+        записи будут качаться через него. Пусто — напрямую (сейчас ConnectTimeout).</span>
+    </label>
+
+    <label class="sg-field">
       <span class="sg-field__label">Долгосрочный токен
         {% if amo_token_set %}<span class="sg-badge sg-badge--active">задан</span>{% else %}<span class="sg-badge">не задан</span>{% endif %}
       </span>

@@ -93,24 +93,27 @@ class AmoClient:
             page += 1
         return users
 
-    def _try(self, url, headers, follow=True):
+    def _try(self, url, headers, follow=True, proxy=None):
         try:
-            r = httpx.get(url, headers=headers, timeout=30, follow_redirects=follow)
-            return r
+            with httpx.Client(proxy=proxy, timeout=30, follow_redirects=follow) as cl:
+                return cl.get(url, headers=headers)
         except Exception as exc:  # noqa: BLE001
             return exc
 
-    def download_recording(self, url: str):
+    def download_recording(self, url: str, proxy: str | None = None):
         """Скачать запись. Возвращает (bytes|None, diag:str).
 
         Порядок: без авторизации; затем с Bearer, но при 3xx-редиректе целевой
         URL тянем БЕЗ auth-заголовка (подписанные ссылки провайдера часто
-        отвергают лишний Authorization).
+        отвергают лишний Authorization). proxy — для РФ-IP (Мегафон блокирует
+        иностранные адреса).
         """
         diag = []
+        if proxy:
+            diag.append("proxy")
 
         # 1) прямая ссылка без авторизации (внешний провайдер/Мегафон)
-        r = self._try(url, {}, follow=True)
+        r = self._try(url, {}, follow=True, proxy=proxy)
         if isinstance(r, Exception):
             diag.append(f"noauth:err({type(r).__name__})")
         else:
@@ -119,7 +122,7 @@ class AmoClient:
                 return r.content, "ok(noauth)"
 
         # 2) с Bearer, редирект обрабатываем вручную
-        r = self._try(url, self._headers(), follow=False)
+        r = self._try(url, self._headers(), follow=False, proxy=proxy)
         if isinstance(r, Exception):
             diag.append(f"bearer:err({type(r).__name__})")
         else:
@@ -129,7 +132,7 @@ class AmoClient:
             if r.status_code in (301, 302, 303, 307, 308):
                 loc = r.headers.get("location")
                 if loc:
-                    r2 = self._try(loc, {}, follow=True)  # цель — без auth
+                    r2 = self._try(loc, {}, follow=True, proxy=proxy)  # цель — без auth
                     if isinstance(r2, Exception):
                         diag.append(f"redir:err({type(r2).__name__})")
                     else:
