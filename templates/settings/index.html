@@ -127,8 +127,11 @@
         <button class="sg-btn" type="submit">👥 Синхронизировать пользователей</button>
       </form>
       <form method="post" action="{{ url_for('settings.amo_reset_cursor') }}"
-            onsubmit="return confirm('Сбросить курсор? Следующий опрос возьмёт только звонки с текущего момента.');">
-        <button class="sg-btn" type="submit">↺ Сбросить курсор</button>
+            onsubmit="return confirm('Очистить курсор? Следующий опрос возьмёт звонки за последние N дней.');">
+        <button class="sg-btn" type="submit">↺ Переопросить за N дней</button>
+      </form>
+      <form method="post" action="{{ url_for('settings.amo_debug') }}">
+        <button class="sg-btn" type="submit">🔍 Диагностика (что отдаёт amoCRM)</button>
       </form>
     </div>
     <p class="sg-muted sg-sm">«Синхронизировать пользователей» подтянет ID из amoCRM и
