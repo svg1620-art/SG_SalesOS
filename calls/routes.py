@@ -286,6 +286,30 @@ def delete_failed():
     return redirect(url_for("calls.index"))
 
 
+@calls_bp.route("/delete-amo", methods=["POST"])
+@admin_required
+def delete_amo():
+    """Удалить все звонки, импортированные из amoCRM (для чистого переопроса)."""
+    calls = Call.query.filter(Call.amo_note_id.isnot(None)).all()
+    for c in calls:
+        _remove_audio(c)
+        db.session.delete(c)
+    db.session.commit()
+    flash(f"Удалено импортированных из amoCRM звонков: {len(calls)}.", "success")
+    return redirect(url_for("calls.index"))
+
+
+@calls_bp.route("/reprocess-stuck", methods=["POST"])
+@admin_required
+def reprocess_stuck():
+    """Переочередить звонки, застрявшие в статусе «new» (фон не дошёл)."""
+    calls = Call.query.filter_by(status="new").all()
+    for c in calls:
+        enqueue_call(c.id)
+    flash(f"Отправлено в обработку зависших звонков: {len(calls)}.", "success")
+    return redirect(url_for("calls.index"))
+
+
 @calls_bp.route("/<int:call_id>/audio")
 @login_required
 def audio(call_id):

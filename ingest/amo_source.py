@@ -94,14 +94,16 @@ def debug_recent_notes(app=None, days=None, limit=15) -> dict:
     try:
         for note in client.iter_call_notes(entity, since_ts):
             params = note.get("params") or {}
+            created = note.get("created_at")
+            updated = note.get("updated_at")
             out.append({
                 "id": note.get("id"),
                 "type": note.get("note_type"),
-                "updated_at": note.get("updated_at"),
+                "call_date": datetime.utcfromtimestamp(int(created)).strftime("%d.%m.%Y") if created else "—",
+                "updated_date": datetime.utcfromtimestamp(int(updated)).strftime("%d.%m.%Y") if updated else "—",
                 "responsible": note.get("responsible_user_id"),
-                "param_keys": ", ".join(sorted(params.keys())),
                 "phone": params.get("phone"),
-                "link": (params.get("link") or "")[:80],
+                "link": bool(params.get("link")),
                 "duration": params.get("duration"),
             })
             if len(out) >= limit:
