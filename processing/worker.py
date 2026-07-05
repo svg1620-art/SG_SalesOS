@@ -1,18 +1,35 @@
 """Фоновый прогон пайплайна обработки звонка по статусам.
 
-new → transcribing → analyzing → done  (или failed с сохранением ошибки).
+new → downloading → transcribing → analyzing → done (или failed с сохранением ошибки).
 
-Обработка идёт в отдельном потоке, чтобы не блокировать HTTP-ответ; UI следит за
-статусом polling'ом. Падение одного звонка не роняет процесс — ошибка пишется в
-Call.error, статус failed (изоляция сбоев по звонку).
+Обработка идёт в ОГРАНИЧЕННОМ пуле потоков (не «поток на звонок»!), чтобы массовый
+импорт из amoCRM не плодил сотни потоков и не исчерпывал пул соединений с БД.
+UI следит за статусом polling'ом. Падение одного звонка не роняет процесс.
 """
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from flask import current_app
 
 from extensions import db
 from models import Call, Checklist
+
+# единый ограниченный пул воркеров на процесс (ленивая инициализация)
+_executor = None
+_executor_lock = threading.Lock()
+
+
+def _get_executor(app):
+    global _executor
+    if _executor is None:
+        with _executor_lock:
+            if _executor is None:
+                workers = max(1, int(app.config.get("WORKER_CONCURRENCY") or 2))
+                _executor = ThreadPoolExecutor(
+                    max_workers=workers, thread_name_prefix="sg-worker"
+                )
+    return _executor
 
 
 def process_call(call_id: int) -> None:
@@ -89,9 +106,10 @@ def _run_in_context(app, call_id: int) -> None:
 
 
 def enqueue_call(call_id: int) -> None:
-    """Запустить обработку звонка в фоновом потоке."""
+    """Поставить звонок в очередь ограниченного пула воркеров.
+
+    Сколько бы звонков ни поставили, одновременно обрабатывается не больше
+    WORKER_CONCURRENCY (по умолчанию 2) — остальные ждут в очереди пула.
+    """
     app = current_app._get_current_object()
-    thread = threading.Thread(
-        target=_run_in_context, args=(app, call_id), daemon=True
-    )
-    thread.start()
+    _get_executor(app).submit(_run_in_context, app, call_id)

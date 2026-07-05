@@ -98,7 +98,7 @@ class AmoClient:
         затем с Bearer (если ссылка на amoCRM)."""
         for headers in ({}, self._headers()):
             try:
-                r = httpx.get(url, headers=headers, timeout=90, follow_redirects=True)
+                r = httpx.get(url, headers=headers, timeout=30, follow_redirects=True)
                 if r.status_code == 200 and r.content:
                     return r.content
             except Exception:  # noqa: BLE001
