@@ -58,6 +58,8 @@ def _register_blueprints(app: Flask) -> None:
 
 
 def _register_error_handlers(app: Flask) -> None:
+    import traceback as _tb
+
     @app.errorhandler(403)
     def forbidden(_e):
         return render_template("errors/403.html"), 403
@@ -65,6 +67,24 @@ def _register_error_handlers(app: Flask) -> None:
     @app.errorhandler(404)
     def not_found(_e):
         return render_template("errors/404.html"), 404
+
+    @app.errorhandler(500)
+    @app.errorhandler(Exception)
+    def server_error(e):
+        from werkzeug.exceptions import HTTPException
+        from flask_login import current_user
+
+        if isinstance(e, HTTPException):
+            return e  # 403/404 и пр. — не перехватываем
+        app.logger.exception("Необработанная ошибка: %s", e)
+        # админу показываем детали, остальным — общий текст
+        detail = None
+        try:
+            if current_user.is_authenticated and current_user.is_admin:
+                detail = "".join(_tb.format_exception(type(e), e, e.__traceback__))
+        except Exception:  # noqa: BLE001
+            detail = None
+        return render_template("errors/500.html", detail=detail), 500
 
     @app.route("/healthz")
     def healthz():

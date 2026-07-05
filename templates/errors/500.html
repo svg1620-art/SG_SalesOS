@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Ошибка — SG SalesOS{% endblock %}
+{% block content %}
+<section class="sg-page sg-error">
+  <div class="sg-error__code sg-mono">500</div>
+  <div class="sg-error__msg">Внутренняя ошибка. Мы уже её залогировали.</div>
+  <a class="sg-btn sg-btn--primary" href="{{ url_for('dashboard.index') }}">На главную</a>
+</section>
+{% if detail %}
+<section class="sg-page">
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Детали (видно только админу)</h3>
+    <pre class="sg-error-text">{{ detail }}</pre>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
