@@ -45,6 +45,7 @@ def _register_blueprints(app: Flask) -> None:
     from users import users_bp
     from dialogs import dialogs_bp
     from departments import departments_bp
+    from settings_admin import settings_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -53,6 +54,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(users_bp)
     app.register_blueprint(dialogs_bp)
     app.register_blueprint(departments_bp)
+    app.register_blueprint(settings_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:
@@ -122,9 +124,46 @@ def _maybe_start_scheduler(app: Flask) -> None:
     if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
         return
 
+    def _run_pulse():
+        with app.app_context():
+            from notify.telegram import send_daily_pulse
+            send_daily_pulse(app)
+
+    def _run_digest():
+        with app.app_context():
+            from digest.daily import generate_daily_digest
+            generate_daily_digest(app)
+
+    try:
+        with app.app_context():
+            _add_schedule_jobs(app, _run_pulse, _run_digest)
+        scheduler.start()
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning("[scheduler] не удалось запустить: %s", exc)
+
+
+def _add_schedule_jobs(app: Flask, pulse_fn, digest_fn) -> None:
+    """(Пере)регистрация джоб с часами из настроек (БД→env)."""
     from apscheduler.triggers.cron import CronTrigger
+    from settings_store import telegram_hour, digest_hour
 
     tz = app.config.get("TZ") or "UTC"
+    t_hour, d_hour = telegram_hour(app), digest_hour(app)
+    scheduler.add_job(
+        pulse_fn, CronTrigger(hour=t_hour, minute=0, timezone=tz),
+        id="telegram_pulse", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        digest_fn, CronTrigger(hour=d_hour, minute=0, timezone=tz),
+        id="daily_digest", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    app.logger.info("[scheduler] пульс %s:00, сводка %s:00 (%s)", t_hour, d_hour, tz)
+
+
+def reschedule_jobs(app: Flask) -> None:
+    """Перепланировать джобы после изменения часов в настройках."""
+    if not scheduler.running:
+        return
 
     def _run_pulse():
         with app.app_context():
@@ -137,21 +176,10 @@ def _maybe_start_scheduler(app: Flask) -> None:
             generate_daily_digest(app)
 
     try:
-        scheduler.add_job(
-            _run_pulse, CronTrigger(hour=app.config["TELEGRAM_HOUR"], minute=0, timezone=tz),
-            id="telegram_pulse", replace_existing=True, max_instances=1, coalesce=True,
-        )
-        scheduler.add_job(
-            _run_digest, CronTrigger(hour=app.config["DIGEST_HOUR"], minute=0, timezone=tz),
-            id="daily_digest", replace_existing=True, max_instances=1, coalesce=True,
-        )
-        scheduler.start()
-        app.logger.info(
-            "[scheduler] запущен: пульс %s:00, сводка %s:00 (%s)",
-            app.config["TELEGRAM_HOUR"], app.config["DIGEST_HOUR"], tz,
-        )
+        with app.app_context():
+            _add_schedule_jobs(app, _run_pulse, _run_digest)
     except Exception as exc:  # noqa: BLE001
-        app.logger.warning("[scheduler] не удалось запустить: %s", exc)
+        app.logger.warning("[scheduler] не удалось перепланировать: %s", exc)
 
 
 def _register_cli(app: Flask) -> None:

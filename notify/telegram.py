@@ -110,11 +110,10 @@ def build_pulse(app, day) -> str:
 
 
 def _send_message(app, text: str) -> bool:
-    token = app.config.get("TELEGRAM_BOT_TOKEN")
-    chat_ids = [
-        c.strip() for c in (app.config.get("TELEGRAM_CHAT_IDS") or "").split(",")
-        if c.strip()
-    ]
+    from settings_store import telegram_token, telegram_chat_ids
+
+    token = telegram_token(app)
+    chat_ids = telegram_chat_ids(app)
     if not token or not chat_ids:
         app.logger.info("[telegram] не настроен (нет токена/получателей) — пропуск.")
         return False
