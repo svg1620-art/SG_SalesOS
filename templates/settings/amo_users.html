@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Пользователи amoCRM — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('settings.index') }}">Настройки</a> / Пользователи amoCRM
+  </div>
+  <h1 class="sg-h1">Пользователи amoCRM</h1>
+  <p class="sg-muted">
+    Всего в amoCRM: <b>{{ result.total }}</b>. Привязано по совпадению email:
+    <b class="sg-ok">{{ result.matched }}</b>.
+    Здесь виден <b>ID</b> каждого пользователя amoCRM (столбец «amo ID»).
+  </p>
+
+  <table class="sg-table">
+    <thead>
+      <tr><th>amo ID</th><th>Имя (amoCRM)</th><th>Email</th><th>Привязан к менеджеру SG</th></tr>
+    </thead>
+    <tbody>
+      {% for u in result.amo_users %}
+      <tr>
+        <td class="sg-mono"><b>{{ u.id }}</b></td>
+        <td>{{ u.name }}</td>
+        <td class="sg-mono sg-sm">{{ u.email or '—' }}</td>
+        <td>
+          {% if u.matched_to %}<span class="sg-ok">✓ {{ u.matched_to }}</span>
+          {% else %}<span class="sg-muted">— нет пользователя SG с таким email</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if result.unmatched_sg %}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Пользователи SG без привязки к amoCRM</h3>
+    <p class="sg-muted sg-sm">Заведите им учётки с email как в amoCRM и повторите синхронизацию,
+       либо проставьте amoCRM user_id вручную в карточке пользователя.</p>
+    <ul>
+      {% for name in result.unmatched_sg %}<li>{{ name }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="sg-actions" style="margin-top:16px">
+    <a class="sg-btn" href="{{ url_for('users.index') }}">К пользователям SG</a>
+    <a class="sg-btn sg-btn--primary" href="{{ url_for('settings.index') }}">Готово</a>
+  </div>
+</section>
+{% endblock %}

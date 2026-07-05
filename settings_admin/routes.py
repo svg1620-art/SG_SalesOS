@@ -92,6 +92,18 @@ def amo_test():
     return redirect(url_for("settings.index"))
 
 
+@settings_bp.route("/amo/sync-users", methods=["POST"])
+@admin_required
+def amo_sync_users():
+    from ingest.amo_source import sync_users
+
+    result = sync_users(current_app._get_current_object())
+    if not result.get("ok"):
+        flash(f"Не удалось получить пользователей: {result.get('error')}", "error")
+        return redirect(url_for("settings.index"))
+    return render_template("settings/amo_users.html", result=result)
+
+
 @settings_bp.route("/amo/poll", methods=["POST"])
 @admin_required
 def amo_poll():

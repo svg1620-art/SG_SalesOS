@@ -117,8 +117,12 @@
       <form method="post" action="{{ url_for('settings.amo_poll') }}">
         <button class="sg-btn" type="submit">⬇️ Опросить звонки сейчас</button>
       </form>
+      <form method="post" action="{{ url_for('settings.amo_sync_users') }}">
+        <button class="sg-btn" type="submit">👥 Синхронизировать пользователей</button>
+      </form>
     </div>
-    <p class="sg-muted sg-sm">Привязка звонка к менеджеру — по полю <b>amoCRM user_id</b> в карточке пользователя.</p>
+    <p class="sg-muted sg-sm">«Синхронизировать пользователей» подтянет ID из amoCRM и
+       проставит <b>amoCRM user_id</b> по совпадению email (для привязки звонков к менеджерам).</p>
   </div>
 </section>
 {% endblock %}

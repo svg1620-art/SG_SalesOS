@@ -66,6 +66,33 @@ class AmoClient:
                 return
             page += 1
 
+    def get_users(self, max_pages: int = 20) -> list[dict]:
+        """Все пользователи amoCRM: [{id, name, email}]."""
+        users, page = [], 1
+        while page <= max_pages:
+            r = httpx.get(
+                f"{self.base}/api/v4/users",
+                headers=self._headers(), params={"page": page, "limit": 250}, timeout=30,
+            )
+            if r.status_code == 204:
+                break
+            if r.status_code != 200:
+                raise AmoError(f"users HTTP {r.status_code}: {r.text[:200]}")
+            data = r.json()
+            batch = (data.get("_embedded") or {}).get("users") or []
+            if not batch:
+                break
+            for u in batch:
+                users.append({
+                    "id": u.get("id"),
+                    "name": u.get("name") or "",
+                    "email": (u.get("email") or "").strip().lower(),
+                })
+            if not (data.get("_links") or {}).get("next"):
+                break
+            page += 1
+        return users
+
     def download_recording(self, url: str) -> bytes | None:
         """Скачать запись. Пробуем без авторизации (внешняя ссылка Мегафона),
         затем с Bearer (если ссылка на amoCRM)."""
