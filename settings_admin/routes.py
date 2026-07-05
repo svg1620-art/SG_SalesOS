@@ -5,7 +5,7 @@ from auth.decorators import admin_required
 from settings_store import (
     get_setting, set_setting, telegram_chat_ids, telegram_hour, digest_hour,
     telegram_token, amo_base_domain, amo_access_token, amo_entity, amo_configured,
-    amo_since_days, amo_min_duration,
+    amo_since_days, amo_min_duration, recording_proxy,
 )
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
@@ -38,6 +38,7 @@ def index():
         amo_last_sync=get_setting("amo_last_sync"),
         amo_since_days=amo_since_days(),
         amo_min_duration=amo_min_duration(),
+        recording_proxy=recording_proxy() or "",
         poll_min=current_app.config.get("POLL_INTERVAL_MIN"),
     )
 
@@ -92,6 +93,8 @@ def save_amo():
     except ValueError:
         min_dur = 10
     set_setting("amo_min_duration", min_dur)
+
+    set_setting("recording_proxy", (request.form.get("recording_proxy") or "").strip())
 
     flash("Настройки amoCRM сохранены.", "success")
     return redirect(url_for("settings.index"))

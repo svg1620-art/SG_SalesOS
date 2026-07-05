@@ -16,7 +16,7 @@ from models import Call, Client, User, Checklist
 from utils import normalize_phone
 from settings_store import (
     amo_base_domain, amo_access_token, amo_entity, amo_configured, amo_since_days,
-    amo_min_duration, get_setting, set_setting,
+    amo_min_duration, recording_proxy, get_setting, set_setting,
 )
 from ingest.amo_client import AmoClient, AmoError
 from processing.worker import enqueue_call
@@ -149,7 +149,7 @@ def download_recording_to_volume(app, url: str):
         return None, "нет ссылки"
     token = amo_access_token(app)
     client = AmoClient(amo_base_domain(app) or "x", token or "")
-    content, diag = client.download_recording(url)
+    content, diag = client.download_recording(url, proxy=recording_proxy(app))
     if not content:
         return None, diag
     return _save_recording(content), diag

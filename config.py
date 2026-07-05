@@ -74,6 +74,8 @@ class Config:
     # долгосрочный токен (упрощённый путь вместо OAuth-обмена кодом)
     AMO_ACCESS_TOKEN = os.environ.get("AMO_ACCESS_TOKEN")
     AMO_ENTITY = os.environ.get("AMO_ENTITY")  # contacts|leads
+    # прокси для скачивания записей (Мегафон блокирует иностранные IP)
+    RECORDING_PROXY = os.environ.get("RECORDING_PROXY")
     # OAuth-переменные (запасной путь, если понадобится)
     AMO_CLIENT_ID = os.environ.get("AMO_CLIENT_ID")
     AMO_CLIENT_SECRET = os.environ.get("AMO_CLIENT_SECRET")
