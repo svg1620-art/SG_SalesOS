@@ -137,6 +137,22 @@ def _save_recording(content: bytes) -> str:
     return path
 
 
+def download_recording_to_volume(app, url: str) -> str | None:
+    """Скачать запись по ссылке в Volume. Возвращает путь или None.
+
+    Пробуем без авторизации (внешняя ссылка Мегафона) и с Bearer amoCRM.
+    Вызывается фоновым worker'ом перед транскрибацией.
+    """
+    if not url:
+        return None
+    token = amo_access_token(app)
+    client = AmoClient(amo_base_domain(app) or "x", token or "")
+    content = client.download_recording(url)
+    if not content:
+        return None
+    return _save_recording(content)
+
+
 def _get_or_create_client(phone_norm: str, started_at: datetime) -> Client:
     client = Client.query.filter_by(phone_normalized=phone_norm).first()
     if client is None:
@@ -217,17 +233,11 @@ def poll_amo(app=None) -> dict:
                 status="new",
             )
 
-            audio = client.download_recording(link) if link else None
-            if audio:
-                call.audio_path = _save_recording(audio)
-            else:
-                call.status = "failed"
-                call.error = "Не удалось скачать запись (нет ссылки/доступа)."
-
+            # запись НЕ качаем здесь (иначе опрос упирается в таймаут запроса) —
+            # скачает фоновый worker перед транскрибацией
             db.session.add(call)
             db.session.commit()
-            if audio:
-                enqueue_call(call.id)
+            enqueue_call(call.id)
             new_calls += 1
         except Exception as exc:  # noqa: BLE001 — изоляция по звонку
             db.session.rollback()

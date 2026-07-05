@@ -26,7 +26,20 @@ def process_call(call_id: int) -> None:
         return
 
     try:
-        # 1) транскрибация (файл уже в Volume — этап downloading для ручной пуст)
+        # 0) скачивание записи из amoCRM/телефонии, если файла ещё нет
+        if not call.audio_path and call.source_link:
+            call.status = "downloading"
+            call.error = None
+            db.session.commit()
+            from ingest.amo_source import download_recording_to_volume
+
+            path = download_recording_to_volume(current_app, call.source_link)
+            if not path:
+                raise RuntimeError("Не удалось скачать запись по ссылке из amoCRM.")
+            call.audio_path = path
+            db.session.commit()
+
+        # 1) транскрибация (файл уже в Volume)
         call.status = "transcribing"
         call.error = None
         db.session.commit()
