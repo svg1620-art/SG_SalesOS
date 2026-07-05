@@ -35,6 +35,47 @@ def test_connection(app=None) -> tuple[bool, str]:
         return False, f"Ошибка подключения: {exc}"
 
 
+def sync_users(app=None) -> dict:
+    """Подтянуть пользователей amoCRM и авто-проставить amo_user_id по email.
+
+    Возвращает {ok, amo_users:[{id,name,email,matched_to}], matched, unmatched_sg}.
+    """
+    app = app or current_app
+    if not amo_configured(app):
+        return {"ok": False, "error": "amoCRM не настроен", "amo_users": []}
+
+    client = AmoClient(amo_base_domain(app), amo_access_token(app))
+    try:
+        amo_users = client.get_users()
+    except AmoError as exc:
+        return {"ok": False, "error": str(exc), "amo_users": []}
+
+    matched = 0
+    result_users = []
+    for au in amo_users:
+        matched_to = None
+        if au["email"]:
+            sg_user = User.query.filter(db.func.lower(User.email) == au["email"]).first()
+            if sg_user is not None:
+                sg_user.amo_user_id = au["id"]
+                matched_to = sg_user.full_name or sg_user.email
+                matched += 1
+        result_users.append({**au, "matched_to": matched_to})
+    db.session.commit()
+
+    unmatched_sg = [
+        (u.full_name or u.email)
+        for u in User.query.filter(User.amo_user_id.is_(None)).all()
+    ]
+    return {
+        "ok": True,
+        "amo_users": result_users,
+        "matched": matched,
+        "total": len(amo_users),
+        "unmatched_sg": unmatched_sg,
+    }
+
+
 def _audio_dir() -> str:
     path = current_app.config.get("AUDIO_DIR") or "/data"
     os.makedirs(path, exist_ok=True)
