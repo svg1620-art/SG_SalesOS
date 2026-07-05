@@ -76,6 +76,53 @@ def sync_users(app=None) -> dict:
     }
 
 
+def debug_recent_notes(app=None, days=None, limit=15) -> dict:
+    """Диагностика: сырые примечания-звонки за N дней (без дедупа/фильтров).
+
+    Показывает реальные поля amoCRM, чтобы понять, почему звонки не подтягиваются.
+    """
+    app = app or current_app
+    if not amo_configured(app):
+        return {"ok": False, "error": "amoCRM не настроен"}
+
+    client = AmoClient(amo_base_domain(app), amo_access_token(app))
+    entity = amo_entity(app)
+    days = days or amo_since_days(app)
+    since_ts = int((datetime.utcnow() - timedelta(days=days)).timestamp())
+
+    out = []
+    try:
+        for note in client.iter_call_notes(entity, since_ts):
+            params = note.get("params") or {}
+            out.append({
+                "id": note.get("id"),
+                "type": note.get("note_type"),
+                "updated_at": note.get("updated_at"),
+                "responsible": note.get("responsible_user_id"),
+                "param_keys": ", ".join(sorted(params.keys())),
+                "phone": params.get("phone"),
+                "link": (params.get("link") or "")[:80],
+                "duration": params.get("duration"),
+            })
+            if len(out) >= limit:
+                break
+    except AmoError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    # для подсказки — сколько на другой сущности
+    other = "leads" if entity == "contacts" else "contacts"
+    other_count = None
+    try:
+        other_count = sum(1 for _ in zip(range(limit), client.iter_call_notes(other, since_ts)))
+    except Exception:  # noqa: BLE001
+        other_count = None
+
+    return {
+        "ok": True, "entity": entity, "other": other, "other_count": other_count,
+        "days": days, "count": len(out), "notes": out,
+    }
+
+
 def _audio_dir() -> str:
     path = current_app.config.get("AUDIO_DIR") or "/data"
     os.makedirs(path, exist_ok=True)

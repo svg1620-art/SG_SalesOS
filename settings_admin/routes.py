@@ -93,11 +93,22 @@ def save_amo():
 @settings_bp.route("/amo/reset-cursor", methods=["POST"])
 @admin_required
 def amo_reset_cursor():
-    from datetime import datetime
-
-    set_setting("amo_last_sync", int(datetime.utcnow().timestamp()))
-    flash("Курсор сброшен: следующий опрос возьмёт только новые звонки (с этого момента).", "success")
+    # очищаем курсор → следующий опрос применит окно «за N дней»
+    set_setting("amo_last_sync", "")
+    flash("Курсор очищен: следующий опрос возьмёт звонки за последние N дней.", "success")
     return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/amo/debug", methods=["POST"])
+@admin_required
+def amo_debug():
+    from ingest.amo_source import debug_recent_notes
+
+    result = debug_recent_notes(current_app._get_current_object())
+    if not result.get("ok"):
+        flash(f"Диагностика: {result.get('error')}", "error")
+        return redirect(url_for("settings.index"))
+    return render_template("settings/amo_debug.html", result=result)
 
 
 @settings_bp.route("/amo/test", methods=["POST"])

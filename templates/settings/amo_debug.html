@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Диагностика amoCRM — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('settings.index') }}">Настройки</a> / Диагностика amoCRM
+  </div>
+  <h1 class="sg-h1">Диагностика amoCRM</h1>
+  <p class="sg-muted">
+    Сущность: <b>{{ result.entity }}</b>, окно: <b>{{ result.days }} дн.</b>,
+    найдено примечаний-звонков: <b class="{{ 'sg-ok' if result.count else 'sg-warn' }}">{{ result.count }}</b>.
+    {% if result.other_count is not none %}
+      На «{{ result.other }}» за то же окно: <b>{{ result.other_count }}{{ '+' if result.other_count >= 15 }}</b>.
+    {% endif %}
+  </p>
+
+  {% if result.count == 0 %}
+  <div class="sg-flash sg-flash--warning">
+    За выбранное окно на сущности «{{ result.entity }}» звонков не найдено.
+    {% if result.other_count %}<br>А на «{{ result.other }}» они есть — переключите «Сущность для опроса» в настройках на неё.{% else %}
+    <br>Проверьте: увеличьте «за сколько дней», убедитесь что у токена есть доступ к примечаниям, и что звонки в этот период вообще были.{% endif %}
+  </div>
+  {% else %}
+  <div class="sg-card sg-card--pad">
+    <table class="sg-table">
+      <thead>
+        <tr><th>ID</th><th>Тип</th><th>responsible</th><th>Поля params</th><th>phone</th><th>link</th><th>duration</th></tr>
+      </thead>
+      <tbody>
+        {% for n in result.notes %}
+        <tr>
+          <td class="sg-mono sg-sm">{{ n.id }}</td>
+          <td class="sg-sm">{{ n.type }}</td>
+          <td class="sg-mono sg-sm">{{ n.responsible or '—' }}</td>
+          <td class="sg-sm">{{ n.param_keys or '—' }}</td>
+          <td class="sg-mono sg-sm {{ 'sg-warn' if not n.phone }}">{{ n.phone or 'НЕТ' }}</td>
+          <td class="sg-mono sg-sm {{ 'sg-warn' if not n.link }}">{{ 'есть' if n.link else 'НЕТ' }}</td>
+          <td class="sg-mono sg-sm">{{ n.duration or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="sg-muted sg-sm">Если в столбцах <b>phone</b> или <b>link</b> стоит «НЕТ» — значит поле называется иначе; пришлите столбец «Поля params», подстроим извлечение.</p>
+  </div>
+  {% endif %}
+
+  <div class="sg-actions" style="margin-top:16px">
+    <a class="sg-btn sg-btn--primary" href="{{ url_for('settings.index') }}">Назад к настройкам</a>
+  </div>
+</section>
+{% endblock %}
