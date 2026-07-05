@@ -164,6 +164,51 @@ def amo_poll():
     return redirect(url_for("settings.index"))
 
 
+@settings_bp.route("/amo/poll-deals", methods=["POST"])
+@admin_required
+def amo_poll_deals():
+    from ingest.amo_deals import poll_deals
+
+    try:
+        result = poll_deals(current_app._get_current_object())
+    except Exception as exc:  # noqa: BLE001
+        flash(f"Ошибка опроса сделок: {exc}", "error")
+        return redirect(url_for("settings.index"))
+
+    if result.get("ok"):
+        flash(
+            f"Опрос сделок: новых {result['new']}, поздравлений {result.get('congrats', 0)}"
+            f"{' (первичная загрузка без поздравлений)' if result.get('backfill') else ''}.",
+            "success",
+        )
+    else:
+        flash(f"Опрос сделок не выполнен: {result.get('error')}", "error")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/amo/resync-deals", methods=["POST"])
+@admin_required
+def amo_resync_deals():
+    """Очистить и загрузить сделки заново по дате закрытия, без поздравлений."""
+    from ingest.amo_deals import resync_deals
+
+    try:
+        result = resync_deals(current_app._get_current_object())
+    except Exception as exc:  # noqa: BLE001
+        flash(f"Ошибка пересинхронизации: {exc}", "error")
+        return redirect(url_for("settings.index"))
+
+    if result.get("ok"):
+        flash(
+            f"Сделки пересобраны: удалено {result.get('deleted', 0)}, "
+            f"загружено {result['new']} (по дате закрытия, без поздравлений).",
+            "success",
+        )
+    else:
+        flash(f"Пересинхронизация не выполнена: {result.get('error')}", "error")
+    return redirect(url_for("settings.index"))
+
+
 @settings_bp.route("/test-pulse", methods=["POST"])
 @admin_required
 def test_pulse():

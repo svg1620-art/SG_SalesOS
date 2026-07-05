@@ -152,5 +152,22 @@
     <p class="sg-muted sg-sm">«Синхронизировать пользователей» подтянет ID из amoCRM и
        проставит <b>amoCRM user_id</b> по совпадению email (для привязки звонков к менеджерам).</p>
   </div>
+
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">🏆 Сделки и Leaderboard</h3>
+    <div class="sg-actions">
+      <form method="post" action="{{ url_for('settings.amo_poll_deals') }}">
+        <button class="sg-btn" type="submit">💰 Опросить сделки сейчас</button>
+      </form>
+      <form method="post" action="{{ url_for('settings.amo_resync_deals') }}"
+            onsubmit="return confirm('Удалить все загруженные сделки и загрузить заново по дате закрытия? Поздравления при этом НЕ отправляются.');">
+        <button class="sg-btn sg-btn--danger" type="submit">↺ Пересобрать сделки (без поздравлений)</button>
+      </form>
+    </div>
+    <p class="sg-muted sg-sm">Выручка на лидерборде считается по <b>дате закрытия</b>
+       сделки (перемещения в статус «Успешно реализовано»). «Пересобрать» — если данные
+       за месяц выглядят неверно: очистит и загрузит сделки заново без поздравлений.
+       Поздравления в бота уходят только за свежие закрытия (не старше 2 дней).</p>
+  </div>
 </section>
 {% endblock %}

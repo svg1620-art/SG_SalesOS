@@ -294,6 +294,14 @@ def _register_cli(app: Flask) -> None:
         result = poll_deals(app)
         click.echo(str(result))
 
+    @app.cli.command("amo-resync-deals")
+    def amo_resync_deals_cmd():
+        """Пересобрать сделки заново по дате закрытия (без поздравлений)."""
+        from ingest.amo_deals import resync_deals
+
+        result = resync_deals(app)
+        click.echo(str(result))
+
 
 # Экземпляр для gunicorn: `gunicorn app:app`
 app = create_app()

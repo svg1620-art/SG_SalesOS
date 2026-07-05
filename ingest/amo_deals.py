@@ -4,8 +4,13 @@
 для всех воронок. Тянем такие сделки, привязываем к менеджеру по
 User.amo_user_id ↔ responsible_user_id, храним сумму (price) и дату закрытия.
 
-XP: +50 за каждые 50 000 руб выручки менеджера (накопительно). При начислении
-XP шлём поздравление в бота.
+Месяц выручки определяется по `closed_at` — дате перемещения сделки в статус
+«успешно» (а НЕ по дате последнего изменения). Так сделка попадает ровно в тот
+месяц, когда была закрыта.
+
+XP: +50 за каждые 50 000 руб выручки менеджера за месяц (накопительно в рамках
+месяца). Поздравление шлётся только за реально свежие закрытия — при первичной
+загрузке (бэкфилле) истории поздравления НЕ отправляются, чтобы не спамить.
 """
 from datetime import datetime, timedelta
 from html import escape
@@ -22,7 +27,12 @@ from ingest.amo_client import AmoClient, AmoError
 WON_STATUS_ID = 142  # «Успешно реализовано» (системный статус amoCRM)
 XP_STEP_RUB = 50000
 XP_PER_STEP = 50
-_FIRST_RUN_DAYS = 45  # на первом опросе — сделки за последние N дней
+_FIRST_RUN_DAYS = 120  # на первом опросе — сделки, обновлённые за последние N дней
+# поздравляем только за закрытия не старше N дней (защита от старых сделок,
+# которые «всплыли» из-за постороннего редактирования)
+_CONGRATS_MAX_AGE_DAYS = 2
+# страховочный лимит поздравлений за один прогон (от лавины при сбоях)
+_MAX_CONGRATS_PER_RUN = 12
 
 
 def manager_revenue(manager_id: int) -> int:
@@ -65,19 +75,28 @@ def _send_congrats(app, manager, price: int, xp_gain: int) -> None:
         app.logger.warning("[deals] не удалось отправить поздравление: %s", exc)
 
 
-def poll_deals(app=None) -> dict:
-    """Опросить успешные сделки, завести новые, начислить XP и поздравить."""
+def poll_deals(app=None, congratulate=None) -> dict:
+    """Опросить успешные сделки, завести новые, начислить XP и поздравить.
+
+    congratulate=None → авто: на первом (бэкфилл) прогоне не поздравляем, дальше
+    поздравляем. Явное True/False переопределяет.
+    """
     app = app or current_app
     if not amo_configured(app):
         return {"ok": False, "error": "amoCRM не настроен", "new": 0}
 
     client = AmoClient(amo_base_domain(app), amo_access_token(app))
     since = get_setting("amo_deals_last_sync")
-    since_ts = int(since) if since and str(since).isdigit() else None
+    first_run = not (since and str(since).isdigit())
+    since_ts = None if first_run else int(since)
     if since_ts is None:
         since_ts = int((datetime.utcnow() - timedelta(days=_FIRST_RUN_DAYS)).timestamp())
+    # на бэкфилле истории не поздравляем — только импортируем
+    if congratulate is None:
+        congratulate = not first_run
 
-    new_count, max_updated = 0, since_ts or 0
+    congrats_after = datetime.utcnow() - timedelta(days=_CONGRATS_MAX_AGE_DAYS)
+    new_count, congrats_sent, max_updated = 0, 0, since_ts or 0
     try:
         leads = list(client.iter_leads(since_ts))
     except AmoError as exc:
@@ -100,8 +119,9 @@ def poll_deals(app=None) -> dict:
                 User.query.filter_by(amo_user_id=responsible).first()
                 if responsible else None
             )
-            won_ts = int(lead.get("closed_at") or updated or 0)
-            won_at = datetime.utcfromtimestamp(won_ts) if won_ts else datetime.utcnow()
+            # месяц выручки — строго по дате закрытия (перемещения в «успешно»)
+            closed_ts = int(lead.get("closed_at") or 0)
+            won_at = datetime.utcfromtimestamp(closed_ts) if closed_ts else None
 
             deal = Deal(
                 amo_lead_id=lead_id,
@@ -116,9 +136,13 @@ def poll_deals(app=None) -> dict:
             db.session.commit()
             new_count += 1
 
-            # XP и поздравление — по выручке за месяц закрытия сделки
-            # (лидерборд считается помесячно, поздравление ему соответствует)
-            if manager and price > 0:
+            # XP и поздравление — только за свежие закрытия, по выручке за месяц
+            eligible = (
+                congratulate and manager and price > 0 and won_at is not None
+                and won_at >= congrats_after
+                and congrats_sent < _MAX_CONGRATS_PER_RUN
+            )
+            if eligible:
                 total_after = manager_revenue_in_month(
                     manager.id, won_at.year, won_at.month
                 )
@@ -126,11 +150,31 @@ def poll_deals(app=None) -> dict:
                 xp_gain = xp_for_revenue(total_after) - xp_for_revenue(total_before)
                 if xp_gain > 0:
                     _send_congrats(app, manager, price, xp_gain)
+                    congrats_sent += 1
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
             app.logger.warning("[deals] сделка %s пропущена: %s", lead.get("id"), exc)
 
     if max_updated:
         set_setting("amo_deals_last_sync", max_updated)
-    app.logger.info("[deals] опрос завершён: новых успешных сделок %s", new_count)
-    return {"ok": True, "new": new_count, "last_sync": max_updated}
+    app.logger.info(
+        "[deals] опрос завершён: новых успешных сделок %s, поздравлений %s (backfill=%s)",
+        new_count, congrats_sent, first_run,
+    )
+    return {
+        "ok": True, "new": new_count, "congrats": congrats_sent,
+        "backfill": first_run, "last_sync": max_updated,
+    }
+
+
+def resync_deals(app=None) -> dict:
+    """Полностью пересобрать сделки: удалить все, сбросить курсор, загрузить
+    заново по дате закрытия — БЕЗ поздравлений. Чинит неверные месяцы/спам."""
+    app = app or current_app
+    deleted = Deal.query.delete()
+    set_setting("amo_deals_last_sync", "")
+    db.session.commit()
+    app.logger.info("[deals] пересинхронизация: удалено %s сделок", deleted)
+    result = poll_deals(app, congratulate=False)
+    result["deleted"] = deleted
+    return result
