@@ -316,6 +316,25 @@ def reprocess_stuck():
     return redirect(url_for("calls.index"))
 
 
+@calls_bp.route("/<int:call_id>/toggle-exclude", methods=["POST"])
+@admin_required
+def toggle_exclude(call_id):
+    call = db.session.get(Call, call_id) or abort(404)
+    call.excluded = not bool(call.excluded)
+    db.session.commit()
+    # пересчёт диалога без учёта исключённого
+    from processing.aggregate import recompute_dialog_for_call
+
+    recompute_dialog_for_call(call)
+    db.session.commit()
+    flash(
+        "Звонок исключён из рейтинга." if call.excluded
+        else "Звонок возвращён в рейтинг.",
+        "success",
+    )
+    return redirect(url_for("calls.detail", call_id=call.id))
+
+
 @calls_bp.route("/<int:call_id>/audio")
 @login_required
 def audio(call_id):
