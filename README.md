@@ -144,9 +144,14 @@ AI-генерация чек-листа требует `ANTHROPIC_API_KEY` и `C
 | `SCHEDULER_ENABLED` | `true` → включить APScheduler (сводка + пульс) |
 | `DIGEST_HOUR` | час дневной AI-сводки, по умолчанию `20` |
 | `TELEGRAM_HOUR` | час Telegram-пульса, по умолчанию `19` |
-| `TELEGRAM_BOT_TOKEN` | токен бота от @BotFather |
-| `TELEGRAM_CHAT_IDS` | chat_id получателей через запятую (РОП, владелец) |
+| `TELEGRAM_BOT_TOKEN` | токен бота от @BotFather (или задать в UI «Настройки») |
+| `TELEGRAM_CHAT_IDS` | chat_id получателей через запятую (или в UI «Настройки») |
 | `CLAUDE_MODEL_DIGEST` | (опц.) отдельная модель для сводки |
+
+> Токен Telegram, получателей и часы пульса/сводки можно задавать прямо в
+> интерфейсе — раздел **«Настройки»** (только админ). Значения из БД имеют
+> приоритет над переменными окружения; кнопка «Отправить тестовый пульс».
+> `SCHEDULER_ENABLED=true` всё равно нужен, чтобы включить авто-расписание.
 
 > На Railway gunicorn запускается c `--workers 1 --threads 4`, чтобы APScheduler
 > не дублировал задачи. Ручной запуск: `flask --app app run-digest`,

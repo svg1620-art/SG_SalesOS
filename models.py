@@ -278,6 +278,22 @@ class DailyDigest(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class Setting(db.Model):
+    """Настройки приложения (key-value), редактируемые из интерфейса.
+
+    Имеют приоритет над переменными окружения (fallback — env).
+    """
+
+    __tablename__ = "settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    value = db.Column(db.Text)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
 class AmoToken(db.Model):
     """OAuth-токены amoCRM (единственная строка)."""
 

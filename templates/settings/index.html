@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Настройки — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <h1 class="sg-h1">Настройки</h1>
+
+  {# --- Статус планировщика --- #}
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Расписание</h3>
+    {% if scheduler_running %}
+      <p class="sg-ok">✓ Планировщик запущен: пульс в {{ telegram_hour }}:00, сводка в {{ digest_hour }}:00.</p>
+    {% elif scheduler_enabled %}
+      <p class="sg-warn">Планировщик включён, но ещё не стартовал (проверьте логи).</p>
+    {% else %}
+      <p class="sg-warn">Авто-расписание выключено. Задайте переменную окружения
+        <code class="sg-mono">SCHEDULER_ENABLED=true</code> в Railway, чтобы пульс и сводка
+        отправлялись автоматически. Ручная отправка работает и без этого.</p>
+    {% endif %}
+  </div>
+
+  {# --- Telegram --- #}
+  <form method="post" action="{{ url_for('settings.save') }}" class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Telegram-бот (дневной пульс)</h3>
+    <p class="sg-muted sg-sm">
+      Создайте бота у <b>@BotFather</b> (<code class="sg-mono">/newbot</code>) и вставьте токен.
+      Получатели — chat_id через запятую. Как узнать chat_id: напишите боту, откройте
+      <code class="sg-mono">https://api.telegram.org/bot&lt;ТОКЕН&gt;/getUpdates</code> → поле <code class="sg-mono">chat.id</code>.
+    </p>
+
+    <label class="sg-field">
+      <span class="sg-field__label">Токен бота
+        {% if token_set %}<span class="sg-badge sg-badge--active">задан</span>{% else %}<span class="sg-badge">не задан</span>{% endif %}
+      </span>
+      <input class="sg-input sg-mono" name="telegram_bot_token" autocomplete="off"
+             placeholder="{{ 'оставьте пустым, чтобы не менять' if token_set else '123456789:AA...' }}">
+      {% if token_set %}<span class="sg-muted sg-sm">Чтобы удалить токен, впишите <code class="sg-mono">__clear__</code>.</span>{% endif %}
+    </label>
+
+    <label class="sg-field">
+      <span class="sg-field__label">Получатели (chat_id через запятую)</span>
+      <input class="sg-input sg-mono" name="telegram_chat_ids" value="{{ chat_ids }}"
+             placeholder="12345678, -1001234567890">
+    </label>
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Час отправки пульса</span>
+        <input class="sg-input sg-mono" type="number" name="telegram_hour" min="0" max="23" value="{{ telegram_hour }}">
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Час дневной сводки</span>
+        <input class="sg-input sg-mono" type="number" name="digest_hour" min="0" max="23" value="{{ digest_hour }}">
+      </label>
+    </div>
+
+    <div class="sg-actions">
+      <button class="sg-btn sg-btn--primary" type="submit">Сохранить</button>
+    </div>
+  </form>
+
+  {# --- Тест --- #}
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Проверка</h3>
+    <p class="sg-muted sg-sm">Отправить пульс за сегодня прямо сейчас (не дожидаясь расписания).</p>
+    <form method="post" action="{{ url_for('settings.test_pulse') }}">
+      <button class="sg-btn" type="submit">📨 Отправить тестовый пульс</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
