@@ -93,14 +93,48 @@ class AmoClient:
             page += 1
         return users
 
-    def download_recording(self, url: str) -> bytes | None:
-        """Скачать запись. Пробуем без авторизации (внешняя ссылка Мегафона),
-        затем с Bearer (если ссылка на amoCRM)."""
-        for headers in ({}, self._headers()):
-            try:
-                r = httpx.get(url, headers=headers, timeout=30, follow_redirects=True)
-                if r.status_code == 200 and r.content:
-                    return r.content
-            except Exception:  # noqa: BLE001
-                continue
-        return None
+    def _try(self, url, headers, follow=True):
+        try:
+            r = httpx.get(url, headers=headers, timeout=30, follow_redirects=follow)
+            return r
+        except Exception as exc:  # noqa: BLE001
+            return exc
+
+    def download_recording(self, url: str):
+        """Скачать запись. Возвращает (bytes|None, diag:str).
+
+        Порядок: без авторизации; затем с Bearer, но при 3xx-редиректе целевой
+        URL тянем БЕЗ auth-заголовка (подписанные ссылки провайдера часто
+        отвергают лишний Authorization).
+        """
+        diag = []
+
+        # 1) прямая ссылка без авторизации (внешний провайдер/Мегафон)
+        r = self._try(url, {}, follow=True)
+        if isinstance(r, Exception):
+            diag.append(f"noauth:err({type(r).__name__})")
+        else:
+            diag.append(f"noauth:{r.status_code}")
+            if r.status_code == 200 and r.content:
+                return r.content, "ok(noauth)"
+
+        # 2) с Bearer, редирект обрабатываем вручную
+        r = self._try(url, self._headers(), follow=False)
+        if isinstance(r, Exception):
+            diag.append(f"bearer:err({type(r).__name__})")
+        else:
+            diag.append(f"bearer:{r.status_code}")
+            if r.status_code == 200 and r.content:
+                return r.content, "ok(bearer)"
+            if r.status_code in (301, 302, 303, 307, 308):
+                loc = r.headers.get("location")
+                if loc:
+                    r2 = self._try(loc, {}, follow=True)  # цель — без auth
+                    if isinstance(r2, Exception):
+                        diag.append(f"redir:err({type(r2).__name__})")
+                    else:
+                        diag.append(f"redir:{r2.status_code}")
+                        if r2.status_code == 200 and r2.content:
+                            return r2.content, "ok(redirect)"
+
+        return None, "; ".join(diag)
