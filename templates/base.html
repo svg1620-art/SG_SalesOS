@@ -105,7 +105,38 @@
         });
       });
     }
-    function sgInitCharts() { sgInitRadars(); sgInitDonuts(); sgInitLines(); }
+    // Сгруппированные столбики по <canvas class="sg-barchart" data-bar="...json...">.
+    function sgInitBars() {
+      if (!window.Chart) return;
+      document.querySelectorAll('canvas.sg-barchart').forEach(function (cv) {
+        if (cv.dataset.rendered) return;
+        var d;
+        try { d = JSON.parse(cv.dataset.bar); } catch (e) { return; }
+        if (!d.datasets || !d.datasets.length) return;
+        cv.dataset.rendered = '1';
+        var css = getComputedStyle(document.documentElement);
+        var muted = (css.getPropertyValue('--sg-muted') || '#8A8A99').trim();
+        var grid = 'rgba(255,255,255,0.08)';
+        new Chart(cv, {
+          type: 'bar',
+          data: {
+            labels: d.labels,
+            datasets: d.datasets.map(function (ds) {
+              return { label: ds.label, data: ds.data, backgroundColor: ds.color, borderWidth: 0, borderRadius: 2 };
+            })
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, padding: 10 } } },
+            scales: {
+              x: { ticks: { color: muted }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { color: muted, precision: 0 }, grid: { color: grid } }
+            }
+          }
+        });
+      });
+    }
+    function sgInitCharts() { sgInitRadars(); sgInitDonuts(); sgInitLines(); sgInitBars(); }
     document.addEventListener('DOMContentLoaded', function () {
       sgInitCharts();
       document.body.addEventListener('htmx:afterSwap', sgInitCharts);

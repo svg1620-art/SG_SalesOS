@@ -45,6 +45,10 @@
       </select>
     </label>
     <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">Месяц (диаграмма)</span>
+      <input class="sg-input sg-input--sm" type="month" name="month" value="{{ filters.month }}">
+    </label>
+    <label class="sg-field sg-field--inline">
       <span class="sg-field__label">Зона</span>
       <select class="sg-input sg-input--sm" name="zone">
         <option value="">Все</option>
@@ -108,6 +112,21 @@
       {% endif %}
     {% else %}
       <p class="sg-muted">Сводка ещё не сформирована. Нажмите «Обновить» или дождитесь {{ '' }}вечернего запуска.</p>
+    {% endif %}
+  </div>
+
+  {# --- Диаграмма звонков по дням месяца --- #}
+  <div class="sg-card sg-card--pad">
+    <div class="sg-page__head">
+      <h3 class="sg-h3">Звонки менеджеров по дням — {{ bars.month_label }}</h3>
+      <span class="sg-muted sg-sm">Всего за месяц: <b class="sg-mono">{{ bars.total }}</b></span>
+    </div>
+    {% if bars.datasets %}
+    <div class="sg-bar-wrap">
+      <canvas class="sg-barchart" data-bar='{{ bars | tojson }}'></canvas>
+    </div>
+    {% else %}
+    <p class="sg-muted">За выбранный месяц звонков нет. Смените месяц в фильтрах.</p>
     {% endif %}
   </div>
 
