@@ -261,6 +261,25 @@ def reprocess(call_id):
     return redirect(url_for("calls.detail", call_id=call.id))
 
 
+@calls_bp.route("/<int:call_id>/push-amo", methods=["POST"])
+@admin_required
+def push_amo(call_id):
+    """Выгрузить оценку/транскрибацию звонка в ленту amoCRM (примечание)."""
+    from flask import current_app
+    from ingest.amo_notes import push_call_note
+
+    call = db.session.get(Call, call_id) or abort(404)
+    include_transcript = request.form.get("include_transcript") != "0"
+    result = push_call_note(
+        current_app._get_current_object(), call, include_transcript=include_transcript
+    )
+    if result.get("ok"):
+        flash("Выгружено в ленту amoCRM.", "success")
+    else:
+        flash(f"Не удалось выгрузить в amoCRM: {result.get('error')}", "error")
+    return redirect(url_for("calls.detail", call_id=call.id))
+
+
 def _remove_audio(call):
     if call.audio_path and os.path.exists(call.audio_path):
         try:

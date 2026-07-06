@@ -122,6 +122,25 @@ class AmoClient:
                 return
             page += 1
 
+    def add_note(self, entity: str, entity_id: int, text: str) -> dict:
+        """Добавить примечание (note_type=common) в ленту сущности amoCRM.
+
+        entity: 'contacts' | 'leads'. Возвращает ответ API (или бросает AmoError).
+        """
+        payload = [{"note_type": "common", "params": {"text": text}}]
+        try:
+            r = httpx.post(
+                f"{self.base}/api/v4/{entity}/{entity_id}/notes",
+                headers=self._headers(), json=payload, timeout=30,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise AmoError(f"сеть: {exc}")
+        if r.status_code == 401:
+            raise AmoError("401 — неверный или истёкший токен.")
+        if r.status_code not in (200, 201):
+            raise AmoError(f"note HTTP {r.status_code}: {r.text[:200]}")
+        return r.json() if r.content else {}
+
     def _try(self, url, headers, follow=True, proxy=None):
         try:
             with httpx.Client(proxy=proxy, timeout=30, follow_redirects=follow) as cl:
