@@ -13,10 +13,21 @@
       <span class="sg-field__label">Название</span>
       <input class="sg-input" name="name" value="{{ form.get('name', '') }}" required autofocus>
     </label>
-    <label class="sg-field">
-      <span class="sg-field__label">Сфера (домен)</span>
-      <input class="sg-input" name="domain" value="{{ form.get('domain', '') }}" placeholder="напр. HoReCa, медицина">
-    </label>
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Сфера (домен)</span>
+        <input class="sg-input" name="domain" value="{{ form.get('domain', '') }}" placeholder="напр. HoReCa, медицина">
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Отдел</span>
+        <select class="sg-input" name="department_id">
+          <option value="0">Все отделы (общий)</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {{ 'selected' if form.get('department_id')|string == d.id|string }}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
     <label class="sg-field">
       <span class="sg-field__label">Описание</span>
       <textarea class="sg-input" name="description" rows="3">{{ form.get('description', '') }}</textarea>

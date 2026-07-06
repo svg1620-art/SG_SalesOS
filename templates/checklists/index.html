@@ -11,6 +11,26 @@
     </div>
   </div>
 
+  {# --- сводка активных чек-листов по отделам --- #}
+  {% if checklists %}
+  <div class="sg-cards">
+    <div class="sg-card">
+      <div class="sg-card__label">Общий (все отделы)</div>
+      <div class="sg-card__value sg-sm">
+        {% if active_map[None] %}✅ {{ active_map[None].name }}{% else %}<span class="sg-muted">— не задан</span>{% endif %}
+      </div>
+    </div>
+    {% for d in departments %}
+    <div class="sg-card">
+      <div class="sg-card__label">{{ d.name }}</div>
+      <div class="sg-card__value sg-sm">
+        {% if active_map[d.id] %}✅ {{ active_map[d.id].name }}{% else %}<span class="sg-muted">— не задан{% if active_map[None] %}, действует общий{% endif %}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if not checklists %}
     <div class="sg-placeholder">
       Пока нет ни одного чек-листа. Создайте вручную, сгенерируйте через AI
@@ -21,6 +41,7 @@
       <thead>
         <tr>
           <th>Название</th>
+          <th>Отдел</th>
           <th>Сфера</th>
           <th>Критериев</th>
           <th>Σ весов</th>
@@ -37,6 +58,7 @@
             <a href="{{ url_for('checklists.edit', checklist_id=cl.id) }}"><b>{{ cl.name }}</b></a>
             {% if cl.description %}<div class="sg-muted sg-sm">{{ cl.description }}</div>{% endif %}
           </td>
+          <td>{{ cl.department.name if cl.department else 'Все отделы' }}</td>
           <td>{{ cl.domain or '—' }}</td>
           <td class="sg-mono">{{ cl.criteria | length }}</td>
           <td class="sg-mono {{ 'sg-warn' if wsum != 100 else '' }}">{{ wsum }}</td>
@@ -60,7 +82,8 @@
         {% endfor %}
       </tbody>
     </table>
-    <p class="sg-muted sg-sm">Активным может быть только один чек-лист — по нему оцениваются новые звонки.</p>
+    <p class="sg-muted sg-sm">Активный чек-лист — по одному на отдел (плюс один общий на случай,
+       если у отдела своего нет). Звонок оценивается по чек-листу отдела своего менеджера.</p>
   {% endif %}
 </section>
 {% endblock %}

@@ -43,6 +43,15 @@
         <span class="sg-field__label">Описание</span>
         <textarea class="sg-input" name="description" rows="2">{{ checklist.description or '' }}</textarea>
       </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Отдел (для какого отдела чек-лист)</span>
+        <select class="sg-input" name="department_id">
+          <option value="0" {{ 'selected' if not checklist.department_id }}>Все отделы (общий)</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {{ 'selected' if checklist.department_id == d.id }}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <div class="sg-grid-2">
         <label class="sg-field">
           <span class="sg-field__label">🟢 Зелёный порог (≥)</span>

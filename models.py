@@ -78,12 +78,18 @@ class Checklist(db.Model):
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
     domain = db.Column(db.String(255))  # свободный текст, напр. "HoReCa"
+    # отдел, к которому привязан чек-лист (None — общий/для всех отделов).
+    # активный чек-лист — по одному на отдел (+ один общий).
+    department_id = db.Column(
+        db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True
+    )
     # пороги зон (см. раздел 12 ТЗ)
     zone_green_min = db.Column(db.Integer, nullable=False, default=80)
     zone_yellow_min = db.Column(db.Integer, nullable=False, default=60)
     is_active = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
+    department = db.relationship("Department")
     criteria = db.relationship(
         "Criterion",
         back_populates="checklist",

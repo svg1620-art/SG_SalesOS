@@ -10,10 +10,20 @@ from flask import (
 )
 
 from extensions import db
-from models import Checklist, Criterion
+from models import Checklist, Criterion, Department
 from auth.decorators import admin_required
 
 checklists_bp = Blueprint("checklists", __name__, url_prefix="/checklists")
+
+
+def _read_department_id(form):
+    """department_id из формы: пусто/'0' → None (общий), иначе валидный отдел."""
+    raw = (form.get("department_id") or "").strip()
+    if not raw or raw == "0":
+        return None
+    if raw.isdigit() and db.session.get(Department, int(raw)) is not None:
+        return int(raw)
+    return None
 
 
 def _parse_int(value, default=0):
@@ -42,27 +52,41 @@ def index():
     checklists = Checklist.query.order_by(
         Checklist.is_active.desc(), Checklist.created_at.desc()
     ).all()
-    return render_template("checklists/index.html", checklists=checklists)
+    departments = Department.query.order_by(Department.name).all()
+    # активный чек-лист по каждому отделу + общий (для сводки сверху)
+    active_map = {None: Checklist.query.filter_by(
+        department_id=None, is_active=True).first()}
+    for d in departments:
+        active_map[d.id] = Checklist.query.filter_by(
+            department_id=d.id, is_active=True).first()
+    return render_template(
+        "checklists/index.html", checklists=checklists,
+        departments=departments, active_map=active_map,
+    )
 
 
 @checklists_bp.route("/new", methods=["GET", "POST"])
 @admin_required
 def create():
+    departments = Department.query.order_by(Department.name).all()
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         if not name:
             flash("Укажите название чек-листа.", "error")
-            return render_template("checklists/new.html", form=request.form), 400
+            return render_template(
+                "checklists/new.html", form=request.form, departments=departments), 400
 
         green, yellow, err = _read_thresholds(request.form)
         if err:
             flash(err, "error")
-            return render_template("checklists/new.html", form=request.form), 400
+            return render_template(
+                "checklists/new.html", form=request.form, departments=departments), 400
 
         checklist = Checklist(
             name=name[:255],
             description=(request.form.get("description") or "").strip(),
             domain=(request.form.get("domain") or "").strip()[:255],
+            department_id=_read_department_id(request.form),
             zone_green_min=green,
             zone_yellow_min=yellow,
             is_active=False,
@@ -72,7 +96,7 @@ def create():
         flash("Чек-лист создан. Добавьте критерии.", "success")
         return redirect(url_for("checklists.edit", checklist_id=checklist.id))
 
-    return render_template("checklists/new.html", form={})
+    return render_template("checklists/new.html", form={}, departments=departments)
 
 
 @checklists_bp.route("/<int:checklist_id>")
@@ -80,8 +104,10 @@ def create():
 def edit(checklist_id):
     checklist = db.session.get(Checklist, checklist_id) or abort(404)
     weight_sum = sum(c.weight for c in checklist.criteria)
+    departments = Department.query.order_by(Department.name).all()
     return render_template(
-        "checklists/edit.html", checklist=checklist, weight_sum=weight_sum
+        "checklists/edit.html", checklist=checklist, weight_sum=weight_sum,
+        departments=departments,
     )
 
 
@@ -102,6 +128,13 @@ def update(checklist_id):
     checklist.name = name[:255]
     checklist.description = (request.form.get("description") or "").strip()
     checklist.domain = (request.form.get("domain") or "").strip()[:255]
+    new_dept = _read_department_id(request.form)
+    # при смене отдела активного чек-листа снимаем активность (чтобы не было
+    # двух активных в одном отделе); админ активирует заново явно
+    if new_dept != checklist.department_id and checklist.is_active:
+        checklist.is_active = False
+        flash("Отдел изменён — активность снята, активируйте чек-лист заново.", "warning")
+    checklist.department_id = new_dept
     checklist.zone_green_min = green
     checklist.zone_yellow_min = yellow
     db.session.commit()
@@ -117,11 +150,14 @@ def activate(checklist_id):
         flash("Нельзя активировать чек-лист без критериев.", "error")
         return redirect(url_for("checklists.edit", checklist_id=checklist_id))
 
-    # единственный активный
-    Checklist.query.filter_by(is_active=True).update({"is_active": False})
+    # единственный активный в рамках отдела (или среди общих, если отдел не задан)
+    Checklist.query.filter_by(
+        is_active=True, department_id=checklist.department_id
+    ).update({"is_active": False})
     checklist.is_active = True
     db.session.commit()
-    flash(f"Чек-лист «{checklist.name}» активирован.", "success")
+    scope = checklist.department.name if checklist.department else "Все отделы (общий)"
+    flash(f"Чек-лист «{checklist.name}» активирован для «{scope}».", "success")
     return redirect(url_for("checklists.index"))
 
 

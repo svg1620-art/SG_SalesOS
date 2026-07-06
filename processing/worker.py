@@ -70,11 +70,11 @@ def process_call(call_id: int) -> None:
         call.status = "analyzing"
         db.session.commit()
 
-        checklist = None
-        if call.checklist_id:
-            checklist = db.session.get(Checklist, call.checklist_id)
-        if checklist is None:
-            checklist = Checklist.query.filter_by(is_active=True).first()
+        # чек-лист: явный на звонке → активный чек-лист отдела менеджера →
+        # общий активный → любой активный
+        from checklists.selection import resolve_checklist_for_call
+
+        checklist = resolve_checklist_for_call(call)
         if checklist is None:
             raise RuntimeError("Нет активного чек-листа для оценки звонка.")
         call.checklist_id = checklist.id
