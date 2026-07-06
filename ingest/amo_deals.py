@@ -107,8 +107,13 @@ def poll_deals(app=None, congratulate=None) -> dict:
         try:
             updated = int(lead.get("updated_at") or 0)
             max_updated = max(max_updated, updated)
-            if lead.get("status_id") != WON_STATUS_ID:
-                continue  # только выигранные
+            # выигранной считаем только сделку в статусе 142 (парсим как int —
+            # API может отдать строку) И с реальной датой закрытия closed_at.
+            if int(lead.get("status_id") or 0) != WON_STATUS_ID:
+                continue  # не выиграна (в работе/другой этап)
+            closed_ts = int(lead.get("closed_at") or 0)
+            if not closed_ts:
+                continue  # нет даты закрытия — не считаем «оплата получена»
             lead_id = lead.get("id")
             if lead_id and Deal.query.filter_by(amo_lead_id=lead_id).first():
                 continue  # уже учтена
@@ -119,9 +124,8 @@ def poll_deals(app=None, congratulate=None) -> dict:
                 User.query.filter_by(amo_user_id=responsible).first()
                 if responsible else None
             )
-            # месяц выручки — строго по дате закрытия (перемещения в «успешно»)
-            closed_ts = int(lead.get("closed_at") or 0)
-            won_at = datetime.utcfromtimestamp(closed_ts) if closed_ts else None
+            # месяц выручки — строго по дате закрытия (перехода в «оплата получена»)
+            won_at = datetime.utcfromtimestamp(closed_ts)
 
             deal = Deal(
                 amo_lead_id=lead_id,
