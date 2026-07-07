@@ -219,7 +219,12 @@ a:hover { text-decoration: underline; }
 /* --- Заголовки/структура (Этап 2) --- */
 .sg-h2 { font-size: 20px; font-weight: 800; margin: 0; }
 .sg-h3 { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+.sg-h4 { font-size: 14px; font-weight: 700; margin: 0; }
 .sg-sm { font-size: 12.5px; }
+
+/* индикатор загрузки htmx (по умолчанию скрыт, показывается во время запроса) */
+.htmx-indicator { opacity: 0; transition: opacity .2s; }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
 .sg-page__head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 16px; flex-wrap: wrap; margin-top: 6px;

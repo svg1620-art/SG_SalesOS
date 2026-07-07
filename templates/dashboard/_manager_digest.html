@@ -1,0 +1,40 @@
+{# Фрагмент персональной сводки по менеджеру (HTMX-swap) #}
+{% if not d.ok %}
+  <div class="sg-flash sg-flash--error">{{ d.error }}</div>
+{% else %}
+  <div class="sg-digest-inner">
+    <div class="sg-page__head">
+      <h4 class="sg-h4">🧠 Сводка: {{ d.manager }}
+        <span class="sg-muted sg-sm">— {{ d.period_label }}</span>
+      </h4>
+      <span class="sg-muted sg-sm">
+        Звонков: <b class="sg-mono">{{ d.stats.calls }}</b>,
+        ср. балл <b class="sg-mono">{{ d.stats.avg if d.stats.avg is not none else '—' }}</b>
+        {% if d.stats.hist_avg is not none %}<span class="sg-muted">(было {{ d.stats.hist_avg }})</span>{% endif %}
+        · <span class="sg-zone--green">{{ d.stats.zones.green }}</span>/<span class="sg-zone--yellow">{{ d.stats.zones.yellow }}</span>/<span class="sg-zone--red">{{ d.stats.zones.red }}</span>
+      </span>
+    </div>
+
+    <p>{{ d.summary or 'Сводка пуста.' }}</p>
+
+    {% if d.focuses %}
+    <ul class="sg-focuses">
+      {% for f in d.focuses %}<li>🎯 {{ f }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if d.stats.top_missed %}
+    <div class="sg-muted sg-sm">Частые упущения:
+      {% for m in d.stats.top_missed %}{{ m.label }} (×{{ m.count }}){% if not loop.last %}, {% endif %}{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if d.stats.red_calls %}
+    <div class="sg-muted sg-sm">Красные звонки:
+      {% for rc in d.stats.red_calls %}
+      <a href="{{ url_for('calls.detail', call_id=rc.id) }}">#{{ rc.id }} ({{ rc.score }})</a>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+{% endif %}

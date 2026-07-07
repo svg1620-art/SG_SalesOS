@@ -5,7 +5,7 @@
 from calendar import monthrange
 from datetime import datetime, timedelta
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
 from flask_login import login_required, current_user
 
 from collections import defaultdict
@@ -230,6 +230,32 @@ def index():
             "month": f"{m_year:04d}-{m_num:02d}",
         },
     )
+
+
+@dashboard_bp.route("/manager/<int:manager_id>/digest", methods=["POST", "GET"])
+@login_required
+def manager_digest(manager_id):
+    """Персональная AI-сводка по менеджеру (HTMX-фрагмент).
+
+    Доступ: админ — по любому менеджеру; менеджер — только по себе.
+    Период берётся из from/to (по умолчанию последние 30 дней).
+    """
+    from flask import current_app
+    from digest.manager import generate_manager_digest
+
+    if not current_user.is_admin and current_user.id != manager_id:
+        abort(403)
+
+    now = datetime.utcnow()
+    date_from = _parse_date(request.args.get("from"), now - timedelta(days=30))
+    date_to = _parse_date(request.args.get("to"), now).replace(
+        hour=23, minute=59, second=59
+    )
+
+    result = generate_manager_digest(
+        current_app._get_current_object(), manager_id, date_from, date_to
+    )
+    return render_template("dashboard/_manager_digest.html", d=result)
 
 
 @dashboard_bp.route("/digest/refresh", methods=["POST"])

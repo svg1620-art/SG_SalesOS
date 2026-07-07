@@ -115,6 +115,26 @@
     {% endif %}
   </div>
 
+  {# --- Персональная сводка по выбранному менеджеру --- #}
+  {% if filters.manager_id %}
+  <div class="sg-card sg-card--pad sg-digest">
+    <div class="sg-page__head">
+      <h3 class="sg-h3">🧠 Сводка по менеджеру</h3>
+      <button class="sg-btn sg-btn--sm sg-btn--primary"
+              hx-post="{{ url_for('dashboard.manager_digest', manager_id=filters.manager_id, **{'from': filters.from, 'to': filters.to}) }}"
+              hx-target="#manager-digest-box" hx-swap="innerHTML"
+              hx-indicator="#manager-digest-load">
+        Сформировать за период
+      </button>
+    </div>
+    <div id="manager-digest-box">
+      <p class="sg-muted">Нажмите «Сформировать за период» — AI соберёт персональную
+        сводку и рекомендации по выбранному менеджеру за {{ filters.from }}–{{ filters.to }}.</p>
+    </div>
+    <p id="manager-digest-load" class="sg-muted sg-sm htmx-indicator">⏳ Готовлю сводку…</p>
+  </div>
+  {% endif %}
+
   {# --- Диаграмма звонков по дням месяца --- #}
   <div class="sg-card sg-card--pad">
     <div class="sg-page__head">

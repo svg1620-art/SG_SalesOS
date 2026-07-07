@@ -26,6 +26,24 @@
     </div>
   </div>
 
+  {# --- Персональная AI-сводка --- #}
+  <div class="sg-card sg-card--pad sg-digest">
+    <div class="sg-page__head">
+      <h3 class="sg-h3">🧠 Моя сводка от AI-наставника</h3>
+      <button class="sg-btn sg-btn--sm sg-btn--primary"
+              hx-post="{{ url_for('dashboard.manager_digest', manager_id=current_user.id) }}"
+              hx-target="#my-digest-box" hx-swap="innerHTML"
+              hx-indicator="#my-digest-load">
+        Сформировать сводку
+      </button>
+    </div>
+    <div id="my-digest-box">
+      <p class="sg-muted">Нажмите «Сформировать сводку» — AI разберёт ваши звонки за
+        последние 30 дней и подскажет, на чём сфокусироваться.</p>
+    </div>
+    <p id="my-digest-load" class="sg-muted sg-sm htmx-indicator">⏳ Готовлю сводку…</p>
+  </div>
+
   {# --- Что улучшить на этой неделе --- #}
   {% if focus %}
   <div class="sg-card sg-card--pad sg-focus">
