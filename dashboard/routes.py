@@ -79,6 +79,51 @@ def _build_month_bars(month_year, month_num, dept_manager_ids):
     }
 
 
+def _manager_cards(period_calls, date_from, date_to, dept_manager_ids):
+    """Карточки менеджеров: объём звонков за период, отклонение к такому же
+    прошлому периоду (стрелка/%), разбивка по зонам."""
+    span = date_to - date_from
+    prev_from = date_from - span
+    prev_calls = Call.query.filter(
+        Call.status == "done",
+        Call.excluded.isnot(True),
+        Call.started_at >= prev_from,
+        Call.started_at < date_from,
+    ).all()
+    if dept_manager_ids is not None:
+        prev_calls = [c for c in prev_calls if c.manager_id in dept_manager_ids]
+
+    cur_by = defaultdict(list)
+    for c in period_calls:
+        cur_by[c.manager_id].append(c)
+    prev_by = defaultdict(int)
+    for c in prev_calls:
+        prev_by[c.manager_id] += 1
+
+    cards = []
+    for mid, mcalls in cur_by.items():
+        manager = db.session.get(User, mid) if mid else None
+        cur = len(mcalls)
+        prev = prev_by.get(mid, 0)
+        if prev > 0:
+            deviation = round((cur - prev) / prev * 100)
+            direction = "up" if cur > prev else "down" if cur < prev else "flat"
+        else:
+            deviation = 100 if cur > 0 else 0
+            direction = "up" if cur > 0 else "flat"
+        cards.append({
+            "manager": manager,
+            "name": (manager.full_name or manager.email) if manager else "Не назначен",
+            "calls": cur,
+            "prev": prev,
+            "deviation": deviation,
+            "direction": direction,
+            "zones": _zone_counts(mcalls),
+        })
+    cards.sort(key=lambda c: c["calls"], reverse=True)
+    return cards
+
+
 def _parse_date(raw, default):
     raw = (raw or "").strip()
     if not raw:
@@ -195,10 +240,8 @@ def index():
         )
     leaderboard.sort(key=lambda r: (r["avg_score"] is not None, r["avg_score"] or 0), reverse=True)
 
-    # --- лента (scoped + фильтр зоны) ---
-    feed = [c for c in scoped if not zone or c.zone == zone]
-    feed.sort(key=lambda c: c.started_at or c.created_at, reverse=True)
-    feed = feed[:100]
+    # --- карточки менеджеров: объём звонков + отклонение к прошлому периоду + зоны ---
+    manager_cards = _manager_cards(period_calls, date_from, date_to, dept_manager_ids)
 
     # --- дневная сводка (последняя) ---
     digest = DailyDigest.query.order_by(DailyDigest.date.desc()).first()
@@ -216,7 +259,7 @@ def index():
         "dashboard/index.html",
         kpi=kpi,
         leaderboard=leaderboard,
-        feed=feed,
+        manager_cards=manager_cards,
         managers=managers,
         digest=digest,
         departments=departments,

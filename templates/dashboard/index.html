@@ -10,7 +10,7 @@
 
 {% block content %}
 <section class="sg-page">
-  <h1 class="sg-h1">Дашборд РОПа</h1>
+  <h1 class="sg-h1">DashBoard 📈</h1>
 
   {# --- Вкладки отделов --- #}
   {% if departments %}
@@ -84,6 +84,40 @@
       <div class="sg-muted sg-sm">{{ kpi.zone_pct.green }}% / {{ kpi.zone_pct.yellow }}% / {{ kpi.zone_pct.red }}%</div>
     </div>
   </div>
+
+  {# --- Карточки менеджеров: объём + отклонение к прошлому периоду + зоны --- #}
+  <div class="sg-page__head" style="margin-top:18px">
+    <h3 class="sg-h3">Менеджеры за период</h3>
+    <span class="sg-muted sg-sm">{{ filters.from }} – {{ filters.to }} · отклонение к предыдущему такому же периоду</span>
+  </div>
+  {% if manager_cards %}
+  <div class="sg-mgr-cards">
+    {% for m in manager_cards %}
+    <div class="sg-mgr-card">
+      <div class="sg-mgr-card__name">{{ m.name }}</div>
+      <div class="sg-mgr-card__main">
+        <span class="sg-mgr-card__calls sg-mono">{{ m.calls }}</span>
+        <span class="sg-mgr-card__unit">звонков</span>
+        {% if m.direction == 'up' %}
+          <span class="sg-delta sg-delta--up">▲ {{ m.deviation }}%</span>
+        {% elif m.direction == 'down' %}
+          <span class="sg-delta sg-delta--down">▼ {{ m.deviation }}%</span>
+        {% else %}
+          <span class="sg-delta sg-delta--flat">▬ {{ m.deviation }}%</span>
+        {% endif %}
+      </div>
+      <div class="sg-mgr-card__prev sg-muted sg-sm">было {{ m.prev }} за прошлый период</div>
+      <div class="sg-mgr-card__zones">
+        <span class="sg-zonechip sg-zonechip--green">🟢 {{ m.zones.green }}</span>
+        <span class="sg-zonechip sg-zonechip--yellow">🟡 {{ m.zones.yellow }}</span>
+        <span class="sg-zonechip sg-zonechip--red">🔴 {{ m.zones.red }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="sg-placeholder">Нет обработанных звонков за период.</div>
+  {% endif %}
 
   {# --- Дневная AI-сводка --- #}
   <div class="sg-card sg-card--pad sg-digest">
@@ -196,31 +230,9 @@
     </div>
   </div>
 
-  {# --- Лента звонков --- #}
   <div class="sg-page__head" style="margin-top:20px">
-    <h3 class="sg-h3">Лента звонков</h3>
-    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.upload') }}">+ Загрузить</a>
+    <span class="sg-muted sg-sm">Полный список звонков с фильтрами и выгрузкой — в разделе «Звонки».</span>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.index') }}">→ Перейти к звонкам</a>
   </div>
-  {% if feed %}
-  <table class="sg-table">
-    <thead>
-      <tr><th>Дата</th><th>Менеджер</th><th>Клиент</th><th>Балл</th><th>Зона</th></tr>
-    </thead>
-    <tbody>
-      {% for c in feed %}
-      <tr class="{{ 'sg-row--red' if c.zone == 'red' else '' }}"
-          onclick="location.href='{{ url_for('calls.detail', call_id=c.id) }}'">
-        <td class="sg-mono sg-sm">{{ c.started_at.strftime('%d.%m %H:%M') if c.started_at else '—' }}</td>
-        <td>{{ c.manager.full_name or c.manager.email if c.manager else '—' }}</td>
-        <td>{{ c.client.name or c.client.phone_normalized if c.client else '—' }}</td>
-        <td class="sg-mono">{{ c.overall_score if c.overall_score is not none else '—' }}</td>
-        <td>{{ zone_badge(c.zone) }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="sg-placeholder">Нет звонков под выбранные фильтры.</div>
-  {% endif %}
 </section>
 {% endblock %}

@@ -8,8 +8,6 @@
     <h1 class="sg-h1">{{ 'Звонки' if current_user.is_admin else 'Мои звонки' }}</h1>
     {% if current_user.is_admin %}
     <div class="sg-actions">
-      <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_csv') }}">⭳ CSV</a>
-      <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_txt') }}">⭳ TXT</a>
       <form method="post" action="{{ url_for('calls.reprocess_stuck') }}">
         <button class="sg-btn sg-btn--sm" type="submit">↻ Обработать зависшие</button>
       </form>
@@ -25,6 +23,45 @@
     </div>
     {% endif %}
   </div>
+
+  {# --- Фильтры --- #}
+  <form method="get" class="sg-filters" action="{{ url_for('calls.index') }}">
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">С</span>
+      <input class="sg-input sg-input--sm" type="date" name="from" value="{{ filters.from }}">
+    </label>
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">По</span>
+      <input class="sg-input sg-input--sm" type="date" name="to" value="{{ filters.to }}">
+    </label>
+    {% if current_user.is_admin %}
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">Менеджер</span>
+      <select class="sg-input sg-input--sm" name="manager_id">
+        <option value="">Все</option>
+        {% for m in managers %}
+        <option value="{{ m.id }}" {{ 'selected' if filters.manager_id == m.id }}>{{ m.full_name or m.email }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">Зона</span>
+      <select class="sg-input sg-input--sm" name="zone">
+        <option value="">Все</option>
+        <option value="green" {{ 'selected' if filters.zone == 'green' }}>🟢 Зелёная</option>
+        <option value="yellow" {{ 'selected' if filters.zone == 'yellow' }}>🟡 Жёлтая</option>
+        <option value="red" {{ 'selected' if filters.zone == 'red' }}>🔴 Красная</option>
+      </select>
+    </label>
+    <button class="sg-btn sg-btn--primary sg-btn--sm" type="submit">Применить</button>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.index') }}">Сброс</a>
+    {% if current_user.is_admin %}
+    <span class="sg-filters__sep"></span>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_csv') }}?{{ query_string }}">⭳ CSV</a>
+    <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.export_txt') }}?{{ query_string }}">⭳ TXT транскрипты</a>
+    {% endif %}
+  </form>
 
   {% if not calls %}
     <div class="sg-placeholder">

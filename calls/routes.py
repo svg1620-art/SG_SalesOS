@@ -44,11 +44,41 @@ def _get_call_or_404(call_id: int) -> Call:
 @calls_bp.route("/")
 @login_required
 def index():
-    query = Call.query.order_by(Call.created_at.desc())
+    now = datetime.utcnow()
+    date_from = _parse_date(request.args.get("from"), now - timedelta(days=30))
+    date_to_raw = _parse_date(request.args.get("to"), now)
+    date_to = date_to_raw.replace(hour=23, minute=59, second=59)
+    zone = request.args.get("zone") or ""
+    manager_id = request.args.get("manager_id")
+    manager_id = int(manager_id) if manager_id and manager_id.isdigit() else None
+
+    query = Call.query.filter(Call.started_at >= date_from, Call.started_at <= date_to)
     if not current_user.is_admin:
         query = query.filter(Call.manager_id == current_user.id)
-    calls = query.limit(200).all()
-    return render_template("calls/index.html", calls=calls)
+        manager_id = None  # менеджеру не даём выбор чужих
+    elif manager_id:
+        query = query.filter(Call.manager_id == manager_id)
+    if zone in {"green", "yellow", "red"}:
+        query = query.filter(Call.zone == zone)
+
+    calls = query.all()
+    calls.sort(key=lambda c: c.started_at or c.created_at, reverse=True)
+    calls = calls[:500]
+
+    managers = (
+        User.query.filter_by(is_active=True).order_by(User.full_name, User.email).all()
+        if current_user.is_admin else []
+    )
+    filters = {
+        "from": date_from.strftime("%Y-%m-%d"),
+        "to": date_to_raw.strftime("%Y-%m-%d"),
+        "manager_id": manager_id,
+        "zone": zone,
+    }
+    return render_template(
+        "calls/index.html", calls=calls, managers=managers, filters=filters,
+        query_string=request.query_string.decode(),
+    )
 
 
 def _checklists_for_select():

@@ -269,6 +269,30 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 .sg-badge--excluded { color: var(--sg-muted); border-color: var(--sg-border); text-transform: none; letter-spacing: 0; }
 .sg-badge--leader { color: #0A0A0D; background: #EAB308; border-color: #EAB308; margin-left: 8px; }
 
+/* --- Карточки менеджеров на дашборде --- */
+.sg-mgr-cards {
+  display: grid; gap: 12px; margin-top: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+.sg-mgr-card {
+  border: 1px solid var(--sg-border); background: var(--sg-surface);
+  border-radius: var(--sg-radius); padding: 14px 16px;
+}
+.sg-mgr-card__name { font-weight: 700; margin-bottom: 8px; }
+.sg-mgr-card__main { display: flex; align-items: baseline; gap: 8px; }
+.sg-mgr-card__calls { font-size: 30px; font-weight: 800; }
+.sg-mgr-card__unit { color: var(--sg-muted); font-size: 13px; }
+.sg-delta { margin-left: auto; font-weight: 700; font-size: 14px; }
+.sg-delta--up { color: var(--sg-green); }
+.sg-delta--down { color: var(--sg-red); }
+.sg-delta--flat { color: var(--sg-muted); }
+.sg-mgr-card__prev { margin-top: 2px; }
+.sg-mgr-card__zones { display: flex; gap: 8px; margin-top: 10px; }
+.sg-zonechip {
+  font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+  background: var(--sg-surface-2); border: 1px solid var(--sg-border);
+}
+
 /* --- Leaderboard / геймификация --- */
 .sg-xp { color: var(--sg-cyan); font-weight: 700; }
 .sg-lead-hero {
