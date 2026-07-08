@@ -61,6 +61,13 @@
     </label>
 
     <label class="sg-field">
+      <span class="sg-field__label">План звонков в день (необязательно)</span>
+      <input class="sg-input sg-mono" type="number" min="0" name="daily_call_plan"
+             value="{{ cur.get('daily_call_plan', user.daily_call_plan if is_edit else '') or '' }}"
+             placeholder="напр. 30 — для отметки выполнения плана">
+    </label>
+
+    <label class="sg-field">
       <span class="sg-field__label">
         Пароль {% if not is_edit %}<span class="sg-req">*</span>{% else %}<span class="sg-muted sg-sm">(оставьте пустым, чтобы не менять)</span>{% endif %}
       </span>

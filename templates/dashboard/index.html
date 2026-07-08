@@ -94,7 +94,16 @@
   <div class="sg-mgr-cards">
     {% for m in manager_cards %}
     <div class="sg-mgr-card">
-      <div class="sg-mgr-card__name">{{ m.name }}</div>
+      <div class="sg-mgr-card__name">
+        {{ m.name }}
+        {% if m.plan %}
+          {% if m.plan.met %}
+          <span class="sg-plan sg-plan--ok" title="План звонков выполнен ({{ m.plan.target }})">✅ план</span>
+          {% else %}
+          <span class="sg-plan sg-plan--fail" title="План звонков не выполнен">⚠️ −{{ m.plan.remaining }}</span>
+          {% endif %}
+        {% endif %}
+      </div>
       <div class="sg-mgr-card__main">
         <span class="sg-mgr-card__calls sg-mono">{{ m.calls }}</span>
         <span class="sg-mgr-card__unit">звонков</span>
@@ -107,6 +116,9 @@
         {% endif %}
       </div>
       <div class="sg-mgr-card__prev sg-muted sg-sm">было {{ m.prev }} за прошлый период</div>
+      {% if m.plan %}
+      <div class="sg-muted sg-sm">План {{ m.plan.per_day }}/день · цель за период {{ m.plan.target }} · факт {{ m.calls }}</div>
+      {% endif %}
       {% if m.balance %}
       <div class="sg-balance" title="Баланс коммуникации: сколько менеджер говорил / слушал">
         <div class="sg-balance__bar">

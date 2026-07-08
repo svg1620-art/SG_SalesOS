@@ -305,6 +305,14 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 .sg-balance--sm { margin: 0; display: flex; align-items: center; gap: 8px; min-width: 120px; }
 .sg-balance--sm .sg-balance__bar { flex: 1; height: 6px; }
 
+/* --- Тег выполнения плана звонков --- */
+.sg-plan {
+  display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px;
+  border-radius: 999px; margin-left: 6px; vertical-align: middle;
+}
+.sg-plan--ok { color: #0A0A0D; background: var(--sg-green); }
+.sg-plan--fail { color: #0A0A0D; background: var(--sg-yellow); }
+
 /* --- Leaderboard / геймификация --- */
 .sg-xp { color: var(--sg-cyan); font-weight: 700; }
 .sg-lead-hero {

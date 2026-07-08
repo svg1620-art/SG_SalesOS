@@ -89,6 +89,12 @@ def build_pulse(app, day) -> str:
             f"\n👤 <b>{escape(name)}</b> — {dialogs} диал., "
             f"ср. {avg_dur}, балл {avg_score} {emoji}"
         )
+        # выполнение плана звонков за день
+        plan = manager.daily_call_plan if manager else None
+        if plan and plan > 0:
+            calls_today = len(mcalls)
+            mark = "✅" if calls_today >= plan else "❌"
+            line += f"\n   📞 звонков {calls_today}/{plan} {mark} план"
         rec = _recommendation_line([c.id for c in mcalls])
         if rec:
             line += f"\n   💡 {escape(rec)}"

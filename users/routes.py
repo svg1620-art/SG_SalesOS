@@ -41,6 +41,18 @@ def _parse_department_id(raw):
     return None
 
 
+def _parse_plan(raw):
+    """План звонков в день: пусто/0 → None, иначе положительное число."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        val = int(raw)
+    except ValueError:
+        return None
+    return val if val > 0 else None
+
+
 def _departments():
     return Department.query.order_by(Department.name).all()
 
@@ -83,6 +95,7 @@ def create():
             is_active=True,
             department_id=_parse_department_id(request.form.get("department_id")),
             amo_user_id=_parse_amo_user_id(request.form.get("amo_user_id")),
+            daily_call_plan=_parse_plan(request.form.get("daily_call_plan")),
         )
         user.set_password(password)
         db.session.add(user)
@@ -142,6 +155,7 @@ def edit(user_id):
         user.is_active = is_active
         user.department_id = _parse_department_id(request.form.get("department_id"))
         user.amo_user_id = _parse_amo_user_id(request.form.get("amo_user_id"))
+        user.daily_call_plan = _parse_plan(request.form.get("daily_call_plan"))
         db.session.commit()
         flash("Пользователь сохранён.", "success")
         return redirect(url_for("users.index"))

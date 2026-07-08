@@ -88,9 +88,9 @@ def _build_month_bars(month_year, month_num, dept_manager_ids):
     }
 
 
-def _manager_cards(period_calls, date_from, date_to, dept_manager_ids):
+def _manager_cards(period_calls, date_from, date_to, dept_manager_ids, period_days=1):
     """Карточки менеджеров: объём звонков за период, отклонение к такому же
-    прошлому периоду (стрелка/%), разбивка по зонам."""
+    прошлому периоду (стрелка/%), разбивка по зонам, выполнение плана звонков."""
     span = date_to - date_from
     prev_from = date_from - span
     prev_calls = Call.query.filter(
@@ -121,6 +121,17 @@ def _manager_cards(period_calls, date_from, date_to, dept_manager_ids):
             deviation = 100 if cur > 0 else 0
             direction = "up" if cur > 0 else "flat"
         from processing.metrics import aggregate_talk_listen
+        # выполнение плана звонков: цель = план/день × число дней периода
+        plan = manager.daily_call_plan if manager else None
+        plan_info = None
+        if plan and plan > 0:
+            target = plan * max(1, period_days)
+            plan_info = {
+                "per_day": plan,
+                "target": target,
+                "met": cur >= target,
+                "remaining": max(0, target - cur),
+            }
         cards.append({
             "manager": manager,
             "name": (manager.full_name or manager.email) if manager else "Не назначен",
@@ -130,6 +141,7 @@ def _manager_cards(period_calls, date_from, date_to, dept_manager_ids):
             "direction": direction,
             "zones": _zone_counts(mcalls),
             "balance": aggregate_talk_listen(mcalls),
+            "plan": plan_info,
         })
     cards.sort(key=lambda c: c["calls"], reverse=True)
     return cards
@@ -256,8 +268,11 @@ def index():
         )
     leaderboard.sort(key=lambda r: (r["avg_score"] is not None, r["avg_score"] or 0), reverse=True)
 
-    # --- карточки менеджеров: объём звонков + отклонение к прошлому периоду + зоны ---
-    manager_cards = _manager_cards(period_calls, date_from, date_to, dept_manager_ids)
+    # --- карточки менеджеров: объём звонков + отклонение + зоны + план ---
+    period_days = (dt_naive.date() - df_naive.date()).days + 1
+    manager_cards = _manager_cards(
+        period_calls, date_from, date_to, dept_manager_ids, period_days
+    )
 
     # --- дневная сводка (последняя) ---
     digest = DailyDigest.query.order_by(DailyDigest.date.desc()).first()

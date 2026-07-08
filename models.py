@@ -42,6 +42,8 @@ class User(UserMixin, db.Model):
     )
     # для сопоставления с ответственным в amoCRM (Этап 8)
     amo_user_id = db.Column(db.BigInteger, nullable=True, index=True)
+    # план по звонкам в день (норма); None/0 — план не задан
+    daily_call_plan = db.Column(db.Integer, nullable=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
