@@ -78,11 +78,13 @@
           <th>Напр.</th>
           <th>Статус</th>
           <th>Балл</th>
+          <th>Баланс 🗣/👂</th>
           <th>Зона</th>
         </tr>
       </thead>
       <tbody>
         {% for c in calls %}
+        {% set bal = balances.get(c.id) %}
         <tr class="{{ 'sg-row--red' if c.zone == 'red' else '' }}"
             onclick="location.href='{{ url_for('calls.detail', call_id=c.id) }}'">
           <td class="sg-mono sg-sm">{{ c.started_at.strftime('%d.%m %H:%M') if c.started_at else '—' }}</td>
@@ -95,6 +97,17 @@
           <td class="sg-sm">{{ 'вх' if c.direction == 'in' else 'исх' if c.direction == 'out' else '—' }}</td>
           <td>{{ status_label(c.status) }}</td>
           <td class="sg-mono">{{ c.overall_score if c.overall_score is not none else '—' }}</td>
+          <td>
+            {% if bal %}
+            <div class="sg-balance sg-balance--sm" title="Говорил {{ bal.talk }}% / слушал {{ bal.listen }}%">
+              <div class="sg-balance__bar">
+                <span class="sg-balance__talk" style="width: {{ bal.talk }}%"></span>
+                <span class="sg-balance__listen" style="width: {{ bal.listen }}%"></span>
+              </div>
+              <span class="sg-mono sg-sm">{{ bal.talk }}/{{ bal.listen }}</span>
+            </div>
+            {% else %}<span class="sg-muted sg-sm">—</span>{% endif %}
+          </td>
           <td>{{ zone_badge(c.zone) }}</td>
         </tr>
         {% endfor %}

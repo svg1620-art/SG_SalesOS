@@ -107,6 +107,18 @@
         {% endif %}
       </div>
       <div class="sg-mgr-card__prev sg-muted sg-sm">было {{ m.prev }} за прошлый период</div>
+      {% if m.balance %}
+      <div class="sg-balance" title="Баланс коммуникации: сколько менеджер говорил / слушал">
+        <div class="sg-balance__bar">
+          <span class="sg-balance__talk" style="width: {{ m.balance.talk }}%"></span>
+          <span class="sg-balance__listen" style="width: {{ m.balance.listen }}%"></span>
+        </div>
+        <div class="sg-balance__legend sg-sm">
+          <span>🗣 говорил {{ m.balance.talk }}%</span>
+          <span>👂 слушал {{ m.balance.listen }}%</span>
+        </div>
+      </div>
+      {% endif %}
       <div class="sg-mgr-card__zones">
         <span class="sg-zonechip sg-zonechip--green">🟢 {{ m.zones.green }}</span>
         <span class="sg-zonechip sg-zonechip--yellow">🟡 {{ m.zones.yellow }}</span>

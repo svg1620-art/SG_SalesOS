@@ -78,6 +78,9 @@ def index():
         User.query.filter_by(is_active=True).order_by(User.full_name, User.email).all()
         if current_user.is_admin else []
     )
+    # баланс «говорил/слушал» по каждому звонку
+    from processing.metrics import talk_listen
+    balances = {c.id: talk_listen(c) for c in calls}
     filters = {
         "from": df_naive.strftime("%Y-%m-%d"),
         "to": dt_naive.strftime("%Y-%m-%d"),
@@ -86,7 +89,7 @@ def index():
     }
     return render_template(
         "calls/index.html", calls=calls, managers=managers, filters=filters,
-        query_string=request.query_string.decode(),
+        balances=balances, query_string=request.query_string.decode(),
     )
 
 

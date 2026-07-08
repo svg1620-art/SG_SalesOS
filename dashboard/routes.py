@@ -120,6 +120,7 @@ def _manager_cards(period_calls, date_from, date_to, dept_manager_ids):
         else:
             deviation = 100 if cur > 0 else 0
             direction = "up" if cur > 0 else "flat"
+        from processing.metrics import aggregate_talk_listen
         cards.append({
             "manager": manager,
             "name": (manager.full_name or manager.email) if manager else "Не назначен",
@@ -128,6 +129,7 @@ def _manager_cards(period_calls, date_from, date_to, dept_manager_ids):
             "deviation": deviation,
             "direction": direction,
             "zones": _zone_counts(mcalls),
+            "balance": aggregate_talk_listen(mcalls),
         })
     cards.sort(key=lambda c: c["calls"], reverse=True)
     return cards
@@ -177,9 +179,8 @@ def index():
     # --- фильтры (в часовом поясе приложения, TZ) ---
     tz = app_tz()
     now_l = now_local()  # aware, локальное время
-    df_naive = _parse_date(
-        request.args.get("from"), (now_l - timedelta(days=30)).replace(tzinfo=None)
-    )
+    # по умолчанию — текущий день (можно расширить период фильтрами)
+    df_naive = _parse_date(request.args.get("from"), now_l.replace(tzinfo=None))
     dt_naive = _parse_date(request.args.get("to"), now_l.replace(tzinfo=None))
     # локальные границы суток → naive-UTC для сравнения со started_at (хранится в UTC)
     date_from_local = df_naive.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=tz)
