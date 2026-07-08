@@ -98,9 +98,9 @@
         {{ m.name }}
         {% if m.plan %}
           {% if m.plan.met %}
-          <span class="sg-plan sg-plan--ok" title="План звонков выполнен ({{ m.plan.target }})">✅ план</span>
+          <span class="sg-plan sg-plan--ok" title="План звонков выполнен">✅ {{ m.calls }}/{{ m.plan.target }}</span>
           {% else %}
-          <span class="sg-plan sg-plan--fail" title="План звонков не выполнен">⚠️ −{{ m.plan.remaining }}</span>
+          <span class="sg-plan sg-plan--fail" title="План звонков не выполнен (не хватает {{ m.plan.remaining }})">⚠️ {{ m.calls }}/{{ m.plan.target }}</span>
           {% endif %}
         {% endif %}
       </div>
@@ -116,9 +116,6 @@
         {% endif %}
       </div>
       <div class="sg-mgr-card__prev sg-muted sg-sm">было {{ m.prev }} за прошлый период</div>
-      {% if m.plan %}
-      <div class="sg-muted sg-sm">План {{ m.plan.per_day }}/день · цель за период {{ m.plan.target }} · факт {{ m.calls }}</div>
-      {% endif %}
       {% if m.balance %}
       <div class="sg-balance" title="Баланс коммуникации: сколько менеджер говорил / слушал">
         <div class="sg-balance__bar">
