@@ -96,7 +96,7 @@ def poll_deals(app=None, congratulate=None) -> dict:
         congratulate = not first_run
 
     congrats_after = datetime.utcnow() - timedelta(days=_CONGRATS_MAX_AGE_DAYS)
-    new_count, congrats_sent, max_updated = 0, 0, since_ts or 0
+    new_count, congrats_sent, removed_count, max_updated = 0, 0, 0, since_ts or 0
     try:
         leads = list(client.iter_leads(since_ts))
     except AmoError as exc:
@@ -107,14 +107,21 @@ def poll_deals(app=None, congratulate=None) -> dict:
         try:
             updated = int(lead.get("updated_at") or 0)
             max_updated = max(max_updated, updated)
+            lead_id = lead.get("id")
             # выигранной считаем только сделку в статусе 142 (парсим как int —
             # API может отдать строку) И с реальной датой закрытия closed_at.
-            if int(lead.get("status_id") or 0) != WON_STATUS_ID:
-                continue  # не выиграна (в работе/другой этап)
+            status = int(lead.get("status_id") or 0)
             closed_ts = int(lead.get("closed_at") or 0)
-            if not closed_ts:
-                continue  # нет даты закрытия — не считаем «оплата получена»
-            lead_id = lead.get("id")
+            if status != WON_STATUS_ID or not closed_ts:
+                # самоочистка: сделка «уехала» из «оплата получена» — убираем,
+                # если раньше была учтена (напр. вернули на предыдущий этап)
+                if lead_id:
+                    stale = Deal.query.filter_by(amo_lead_id=lead_id).first()
+                    if stale is not None:
+                        db.session.delete(stale)
+                        db.session.commit()
+                        removed_count += 1
+                continue
             if lead_id and Deal.query.filter_by(amo_lead_id=lead_id).first():
                 continue  # уже учтена
 
@@ -162,12 +169,13 @@ def poll_deals(app=None, congratulate=None) -> dict:
     if max_updated:
         set_setting("amo_deals_last_sync", max_updated)
     app.logger.info(
-        "[deals] опрос завершён: новых успешных сделок %s, поздравлений %s (backfill=%s)",
-        new_count, congrats_sent, first_run,
+        "[deals] опрос завершён: новых %s, удалено (уехали из «оплата получена») %s, "
+        "поздравлений %s (backfill=%s)",
+        new_count, removed_count, congrats_sent, first_run,
     )
     return {
-        "ok": True, "new": new_count, "congrats": congrats_sent,
-        "backfill": first_run, "last_sync": max_updated,
+        "ok": True, "new": new_count, "removed": removed_count,
+        "congrats": congrats_sent, "backfill": first_run, "last_sync": max_updated,
     }
 
 

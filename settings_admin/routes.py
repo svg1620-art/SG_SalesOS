@@ -177,7 +177,8 @@ def amo_poll_deals():
 
     if result.get("ok"):
         flash(
-            f"Опрос сделок: новых {result['new']}, поздравлений {result.get('congrats', 0)}"
+            f"Опрос сделок: новых {result['new']}, удалено {result.get('removed', 0)}, "
+            f"поздравлений {result.get('congrats', 0)}"
             f"{' (первичная загрузка без поздравлений)' if result.get('backfill') else ''}.",
             "success",
         )
