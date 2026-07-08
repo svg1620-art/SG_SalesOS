@@ -44,10 +44,19 @@ def _get_call_or_404(call_id: int) -> Call:
 @calls_bp.route("/")
 @login_required
 def index():
-    now = datetime.utcnow()
-    date_from = _parse_date(request.args.get("from"), now - timedelta(days=30))
-    date_to_raw = _parse_date(request.args.get("to"), now)
-    date_to = date_to_raw.replace(hour=23, minute=59, second=59)
+    from utils import app_tz, now_local, local_to_utc_naive
+    tz = app_tz()
+    now_l = now_local()
+    df_naive = _parse_date(
+        request.args.get("from"), (now_l - timedelta(days=30)).replace(tzinfo=None)
+    )
+    dt_naive = _parse_date(request.args.get("to"), now_l.replace(tzinfo=None))
+    date_from = local_to_utc_naive(
+        df_naive.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=tz)
+    )
+    date_to = local_to_utc_naive(
+        dt_naive.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=tz)
+    )
     zone = request.args.get("zone") or ""
     manager_id = request.args.get("manager_id")
     manager_id = int(manager_id) if manager_id and manager_id.isdigit() else None
@@ -70,8 +79,8 @@ def index():
         if current_user.is_admin else []
     )
     filters = {
-        "from": date_from.strftime("%Y-%m-%d"),
-        "to": date_to_raw.strftime("%Y-%m-%d"),
+        "from": df_naive.strftime("%Y-%m-%d"),
+        "to": dt_naive.strftime("%Y-%m-%d"),
         "manager_id": manager_id,
         "zone": zone,
     }
@@ -407,10 +416,18 @@ def _parse_date(raw, default):
 
 def _filtered_calls_from_args():
     """Звонки по фильтрам из query (from/to/manager_id/zone/status)."""
-    now = datetime.utcnow()
-    date_from = _parse_date(request.args.get("from"), now - timedelta(days=90))
-    date_to = _parse_date(request.args.get("to"), now).replace(
-        hour=23, minute=59, second=59
+    from utils import app_tz, now_local, local_to_utc_naive
+    tz = app_tz()
+    now_l = now_local()
+    df_naive = _parse_date(
+        request.args.get("from"), (now_l - timedelta(days=90)).replace(tzinfo=None)
+    )
+    dt_naive = _parse_date(request.args.get("to"), now_l.replace(tzinfo=None))
+    date_from = local_to_utc_naive(
+        df_naive.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=tz)
+    )
+    date_to = local_to_utc_naive(
+        dt_naive.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=tz)
     )
     query = Call.query.filter(
         Call.started_at >= date_from, Call.started_at <= date_to

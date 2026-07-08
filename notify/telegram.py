@@ -47,8 +47,12 @@ def _recommendation_line(call_ids):
 
 def build_pulse(app, day) -> str:
     """Собрать текст пульса за день (HTML для Telegram)."""
-    start = datetime(day.year, day.month, day.day)
-    end = start + timedelta(days=1)
+    from utils import app_tz, local_to_utc_naive
+    tz = app_tz(app)
+    start = local_to_utc_naive(datetime(day.year, day.month, day.day, tzinfo=tz))
+    end = local_to_utc_naive(
+        datetime(day.year, day.month, day.day, tzinfo=tz) + timedelta(days=1)
+    )
 
     calls = Call.query.filter(
         Call.status == "done",

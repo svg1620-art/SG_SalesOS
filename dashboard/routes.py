@@ -13,6 +13,7 @@ from collections import defaultdict
 from extensions import db
 from models import Call, User, Recommendation, MissedMoment, DailyDigest, Department
 from auth.decorators import admin_required
+from utils import app_tz, now_local, to_local, local_to_utc_naive
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -30,14 +31,22 @@ _RU_MONTHS = [
 
 
 def _build_month_bars(month_year, month_num, dept_manager_ids):
-    """Сгруппированная диаграмма: звонки по дням месяца, датасет на менеджера."""
+    """Сгруппированная диаграмма: звонки по дням месяца, датасет на менеджера.
+
+    Дни считаются в часовом поясе приложения (TZ), а started_at хранится в UTC —
+    поэтому границы месяца переводим в UTC, а каждый звонок раскладываем по
+    ЛОКАЛЬНОМУ дню.
+    """
+    tz = app_tz()
     days_in = monthrange(month_year, month_num)[1]
-    start = datetime(month_year, month_num, 1)
-    end = (
-        datetime(month_year + 1, 1, 1)
+    start_local = datetime(month_year, month_num, 1, tzinfo=tz)
+    end_local = (
+        datetime(month_year + 1, 1, 1, tzinfo=tz)
         if month_num == 12
-        else datetime(month_year, month_num + 1, 1)
+        else datetime(month_year, month_num + 1, 1, tzinfo=tz)
     )
+    start = local_to_utc_naive(start_local)
+    end = local_to_utc_naive(end_local)
 
     query = Call.query.filter(
         Call.started_at >= start, Call.started_at < end, Call.excluded.isnot(True)
@@ -46,12 +55,12 @@ def _build_month_bars(month_year, month_num, dept_manager_ids):
     if dept_manager_ids is not None:
         calls = [c for c in calls if c.manager_id in dept_manager_ids]
 
-    # counts[manager_id][day-1]
+    # counts[manager_id][day-1] — по локальному дню
     counts = defaultdict(lambda: [0] * days_in)
     for c in calls:
-        day = (c.started_at or c.created_at).day
-        if 1 <= day <= days_in:
-            counts[c.manager_id][day - 1] += 1
+        local_dt = to_local(c.started_at or c.created_at)
+        if local_dt.year == month_year and local_dt.month == month_num:
+            counts[c.manager_id][local_dt.day - 1] += 1
 
     # имена менеджеров
     datasets = []
@@ -165,12 +174,18 @@ def index():
     if not current_user.is_admin:
         return redirect(url_for("dashboard.manager_home"))
 
-    # --- фильтры ---
-    now = datetime.utcnow()
-    date_from = _parse_date(request.args.get("from"), now - timedelta(days=30))
-    date_to_raw = _parse_date(request.args.get("to"), now)
-    # включительно по концу дня
-    date_to = date_to_raw.replace(hour=23, minute=59, second=59)
+    # --- фильтры (в часовом поясе приложения, TZ) ---
+    tz = app_tz()
+    now_l = now_local()  # aware, локальное время
+    df_naive = _parse_date(
+        request.args.get("from"), (now_l - timedelta(days=30)).replace(tzinfo=None)
+    )
+    dt_naive = _parse_date(request.args.get("to"), now_l.replace(tzinfo=None))
+    # локальные границы суток → naive-UTC для сравнения со started_at (хранится в UTC)
+    date_from_local = df_naive.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=tz)
+    date_to_local = dt_naive.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=tz)
+    date_from = local_to_utc_naive(date_from_local)
+    date_to = local_to_utc_naive(date_to_local)
     manager_id = request.args.get("manager_id")
     manager_id = int(manager_id) if manager_id and manager_id.isdigit() else None
     zone = request.args.get("zone") or ""
@@ -252,7 +267,7 @@ def index():
         m_year, m_num = map(int, month_raw.split("-"))
         assert 1 <= m_num <= 12
     except Exception:  # noqa: BLE001
-        m_year, m_num = now.year, now.month
+        m_year, m_num = now_l.year, now_l.month
     bars = _build_month_bars(m_year, m_num, dept_manager_ids)
 
     return render_template(
@@ -265,8 +280,8 @@ def index():
         departments=departments,
         bars=bars,
         filters={
-            "from": date_from.strftime("%Y-%m-%d"),
-            "to": date_to_raw.strftime("%Y-%m-%d"),
+            "from": df_naive.strftime("%Y-%m-%d"),
+            "to": dt_naive.strftime("%Y-%m-%d"),
             "manager_id": manager_id,
             "zone": zone,
             "department_id": department_id,
@@ -289,10 +304,17 @@ def manager_digest(manager_id):
     if not current_user.is_admin and current_user.id != manager_id:
         abort(403)
 
-    now = datetime.utcnow()
-    date_from = _parse_date(request.args.get("from"), now - timedelta(days=30))
-    date_to = _parse_date(request.args.get("to"), now).replace(
-        hour=23, minute=59, second=59
+    tz = app_tz()
+    now_l = now_local()
+    df_naive = _parse_date(
+        request.args.get("from"), (now_l - timedelta(days=30)).replace(tzinfo=None)
+    )
+    dt_naive = _parse_date(request.args.get("to"), now_l.replace(tzinfo=None))
+    date_from = local_to_utc_naive(
+        df_naive.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=tz)
+    )
+    date_to = local_to_utc_naive(
+        dt_naive.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=tz)
     )
 
     result = generate_manager_digest(

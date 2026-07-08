@@ -6,6 +6,35 @@ JSON в ```json ... ```, добавить пояснения до/после, п
 """
 import json
 import re
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+
+def app_tz(app=None):
+    """Часовой пояс приложения (TZ из конфига, по умолчанию UTC)."""
+    from flask import current_app
+    app = app or current_app
+    try:
+        return ZoneInfo(app.config.get("TZ") or "UTC")
+    except Exception:  # noqa: BLE001
+        return ZoneInfo("UTC")
+
+
+def now_local(app=None) -> datetime:
+    """Текущее время в часовом поясе приложения (aware)."""
+    return datetime.now(app_tz(app))
+
+
+def to_local(dt_utc_naive: datetime, app=None) -> datetime:
+    """naive-UTC (как хранится started_at) → aware-локальное время."""
+    if dt_utc_naive is None:
+        return None
+    return dt_utc_naive.replace(tzinfo=timezone.utc).astimezone(app_tz(app))
+
+
+def local_to_utc_naive(dt_local_aware: datetime) -> datetime:
+    """aware-локальное время → naive-UTC (для сравнения со started_at)."""
+    return dt_local_aware.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _find_balanced(text: str, open_ch: str, close_ch: str):

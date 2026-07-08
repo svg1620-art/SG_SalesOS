@@ -27,9 +27,13 @@ def today_in_tz(app=None) -> "datetime.date":
         return datetime.utcnow().date()
 
 
-def compute_day_stats(day) -> dict:
-    start = datetime(day.year, day.month, day.day)
-    end = start + timedelta(days=1)
+def compute_day_stats(day, app=None) -> dict:
+    from utils import app_tz, local_to_utc_naive
+    tz = app_tz(app)
+    start = local_to_utc_naive(datetime(day.year, day.month, day.day, tzinfo=tz))
+    end = local_to_utc_naive(
+        datetime(day.year, day.month, day.day, tzinfo=tz) + timedelta(days=1)
+    )
 
     calls = Call.query.filter(
         Call.status == "done",
@@ -142,7 +146,7 @@ def _narrative_from_claude(day, stats: dict) -> dict:
 def generate_daily_digest(app, day=None) -> DailyDigest:
     """Сформировать/обновить сводку за день. Возвращает DailyDigest."""
     day = day or today_in_tz(app)
-    stats = compute_day_stats(day)
+    stats = compute_day_stats(day, app)
 
     narrative = {"summary": "", "focuses": []}
     if stats["calls"] == 0:
