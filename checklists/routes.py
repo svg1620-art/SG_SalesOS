@@ -161,6 +161,32 @@ def activate(checklist_id):
     return redirect(url_for("checklists.index"))
 
 
+@checklists_bp.route("/<int:checklist_id>/activate-for", methods=["POST"])
+@admin_required
+def activate_for(checklist_id):
+    """Активировать чек-лист сразу для выбранного отдела (без захода в редактор)."""
+    checklist = db.session.get(Checklist, checklist_id) or abort(404)
+    if not checklist.criteria:
+        flash("Нельзя активировать чек-лист без критериев.", "error")
+        return redirect(url_for("checklists.index"))
+
+    dept_id = _read_department_id(request.form)  # None = «Все отделы (общий)»
+    checklist.department_id = dept_id
+    # единственный активный в рамках отдела (или среди общих)
+    Checklist.query.filter_by(
+        is_active=True, department_id=dept_id
+    ).update({"is_active": False})
+    checklist.is_active = True
+    db.session.commit()
+
+    scope = "Все отделы (общий)"
+    if dept_id:
+        dep = db.session.get(Department, dept_id)
+        scope = dep.name if dep else scope
+    flash(f"Чек-лист «{checklist.name}» активирован для «{scope}».", "success")
+    return redirect(url_for("checklists.index"))
+
+
 @checklists_bp.route("/<int:checklist_id>/delete", methods=["POST"])
 @admin_required
 def delete(checklist_id):

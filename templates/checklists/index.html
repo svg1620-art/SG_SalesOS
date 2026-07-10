@@ -72,9 +72,15 @@
           </td>
           <td class="sg-row-actions">
             <a class="sg-btn sg-btn--sm" href="{{ url_for('checklists.edit', checklist_id=cl.id) }}">Редактировать</a>
-            {% if not cl.is_active %}
-            <form method="post" action="{{ url_for('checklists.activate', checklist_id=cl.id) }}">
-              <button class="sg-btn sg-btn--sm sg-btn--primary" type="submit">Активировать</button>
+            {% if cl.criteria %}
+            <form method="post" action="{{ url_for('checklists.activate_for', checklist_id=cl.id) }}" class="sg-activate-for">
+              <select class="sg-input sg-input--sm" name="department_id" title="Сделать активным для отдела">
+                <option value="0" {{ 'selected' if not cl.department_id }}>Все отделы (общий)</option>
+                {% for d in departments %}
+                <option value="{{ d.id }}" {{ 'selected' if cl.department_id == d.id }}>{{ d.name }}</option>
+                {% endfor %}
+              </select>
+              <button class="sg-btn sg-btn--sm sg-btn--primary" type="submit">✓ Сделать активным</button>
             </form>
             {% endif %}
           </td>
