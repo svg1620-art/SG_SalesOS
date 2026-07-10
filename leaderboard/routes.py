@@ -69,8 +69,13 @@ def index():
     else:
         managers = []
 
-    # выручка за месяц по менеджеру
-    deals = Deal.query.filter(Deal.won_at >= start, Deal.won_at < end).all()
+    # выручка за месяц по менеджеру (только сделки выбранной воронки, если задана)
+    from settings_store import leaderboard_pipeline_id
+    pid = leaderboard_pipeline_id()
+    deals_q = Deal.query.filter(Deal.won_at >= start, Deal.won_at < end)
+    if pid is not None:
+        deals_q = deals_q.filter(Deal.pipeline_id == pid)
+    deals = deals_q.all()
     revenue_by_mgr, deals_by_mgr = {}, {}
     unattributed = 0  # сделки без привязки к менеджеру (нет amo_user_id)
     for d in deals:

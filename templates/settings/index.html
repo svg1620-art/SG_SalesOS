@@ -155,6 +155,30 @@
 
   <div class="sg-card sg-card--pad">
     <h3 class="sg-h3">🏆 Сделки и Leaderboard</h3>
+
+    <form method="post" action="{{ url_for('settings.amo_leaderboard_pipeline') }}" class="sg-form" style="margin-bottom:14px">
+      <label class="sg-field">
+        <span class="sg-field__label">Воронка для лидерборда</span>
+        {% if pipelines %}
+        <select class="sg-input" name="leaderboard_pipeline_id">
+          <option value="0" {{ 'selected' if not leaderboard_pipeline_id }}>Все воронки</option>
+          {% for p in pipelines %}
+          <option value="{{ p.id }}" {{ 'selected' if leaderboard_pipeline_id == p.id }}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input class="sg-input sg-mono" name="leaderboard_pipeline_id" type="number" min="0"
+               value="{{ leaderboard_pipeline_id or '' }}"
+               placeholder="ID воронки (список не загрузился — проверьте подключение amoCRM)">
+        {% endif %}
+      </label>
+      <div class="sg-actions">
+        <button class="sg-btn sg-btn--primary sg-btn--sm" type="submit">Сохранить воронку</button>
+      </div>
+      <p class="sg-muted sg-sm">Считать в лидерборде только успешные сделки выбранной
+        воронки. После смены нажмите «Пересобрать сделки», чтобы убрать чужие.</p>
+    </form>
+
     <div class="sg-actions">
       <form method="post" action="{{ url_for('settings.amo_poll_deals') }}">
         <button class="sg-btn" type="submit">💰 Опросить сделки сейчас</button>

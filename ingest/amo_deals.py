@@ -95,6 +95,9 @@ def poll_deals(app=None, congratulate=None) -> dict:
     if congratulate is None:
         congratulate = not first_run
 
+    from settings_store import leaderboard_pipeline_id
+    target_pipeline = leaderboard_pipeline_id(app)  # None → все воронки
+
     congrats_after = datetime.utcnow() - timedelta(days=_CONGRATS_MAX_AGE_DAYS)
     new_count, congrats_sent, removed_count, max_updated = 0, 0, 0, since_ts or 0
     try:
@@ -112,9 +115,14 @@ def poll_deals(app=None, congratulate=None) -> dict:
             # API может отдать строку) И с реальной датой закрытия closed_at.
             status = int(lead.get("status_id") or 0)
             closed_ts = int(lead.get("closed_at") or 0)
-            if status != WON_STATUS_ID or not closed_ts:
-                # самоочистка: сделка «уехала» из «оплата получена» — убираем,
-                # если раньше была учтена (напр. вернули на предыдущий этап)
+            # воронка: если задана целевая — считаем только её сделки
+            in_pipeline = (
+                target_pipeline is None
+                or int(lead.get("pipeline_id") or 0) == target_pipeline
+            )
+            if status != WON_STATUS_ID or not closed_ts or not in_pipeline:
+                # самоочистка: сделка не подходит (не выиграна / чужая воронка) —
+                # убираем, если раньше была учтена
                 if lead_id:
                     stale = Deal.query.filter_by(amo_lead_id=lead_id).first()
                     if stale is not None:

@@ -122,3 +122,13 @@ def amo_min_duration(app=None) -> int:
         return max(0, int(val))
     except (TypeError, ValueError):
         return 10
+
+
+def leaderboard_pipeline_id(app=None):
+    """ID воронки amoCRM для лидерборда (только её сделки считаем). None — все."""
+    val = get_setting("leaderboard_pipeline_id")
+    try:
+        pid = int(val)
+        return pid if pid > 0 else None
+    except (TypeError, ValueError):
+        return None

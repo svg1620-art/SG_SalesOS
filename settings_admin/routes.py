@@ -5,7 +5,7 @@ from auth.decorators import admin_required
 from settings_store import (
     get_setting, set_setting, telegram_chat_ids, telegram_hour, digest_hour,
     telegram_token, amo_base_domain, amo_access_token, amo_entity, amo_configured,
-    amo_since_days, amo_min_duration, recording_proxy,
+    amo_since_days, amo_min_duration, recording_proxy, leaderboard_pipeline_id,
 )
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
@@ -23,8 +23,19 @@ def _clamp_hour(raw, default):
 def index():
     from extensions import scheduler
 
+    # список воронок amoCRM (для выбора воронки лидерборда) — best-effort
+    pipelines = []
+    if amo_configured():
+        try:
+            from ingest.amo_client import AmoClient
+            pipelines = AmoClient(amo_base_domain(), amo_access_token()).get_pipelines()
+        except Exception as exc:  # noqa: BLE001
+            current_app.logger.info("[settings] воронки amoCRM не получены: %s", exc)
+
     return render_template(
         "settings/index.html",
+        pipelines=pipelines,
+        leaderboard_pipeline_id=leaderboard_pipeline_id(),
         token_set=bool(telegram_token()),
         chat_ids=", ".join(telegram_chat_ids()),
         telegram_hour=telegram_hour(),
@@ -184,6 +195,17 @@ def amo_poll_deals():
         )
     else:
         flash(f"Опрос сделок не выполнен: {result.get('error')}", "error")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/amo/leaderboard-pipeline", methods=["POST"])
+@admin_required
+def amo_leaderboard_pipeline():
+    """Сохранить воронку, по которой считается лидерборд (0 — все воронки)."""
+    raw = (request.form.get("leaderboard_pipeline_id") or "").strip()
+    set_setting("leaderboard_pipeline_id", raw if raw.isdigit() else "")
+    flash("Воронка лидерборда сохранена. Нажмите «Пересобрать сделки», чтобы "
+          "очистить сделки других воронок.", "success")
     return redirect(url_for("settings.index"))
 
 

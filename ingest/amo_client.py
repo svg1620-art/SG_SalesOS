@@ -93,6 +93,23 @@ class AmoClient:
             page += 1
         return users
 
+    def get_pipelines(self) -> list[dict]:
+        """Список воронок amoCRM: [{id, name}]."""
+        try:
+            r = httpx.get(
+                f"{self.base}/api/v4/leads/pipelines",
+                headers=self._headers(), timeout=30,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise AmoError(f"сеть: {exc}")
+        if r.status_code == 401:
+            raise AmoError("401 — неверный или истёкший токен.")
+        if r.status_code != 200:
+            raise AmoError(f"pipelines HTTP {r.status_code}: {r.text[:200]}")
+        data = r.json()
+        pipelines = (data.get("_embedded") or {}).get("pipelines") or []
+        return [{"id": p.get("id"), "name": p.get("name") or ""} for p in pipelines]
+
     def iter_leads(self, since_ts: int | None = None, max_pages: int = 50):
         """Итератор по сделкам (leads), обновлённым с since_ts."""
         page = 1
