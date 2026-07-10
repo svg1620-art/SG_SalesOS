@@ -83,7 +83,9 @@
       </div>
       <div id="next-steps-box-{{ call.id }}">
         {% if call.next_steps_json %}
-          {% include "calls/_next_steps.html" with context %}
+          {% with result = {"ok": True, "steps": call.next_steps_json} %}
+            {% include "calls/_next_steps.html" %}
+          {% endwith %}
         {% else %}
         <p class="sg-muted">Нажмите кнопку — нейросеть проанализирует диалог и
           подскажет, что делать дальше с этим клиентом.</p>
