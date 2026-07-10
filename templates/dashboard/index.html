@@ -116,6 +116,12 @@
         {% endif %}
       </div>
       <div class="sg-mgr-card__prev sg-muted sg-sm">было {{ m.prev }} за прошлый период</div>
+      {% if m.engagement %}
+      <div class="sg-engage {{ 'sg-engage--stale' if m.engagement.stale }}">
+        📖 разобрано {{ m.engagement.reviewed }}/{{ m.engagement.total }}
+        · заходил: {{ m.engagement.seen_label }}
+      </div>
+      {% endif %}
       {% if m.balance %}
       <div class="sg-balance" title="Баланс коммуникации: сколько менеджер говорил / слушал">
         <div class="sg-balance__bar">

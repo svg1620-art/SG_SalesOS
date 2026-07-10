@@ -43,6 +43,9 @@ def login():
             return render_template("auth/login.html", email=email), 403
 
         login_user(user)
+        from activity import log_event, touch_last_seen
+        touch_last_seen(user)
+        log_event(user.id, "login")
 
         next_url = request.args.get("next")
         if _is_safe_next(next_url):

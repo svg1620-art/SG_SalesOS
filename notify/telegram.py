@@ -67,7 +67,7 @@ def build_pulse(app, day) -> str:
 
     header = f"📊 <b>Пульс за {day:%d.%m.%Y}</b>"
     if not calls:
-        return header + "\n\nЗа день нет обработанных звонков."
+        return header + "\n\nЗа день нет обработанных звонков." + _inactive_block(day)
 
     def _avg(mcalls):
         s = [c.overall_score for c in mcalls if c.overall_score is not None]
@@ -117,7 +117,23 @@ def build_pulse(app, day) -> str:
         for manager, mcalls in rows:
             blocks.append(_manager_line(manager, mcalls))
 
+    blocks.append(_inactive_block(day))
     return "".join(blocks)
+
+
+def _inactive_block(day) -> str:
+    """Блок «не заходили в платформу сегодня» — контроль вовлечённости."""
+    from utils import to_local
+
+    inactive = []
+    for u in User.query.filter_by(role="manager", is_active=True).all():
+        seen = to_local(u.last_seen_at).date() if u.last_seen_at else None
+        if seen != day:
+            inactive.append(u.full_name or u.email)
+    if not inactive:
+        return ""
+    names = ", ".join(escape(n) for n in sorted(inactive))
+    return f"\n\n⚠️ <b>Не заходили в платформу:</b> {names}"
 
 
 def _send_message(app, text: str) -> bool:

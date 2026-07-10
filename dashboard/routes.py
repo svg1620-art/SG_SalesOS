@@ -88,6 +88,19 @@ def _build_month_bars(month_year, month_num, dept_manager_ids):
     }
 
 
+def _last_seen_label(last_seen, now_l):
+    """('сегодня'|'вчера'|'N дн назад'|'не заходил', stale_by_time)."""
+    if not last_seen:
+        return "не заходил", True
+    local = to_local(last_seen)
+    days = (now_l.date() - local.date()).days
+    if days <= 0:
+        return "сегодня", False
+    if days == 1:
+        return "вчера", False
+    return f"{days} дн назад", days >= 3
+
+
 def _manager_cards(period_calls, date_from, date_to, dept_manager_ids, period_days=1):
     """Карточки менеджеров: объём звонков за период, отклонение к такому же
     прошлому периоду (стрелка/%), разбивка по зонам, выполнение плана звонков."""
@@ -108,6 +121,11 @@ def _manager_cards(period_calls, date_from, date_to, dept_manager_ids, period_da
     prev_by = defaultdict(int)
     for c in prev_calls:
         prev_by[c.manager_id] += 1
+
+    # вовлечённость: какие звонки менеджер открывал + когда последний раз заходил
+    from activity import viewed_call_ids
+    viewed = viewed_call_ids(list(cur_by.keys()))
+    now_l = now_local()
 
     cards = []
     for mid, mcalls in cur_by.items():
@@ -132,6 +150,18 @@ def _manager_cards(period_calls, date_from, date_to, dept_manager_ids, period_da
                 "met": cur >= target,
                 "remaining": max(0, target - cur),
             }
+        # вовлечённость: разобрано N из Y звонков периода + последний вход
+        reviewed = len({c.id for c in mcalls} & viewed.get(mid, set()))
+        seen_label, stale_time = _last_seen_label(
+            manager.last_seen_at if manager else None, now_l
+        )
+        low_review = cur > 0 and (reviewed / cur) < 0.3
+        engagement = {
+            "reviewed": reviewed,
+            "total": cur,
+            "seen_label": seen_label,
+            "stale": bool(manager) and (stale_time or low_review),
+        }
         cards.append({
             "manager": manager,
             "name": (manager.full_name or manager.email) if manager else "Не назначен",
@@ -142,6 +172,7 @@ def _manager_cards(period_calls, date_from, date_to, dept_manager_ids, period_da
             "zones": _zone_counts(mcalls),
             "balance": aggregate_talk_listen(mcalls),
             "plan": plan_info,
+            "engagement": engagement,
         })
     cards.sort(key=lambda c: c["calls"], reverse=True)
     return cards

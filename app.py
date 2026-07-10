@@ -19,6 +19,7 @@ def create_app(config_object: type = Config) -> Flask:
 
     _init_extensions(app)
     _register_blueprints(app)
+    _register_activity_hook(app)
     _register_error_handlers(app)
     _register_cli(app)
     _maybe_seed_admin(app)
@@ -57,6 +58,23 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(departments_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(leaderboard_bp)
+
+
+def _register_activity_hook(app: Flask) -> None:
+    """Обновляем last_seen на каждом запросе авторизованного пользователя."""
+    from flask import request
+    from flask_login import current_user
+
+    @app.before_request
+    def _track_last_seen():  # noqa: ANN202
+        if request.endpoint == "static":
+            return
+        try:
+            if current_user.is_authenticated:
+                from activity import touch_last_seen
+                touch_last_seen(current_user)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _register_error_handlers(app: Flask) -> None:

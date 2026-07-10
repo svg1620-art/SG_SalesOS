@@ -264,6 +264,10 @@ def _panel_context(call):
 @login_required
 def detail(call_id):
     call = _get_call_or_404(call_id)
+    # менеджер открыл свой звонок — засчитываем «разобрал»
+    if not current_user.is_admin and call.manager_id == current_user.id:
+        from activity import log_event
+        log_event(current_user.id, "view_call", call_id=call.id)
     return render_template("calls/detail.html", **_panel_context(call))
 
 

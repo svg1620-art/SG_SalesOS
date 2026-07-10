@@ -44,6 +44,8 @@ class User(UserMixin, db.Model):
     amo_user_id = db.Column(db.BigInteger, nullable=True, index=True)
     # план по звонкам в день (норма); None/0 — план не задан
     daily_call_plan = db.Column(db.Integer, nullable=True)
+    # последняя активность (для контроля использования платформы)
+    last_seen_at = db.Column(db.DateTime, nullable=True, index=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
@@ -310,6 +312,22 @@ class Deal(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     manager = db.relationship("User")
+
+
+class ActivityEvent(db.Model):
+    """Событие использования платформы (для контроля вовлечённости).
+
+    kind: login | view_call | next_step | listen. call_id — если событие
+    привязано к звонку (напр. просмотр карточки).
+    """
+
+    __tablename__ = "activity_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    kind = db.Column(db.String(20), nullable=False)
+    call_id = db.Column(db.Integer, db.ForeignKey("calls.id"), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
 
 class Setting(db.Model):
