@@ -69,6 +69,40 @@ def build_call_note(call, include_transcript: bool = True) -> str:
     return text
 
 
+def build_next_steps_note(call) -> str:
+    """Текст примечания с рекомендацией следующего шага от НейроGuru."""
+    parts = ["🧠 Следующий шаг (НейроGuru) — SG SalesOS"]
+    if call.client:
+        parts.append(f"Клиент: {call.client.name or call.client.phone_normalized}")
+    for i, step in enumerate(call.next_steps_json or [], start=1):
+        action = (step.get("action") or "").strip() if isinstance(step, dict) else str(step)
+        why = (step.get("why") or "").strip() if isinstance(step, dict) else ""
+        line = f"{i}. {action}"
+        if why:
+            line += f" — {why}"
+        parts.append(line)
+    return "\n".join(parts)
+
+
+def push_next_steps_note(app=None, call=None) -> dict:
+    """Отправить рекомендацию следующего шага в ленту amoCRM."""
+    app = app or current_app
+    if not amo_configured(app):
+        return {"ok": False, "error": "amoCRM не настроен."}
+    if not (call.amo_entity_type and call.amo_entity_id):
+        return {"ok": False, "error": "Звонок не привязан к сущности amoCRM."}
+    if not call.next_steps_json:
+        return {"ok": False, "error": "Рекомендация ещё не сформирована."}
+
+    text = build_next_steps_note(call)
+    client = AmoClient(amo_base_domain(app), amo_access_token(app))
+    try:
+        client.add_note(call.amo_entity_type, call.amo_entity_id, text)
+    except AmoError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True}
+
+
 def push_call_note(app=None, call=None, include_transcript: bool = True) -> dict:
     """Отправить примечание по звонку в ленту amoCRM.
 

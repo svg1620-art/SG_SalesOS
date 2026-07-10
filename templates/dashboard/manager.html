@@ -109,6 +109,33 @@
   </div>
   {% endif %}
 
+  {# --- Рекомендации следующего шага от НейроGuru --- #}
+  {% if next_step_calls %}
+  <div class="sg-page__head" style="margin-top:20px">
+    <h3 class="sg-h3">🧠 Следующие шаги от НейроGuru</h3>
+    <span class="sg-muted sg-sm">по звонкам, где вы запросили рекомендацию</span>
+  </div>
+  <table class="sg-table">
+    <thead><tr><th>Менеджер</th><th>Контакт</th><th>Дата / время</th><th>Рекомендация</th></tr></thead>
+    <tbody>
+      {% for c in next_step_calls %}
+      <tr onclick="location.href='{{ url_for('calls.detail', call_id=c.id) }}'">
+        <td>{{ c.manager.full_name or c.manager.email if c.manager else '—' }}</td>
+        <td>{{ c.client.name or c.client.phone_normalized if c.client else '—' }}</td>
+        <td class="sg-mono sg-sm">{{ (c.started_at or c.created_at).strftime('%d.%m.%Y %H:%M') }}</td>
+        <td class="sg-sm">
+          <ol class="sg-steps sg-steps--compact">
+            {% for s in c.next_steps_json %}
+            <li>{{ s.action if s.action is defined else s }}</li>
+            {% endfor %}
+          </ol>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
   {# --- Мои последние звонки --- #}
   <div class="sg-page__head" style="margin-top:20px">
     <h3 class="sg-h3">Мои последние звонки</h3>

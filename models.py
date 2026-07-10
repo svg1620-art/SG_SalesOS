@@ -191,6 +191,9 @@ class Call(db.Model):
 
     transcript_json = db.Column(db.JSON)  # реплики со спикером и таймингами
     summary = db.Column(db.Text)
+    # рекомендация следующего шага от НейроGuru (по запросу): [{action, why}]
+    next_steps_json = db.Column(db.JSON)
+    next_steps_at = db.Column(db.DateTime)
     overall_score = db.Column(db.Integer)
     zone = db.Column(db.String(10))  # green|yellow|red
     diarization = db.Column(db.String(10))  # stereo|heuristic

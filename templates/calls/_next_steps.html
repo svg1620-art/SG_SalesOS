@@ -10,4 +10,15 @@
     </li>
     {% endfor %}
   </ol>
+  <div class="sg-actions" style="margin-top:12px">
+    <button class="sg-btn sg-btn--sm"
+            hx-post="{{ url_for('calls.next_steps', call_id=call.id) }}"
+            hx-target="#next-steps-box-{{ call.id }}" hx-swap="innerHTML"
+            hx-indicator="#next-steps-load-{{ call.id }}">↻ Перегенерировать</button>
+    {% if call.amo_entity_type and call.amo_entity_id %}
+    <form method="post" action="{{ url_for('calls.push_next_steps_amo', call_id=call.id) }}">
+      <button class="sg-btn sg-btn--sm" type="submit">⬆ Выгрузить в amoCRM</button>
+    </form>
+    {% endif %}
+  </div>
 {% endif %}

@@ -409,6 +409,16 @@ def manager_home():
 
     recent_calls = list(reversed(calls))[:20]
 
+    # звонки с сформированной рекомендацией следующего шага (НейроGuru)
+    next_step_calls = (
+        Call.query.filter(
+            Call.manager_id == current_user.id, Call.next_steps_json.isnot(None)
+        )
+        .order_by(Call.next_steps_at.desc().nullslast())
+        .limit(50)
+        .all()
+    )
+
     return render_template(
         "dashboard/manager.html",
         avg_score=avg_score,
@@ -419,4 +429,5 @@ def manager_home():
         focus=focus,
         missed=missed,
         recent_calls=recent_calls,
+        next_step_calls=next_step_calls,
     )

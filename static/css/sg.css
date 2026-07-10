@@ -317,6 +317,8 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 .sg-steps { margin: 6px 0 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
 .sg-step-item { line-height: 1.5; }
 .sg-step-item__action { font-weight: 600; }
+.sg-steps--compact { gap: 2px; margin: 0; }
+.sg-steps--compact li { line-height: 1.4; }
 
 /* --- Leaderboard / геймификация --- */
 .sg-xp { color: var(--sg-cyan); font-weight: 700; }

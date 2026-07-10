@@ -280,14 +280,44 @@ def panel(call_id):
 def next_steps(call_id):
     """Рекомендация следующего шага от НейроGuru (HTMX-фрагмент).
 
+    POST — сгенерировать заново и сохранить. GET — вернуть сохранённую.
     Доступ: админ по любому звонку, менеджер — только по своему (_get_call_or_404).
     """
     from flask import current_app
     from processing.next_step import generate_next_steps
 
     call = _get_call_or_404(call_id)
-    result = generate_next_steps(current_app._get_current_object(), call)
+
+    if request.method == "POST":
+        result = generate_next_steps(current_app._get_current_object(), call)
+        if result.get("ok"):
+            call.next_steps_json = result["steps"]
+            call.next_steps_at = datetime.utcnow()
+            db.session.commit()
+    else:
+        # сохранённая рекомендация
+        if call.next_steps_json:
+            result = {"ok": True, "steps": call.next_steps_json}
+        else:
+            result = {"ok": False, "error": "Рекомендация ещё не сформирована."}
+
     return render_template("calls/_next_steps.html", result=result, call=call)
+
+
+@calls_bp.route("/<int:call_id>/next-steps/push-amo", methods=["POST"])
+@login_required
+def push_next_steps_amo(call_id):
+    """Выгрузить рекомендацию следующего шага в ленту amoCRM."""
+    from flask import current_app
+    from ingest.amo_notes import push_next_steps_note
+
+    call = _get_call_or_404(call_id)
+    result = push_next_steps_note(current_app._get_current_object(), call)
+    if result.get("ok"):
+        flash("Рекомендация выгружена в ленту amoCRM.", "success")
+    else:
+        flash(f"Не удалось выгрузить: {result.get('error')}", "error")
+    return redirect(url_for("calls.detail", call_id=call.id))
 
 
 @calls_bp.route("/<int:call_id>/reprocess", methods=["POST"])
