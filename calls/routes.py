@@ -275,6 +275,21 @@ def panel(call_id):
     return render_template("calls/_panel.html", **_panel_context(call))
 
 
+@calls_bp.route("/<int:call_id>/next-steps", methods=["POST", "GET"])
+@login_required
+def next_steps(call_id):
+    """Рекомендация следующего шага от НейроGuru (HTMX-фрагмент).
+
+    Доступ: админ по любому звонку, менеджер — только по своему (_get_call_or_404).
+    """
+    from flask import current_app
+    from processing.next_step import generate_next_steps
+
+    call = _get_call_or_404(call_id)
+    result = generate_next_steps(current_app._get_current_object(), call)
+    return render_template("calls/_next_steps.html", result=result, call=call)
+
+
 @calls_bp.route("/<int:call_id>/reprocess", methods=["POST"])
 @admin_required
 def reprocess(call_id):

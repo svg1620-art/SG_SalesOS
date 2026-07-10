@@ -70,6 +70,24 @@
     </div>
     {% endif %}
 
+    {# --- Рекомендация следующего шага от НейроGuru (по запросу) --- #}
+    <div class="sg-card sg-card--pad">
+      <div class="sg-page__head">
+        <h3 class="sg-h3">🧠 Рекомендация следующего шага от НейроGuru</h3>
+        <button class="sg-btn sg-btn--sm sg-btn--primary"
+                hx-post="{{ url_for('calls.next_steps', call_id=call.id) }}"
+                hx-target="#next-steps-box-{{ call.id }}" hx-swap="innerHTML"
+                hx-indicator="#next-steps-load-{{ call.id }}">
+          Подсказать следующий шаг
+        </button>
+      </div>
+      <div id="next-steps-box-{{ call.id }}">
+        <p class="sg-muted">Нажмите кнопку — нейросеть проанализирует диалог и
+          подскажет, что делать дальше с этим клиентом.</p>
+      </div>
+      <p id="next-steps-load-{{ call.id }}" class="sg-muted sg-sm htmx-indicator">⏳ Думаю…</p>
+    </div>
+
     {% if call.criterion_scores %}
     <div class="sg-card sg-card--pad">
       <h3 class="sg-h3">Скоркарта по критериям</h3>

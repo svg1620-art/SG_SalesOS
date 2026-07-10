@@ -1,0 +1,13 @@
+{# Фрагмент: рекомендация следующего шага от НейроGuru (HTMX-swap) #}
+{% if not result.ok %}
+  <div class="sg-flash sg-flash--error">{{ result.error }}</div>
+{% else %}
+  <ol class="sg-steps">
+    {% for s in result.steps %}
+    <li class="sg-step-item">
+      <span class="sg-step-item__action">{{ s.action }}</span>
+      {% if s.why %}<span class="sg-step-item__why sg-muted sg-sm"> — {{ s.why }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+{% endif %}

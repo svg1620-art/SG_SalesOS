@@ -313,6 +313,11 @@ code.sg-mono { background: var(--sg-surface-2); padding: 1px 6px; border-radius:
 .sg-plan--ok { color: #0A0A0D; background: var(--sg-green); }
 .sg-plan--fail { color: #0A0A0D; background: var(--sg-yellow); }
 
+/* --- Следующие шаги от НейроGuru --- */
+.sg-steps { margin: 6px 0 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+.sg-step-item { line-height: 1.5; }
+.sg-step-item__action { font-weight: 600; }
+
 /* --- Leaderboard / геймификация --- */
 .sg-xp { color: var(--sg-cyan); font-weight: 700; }
 .sg-lead-hero {
