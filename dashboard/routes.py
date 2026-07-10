@@ -274,6 +274,19 @@ def index():
         period_calls, date_from, date_to, dept_manager_ids, period_days
     )
 
+    # --- рекомендации следующего шага (НейроGuru) за период, с учётом фильтров ---
+    ns_calls = Call.query.filter(
+        Call.next_steps_json.isnot(None),
+        Call.started_at >= date_from,
+        Call.started_at <= date_to,
+    ).all()
+    if dept_manager_ids is not None:
+        ns_calls = [c for c in ns_calls if c.manager_id in dept_manager_ids]
+    if manager_id is not None:
+        ns_calls = [c for c in ns_calls if c.manager_id == manager_id]
+    ns_calls.sort(key=lambda c: c.next_steps_at or c.started_at or c.created_at, reverse=True)
+    next_step_calls = ns_calls[:50]
+
     # --- дневная сводка (последняя) ---
     digest = DailyDigest.query.order_by(DailyDigest.date.desc()).first()
 
@@ -293,6 +306,7 @@ def index():
         manager_cards=manager_cards,
         managers=managers,
         digest=digest,
+        next_step_calls=next_step_calls,
         departments=departments,
         bars=bars,
         filters={
