@@ -119,7 +119,11 @@ def poll_deals(app=None, congratulate=None) -> dict:
     # реализовано» и 143 «Закрыто и не реализовано». Их id нельзя изменить —
     # можно только переименовать метку (в этом аккаунте 142 = «Оплата получена»).
     # Поле type тут НЕ помогает: type==1 — это «Неразобранное», а не выигрыш.
-    # Серверный фильтр по этим этапам, чтобы не тянуть весь аккаунт.
+    #
+    # ВАЖНО: тянем закрытые сделки из ВСЕХ воронок и храним их все (с pipeline_id).
+    # Ограничение «только Воронка1» применяется на ЭКРАНЕ лидерборда, а не при
+    # импорте — иначе смена воронки в настройках стирала бы реальные сделки
+    # (именно из-за этого «лидерборд пропал»).
     won_ids, lost_ids = {WON_STATUS_ID}, {LOST_STATUS_ID}
     statuses = []
     try:
@@ -128,11 +132,9 @@ def poll_deals(app=None, congratulate=None) -> dict:
         pipelines = []
     if not isinstance(pipelines, list):
         pipelines = []
-    target_pls = [
-        p for p in pipelines
-        if p.get("id") and (not target_pipeline or p["id"] == target_pipeline)
-    ]
-    for p in target_pls:
+    for p in pipelines:
+        if not p.get("id"):
+            continue
         statuses.append((p["id"], WON_STATUS_ID))
         statuses.append((p["id"], LOST_STATUS_ID))
     # фолбэк, если воронки не получили
@@ -166,16 +168,17 @@ def poll_deals(app=None, congratulate=None) -> dict:
             )
             if outcome and closed_ts:
                 diag["closed"] += 1
-            # воронка: если задана целевая — считаем только её сделки
-            in_pipeline = (
+            # в целевой воронке лидерборда? — только для счётчика/поздравлений
+            in_target = (
                 target_pipeline is None
                 or int(lead.get("pipeline_id") or 0) == target_pipeline
             )
-            if outcome and closed_ts and in_pipeline:
+            if outcome and closed_ts and in_target:
                 diag["in_pipeline"] += 1
-            # учитываем закрытые сделки (выигранные/проигранные) с датой закрытия
-            if outcome is None or not closed_ts or not in_pipeline:
-                # самоочистка: сделка снова открыта / чужая воронка — убираем
+            # храним ВСЕ закрытые сделки (выигранные/проигранные) с датой закрытия,
+            # из любой воронки — фильтр воронки применяется на экране лидерборда
+            if outcome is None or not closed_ts:
+                # самоочистка: сделка снова открыта — убираем из базы
                 if lead_id:
                     stale = Deal.query.filter_by(amo_lead_id=lead_id).first()
                     if stale is not None:
@@ -222,6 +225,7 @@ def poll_deals(app=None, congratulate=None) -> dict:
                 and congratulate and manager and price > 0
                 and won_at >= congrats_after
                 and congrats_sent < _MAX_CONGRATS_PER_RUN
+                and in_target  # поздравляем только за воронку лидерборда
             )
             if eligible:
                 total_after = manager_revenue_in_month(
@@ -266,56 +270,66 @@ def _save_last_result(app, result: dict) -> None:
         pass
 
 
-def status_histogram(app=None, max_pages: int = 16) -> dict:
-    """Распределение сделок целевой воронки по этапам — диагностика лидерборда.
+def status_histogram(app=None, max_pages: int = 60) -> dict:
+    """Где лежат ВЫИГРАННЫЕ/проигранные сделки — по воронкам (диагностика).
 
-    Показывает, СКОЛЬКО сделок реально лежит в каждом этапе (и сколько из них
-    закрыто). Так видно, есть ли вообще выигранные сделки в статусе 142
-    «Оплата получена» — или менеджеры держат «успех» в другом этапе.
+    Прямой серверный запрос закрытых сделок (статусы 142/143) по ВСЕМ воронкам,
+    группировка по воронке. Так сразу видно, в какой воронке реально копятся
+    выигранные сделки — и почему лидерборд, настроенный на другую воронку, пуст.
+    Это авторитетный подсчёт (а не выборка): amoCRM отдаёт ровно закрытые сделки.
     """
     app = app or current_app
     if not amo_configured(app):
         return {"ok": False, "error": "amoCRM не настроен."}
 
     from settings_store import leaderboard_pipeline_id
-    pid = leaderboard_pipeline_id(app)
+    target = leaderboard_pipeline_id(app)
     client = AmoClient(amo_base_domain(app), amo_access_token(app))
 
-    names = {}
     try:
-        for p in client.get_pipelines():
-            if pid and p.get("id") != pid:
-                continue
-            for s in (p.get("statuses") or []):
-                names[s.get("id")] = s.get("name") or str(s.get("id"))
-    except Exception:  # noqa: BLE001
-        pass
+        pipelines = client.get_pipelines()
+    except AmoError as exc:
+        return {"ok": False, "error": str(exc)}
+    pname = {p.get("id"): (p.get("name") or str(p.get("id"))) for p in pipelines}
 
-    hist, closed, total = {}, {}, 0
+    statuses = []
+    for p in pipelines:
+        if not p.get("id"):
+            continue
+        statuses.append((p["id"], WON_STATUS_ID))
+        statuses.append((p["id"], LOST_STATUS_ID))
+    if not statuses:
+        return {"ok": False, "error": "Не удалось получить воронки amoCRM."}
+
+    won, lost, total = {}, {}, 0
     try:
-        for lead in client.iter_leads(None, max_pages=max_pages, pipeline_id=pid):
+        for lead in client.iter_leads(None, max_pages=max_pages, statuses=statuses):
+            pid = int(lead.get("pipeline_id") or 0)
             sid = int(lead.get("status_id") or 0)
-            hist[sid] = hist.get(sid, 0) + 1
             total += 1
-            if lead.get("closed_at"):
-                closed[sid] = closed.get(sid, 0) + 1
+            if sid == WON_STATUS_ID:
+                won[pid] = won.get(pid, 0) + 1
+            elif sid == LOST_STATUS_ID:
+                lost[pid] = lost.get(pid, 0) + 1
     except AmoError as exc:
         return {"ok": False, "error": str(exc)}
 
+    pids = set(won) | set(lost)
     rows = [
         {
-            "id": sid,
-            "name": names.get(sid, str(sid)),
-            "count": cnt,
-            "closed": closed.get(sid, 0),
-            "is_won": sid == WON_STATUS_ID,
-            "is_lost": sid == LOST_STATUS_ID,
+            "id": pid,
+            "name": pname.get(pid, str(pid)),
+            "won": won.get(pid, 0),
+            "lost": lost.get(pid, 0),
+            "is_target": target is not None and pid == target,
         }
-        for sid, cnt in sorted(hist.items(), key=lambda kv: -kv[1])
+        for pid in pids
     ]
+    rows.sort(key=lambda r: (-r["won"], -r["lost"]))
     return {
-        "ok": True, "pipeline_id": pid, "total": total,
-        "capped": total >= max_pages * 250, "rows": rows,
+        "ok": True, "target": target, "target_name": pname.get(target),
+        "total": total, "total_won": sum(won.values()),
+        "total_lost": sum(lost.values()), "rows": rows,
     }
 
 
