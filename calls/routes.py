@@ -74,10 +74,10 @@ def index():
     calls = query.all()
     calls.sort(key=lambda c: c.started_at or c.created_at, reverse=True)
 
-    # исход сделки по контакту звонка
-    from processing.lead_score import outcome_by_contact, call_contact_id
-    oc_map = outcome_by_contact()
-    call_outcomes = {c.id: oc_map.get(call_contact_id(c)) for c in calls}
+    # исход сделки: по лиду или по контакту звонка
+    from processing.lead_score import outcome_lookup, call_outcome
+    by_contact, by_lead = outcome_lookup()
+    call_outcomes = {c.id: call_outcome(c, by_contact, by_lead) for c in calls}
     if outcome in {"won", "lost"}:
         calls = [c for c in calls if call_outcomes.get(c.id) == outcome]
     calls = calls[:500]
@@ -545,9 +545,9 @@ def _filtered_calls_from_args():
     calls.sort(key=lambda c: c.started_at or c.created_at)
     outcome = request.args.get("outcome")
     if outcome in {"won", "lost"}:
-        from processing.lead_score import outcome_by_contact, call_contact_id
-        oc_map = outcome_by_contact()
-        calls = [c for c in calls if oc_map.get(call_contact_id(c)) == outcome]
+        from processing.lead_score import outcome_lookup, call_outcome
+        by_contact, by_lead = outcome_lookup()
+        calls = [c for c in calls if call_outcome(c, by_contact, by_lead) == outcome]
     return calls
 
 

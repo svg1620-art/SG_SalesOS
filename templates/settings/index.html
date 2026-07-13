@@ -196,15 +196,17 @@
       <b class="sg-mono">{{ deals_won }}</b> выиграно /
       <b class="sg-mono">{{ deals_lost }}</b> проиграно.
       Проигранные сделки тоже подтягиваются — как история для обучения (в рейтинг не идут).</p>
-    <p class="sg-muted sg-sm">🔗 Связка «звонок ↔ сделка»:
-      контактов у сделок <b class="sg-mono">{{ link_diag.deal_contacts }}</b>
-      (без контакта: <b class="sg-mono">{{ link_diag.deals_no_contact }}</b>),
-      контактов у звонков <b class="sg-mono">{{ link_diag.call_contacts }}</b>,
-      совпадает <b class="sg-mono">{{ link_diag.matched }}</b>.
-      {% if link_diag.deals_no_contact and not link_diag.deal_contacts %}
-      <span style="color:var(--sg-red)">У сделок не заполнен контакт — «Пересобрать сделки» (тянет контакт из amoCRM).</span>
-      {% elif not link_diag.matched %}
-      <span style="color:var(--sg-yellow)">Совпадений нет: звонки и сделки — по разным контактам либо звонки вне выбранного периода в «Звонках».</span>
+    <p class="sg-muted sg-sm">🔗 Связка «звонок ↔ сделка»:<br>
+      • по контакту: сделок <b class="sg-mono">{{ link_diag.deal_contacts }}</b>,
+        звонков <b class="sg-mono">{{ link_diag.call_contacts }}</b>,
+        совпадает <b class="sg-mono">{{ link_diag.matched_by_contact }}</b><br>
+      • по сделке (лиду): сделок <b class="sg-mono">{{ link_diag.deal_leads }}</b>,
+        звонков-на-лид <b class="sg-mono">{{ link_diag.call_leads }}</b>,
+        совпадает <b class="sg-mono">{{ link_diag.matched_by_lead }}</b>
+      {% if link_diag.matched_by_contact or link_diag.matched_by_lead %}
+      <span style="color:var(--sg-green)">— связка работает.</span>
+      {% else %}
+      <span style="color:var(--sg-yellow)">— совпадений нет ни по контакту, ни по лиду. Проверьте период в «Звонках» (по умолчанию 30 дней) или пришлите скрин.</span>
       {% endif %}</p>
   </div>
 </section>

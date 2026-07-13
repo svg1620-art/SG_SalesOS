@@ -35,46 +35,64 @@ def call_contact_id(call):
     return None
 
 
-def outcome_by_contact() -> dict:
-    """{amo_contact_id: 'won'|'lost'} — исход последней закрытой сделки контакта."""
+def outcome_lookup():
+    """Карты исхода: (по контакту, по лиду). Ключи — id, значения 'won'|'lost'."""
     from models import Deal
-    result = {}
+    by_contact, by_lead = {}, {}
     rows = (
-        Deal.query.filter(
-            Deal.outcome.in_(["won", "lost"]),
-            Deal.amo_contact_id.isnot(None),
-        )
+        Deal.query.filter(Deal.outcome.in_(["won", "lost"]))
         .order_by(Deal.won_at.asc())  # asc → перезапись оставит самую свежую
-        .with_entities(Deal.amo_contact_id, Deal.outcome)
+        .with_entities(Deal.amo_contact_id, Deal.amo_lead_id, Deal.outcome)
         .all()
     )
-    for contact_id, outcome in rows:
-        result[contact_id] = outcome
-    return result
+    for contact_id, lead_id, outcome in rows:
+        if contact_id is not None:
+            by_contact[contact_id] = outcome
+        if lead_id is not None:
+            by_lead[lead_id] = outcome
+    return by_contact, by_lead
 
 
-def deal_outcome_for_call(call):
-    """Фактический исход сделки клиента ('won'|'lost'|None) — для валидации.
+def outcome_by_contact() -> dict:
+    """{amo_contact_id: 'won'|'lost'} (совместимость)."""
+    return outcome_lookup()[0]
 
-    Схема: звонок → контакт (client.amo_contact_id) → сделка (Deal.amo_contact_id).
-    """
-    from models import Deal
-    contact_id = None
-    if call.client and call.client.amo_contact_id:
-        contact_id = call.client.amo_contact_id
-    elif call.amo_entity_type == "contacts" and call.amo_entity_id:
-        contact_id = call.amo_entity_id
-    if not contact_id:
+
+def call_outcome(call, by_contact=None, by_lead=None):
+    """Исход сделки звонка: сначала прямая привязка к лиду, потом по контакту."""
+    # звонок привязан к сделке (лиду) напрямую
+    if call.amo_entity_type == "leads" and call.amo_entity_id:
+        if by_lead is not None:
+            if call.amo_entity_id in by_lead:
+                return by_lead[call.amo_entity_id]
+        else:
+            from models import Deal
+            d = Deal.query.filter(
+                Deal.amo_lead_id == call.amo_entity_id,
+                Deal.outcome.in_(["won", "lost"]),
+            ).first()
+            if d:
+                return d.outcome
+    # иначе — по контакту
+    cid = call_contact_id(call)
+    if cid is None:
         return None
-    deal = (
+    if by_contact is not None:
+        return by_contact.get(cid)
+    from models import Deal
+    d = (
         Deal.query.filter(
-            Deal.amo_contact_id == contact_id,
-            Deal.outcome.in_(["won", "lost"]),
+            Deal.amo_contact_id == cid, Deal.outcome.in_(["won", "lost"])
         )
         .order_by(Deal.won_at.desc())
         .first()
     )
-    return deal.outcome if deal else None
+    return d.outcome if d else None
+
+
+def deal_outcome_for_call(call):
+    """Фактический исход сделки звонка ('won'|'lost'|None) — по лиду или контакту."""
+    return call_outcome(call)
 
 
 def _level_for(potential: int) -> str:

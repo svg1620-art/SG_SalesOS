@@ -55,13 +55,11 @@ def index():
     deals_won = Deal.query.filter_by(outcome="won").count()
     deals_lost = Deal.query.filter_by(outcome="lost").count()
 
-    # диагностика связки «звонок → контакт → сделка»
-    from processing.lead_score import outcome_by_contact
-    oc = outcome_by_contact()
-    deal_contacts = set(oc.keys())
-    deals_no_contact = Deal.query.filter(
-        Deal.outcome.in_(["won", "lost"]), Deal.amo_contact_id.is_(None)
-    ).count()
+    # диагностика связки «звонок ↔ сделка» — по контакту И по лиду
+    from processing.lead_score import outcome_lookup
+    by_contact, by_lead = outcome_lookup()
+    deal_contacts, deal_leads = set(by_contact.keys()), set(by_lead.keys())
+
     call_contacts = set()
     for (cid,) in _db.session.query(Call.amo_entity_id).filter(
         Call.amo_entity_type == "contacts", Call.amo_entity_id.isnot(None)
@@ -71,11 +69,19 @@ def index():
         Client.amo_contact_id.isnot(None)
     ).distinct().all():
         call_contacts.add(cid)
+    call_leads = set()
+    for (lid,) in _db.session.query(Call.amo_entity_id).filter(
+        Call.amo_entity_type == "leads", Call.amo_entity_id.isnot(None)
+    ).distinct().all():
+        call_leads.add(lid)
+
     link_diag = {
         "deal_contacts": len(deal_contacts),
-        "deals_no_contact": deals_no_contact,
         "call_contacts": len(call_contacts),
-        "matched": len(deal_contacts & call_contacts),
+        "matched_by_contact": len(deal_contacts & call_contacts),
+        "deal_leads": len(deal_leads),
+        "call_leads": len(call_leads),
+        "matched_by_lead": len(deal_leads & call_leads),
     }
 
     return render_template(
