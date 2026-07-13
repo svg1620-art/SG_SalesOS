@@ -183,6 +183,9 @@
       <form method="post" action="{{ url_for('settings.amo_import_won') }}">
         <button class="sg-btn sg-btn--primary" type="submit">✅ Импортировать выигранные (быстро)</button>
       </form>
+      <form method="post" action="{{ url_for('settings.amo_import_lost') }}">
+        <button class="sg-btn" type="submit">❌ Импортировать проигранные (в фоне)</button>
+      </form>
       <form method="post" action="{{ url_for('settings.amo_poll_deals') }}">
         <button class="sg-btn" type="submit">💰 Опросить сделки сейчас</button>
       </form>
@@ -221,6 +224,17 @@
       {% endif %}
       {% else %}
       <span style="color:var(--sg-red)">ошибка: {{ deals_last.error }}</span>
+      {% endif %}
+    </p>
+    {% endif %}
+    {% if lost_last %}
+    <p class="sg-muted sg-sm">📉 Последний импорт проигранных ({{ lost_last.at }}):
+      {% if lost_last.ok %}
+      просмотрено <b class="sg-mono">{{ lost_last.seen }}</b>,
+      добавлено <b class="sg-mono">{{ lost_last.imported }}</b>,
+      обновлено <b class="sg-mono">{{ lost_last.updated }}</b>.
+      {% else %}
+      <span style="color:var(--sg-red)">ошибка: {{ lost_last.error }}</span>
       {% endif %}
     </p>
     {% endif %}

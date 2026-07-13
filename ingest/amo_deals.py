@@ -39,6 +39,8 @@ _MAX_CONGRATS_PER_RUN = 12
 # истории/скоринга, в рейтинг они не идут)
 _WON_MAX_PAGES = 60
 _LOST_MAX_PAGES = 40
+# отдельный (фоновый) полный импорт проигранных — их могут быть десятки тысяч
+_LOST_IMPORT_MAX_PAGES = 100
 
 
 def manager_revenue(manager_id: int) -> int:
@@ -271,15 +273,102 @@ def poll_deals(app=None, congratulate=None) -> dict:
     return result
 
 
-def _save_last_result(app, result: dict) -> None:
-    """Сохранить итог последнего опроса сделок (для показа в Настройках)."""
+def _save_last_result(app, result: dict, key: str = "amo_deals_last_result") -> None:
+    """Сохранить итог последнего опроса/импорта сделок (для показа в Настройках)."""
     import json
     try:
         payload = dict(result)
         payload["at"] = datetime.utcnow().isoformat(timespec="seconds")
-        set_setting("amo_deals_last_result", json.dumps(payload, ensure_ascii=False))
+        set_setting(key, json.dumps(payload, ensure_ascii=False))
     except Exception:  # noqa: BLE001
         pass
+
+
+def import_lost(app=None, max_pages: int = _LOST_IMPORT_MAX_PAGES) -> dict:
+    """Импорт проигранных сделок (143) из всех воронок — в фоне, батч-коммитом.
+
+    Проигранных десятки тысяч, поэтому запускать только фоном. Нужны для истории
+    скоринга и фильтра «закрыто и не реализовано» в звонках. В рейтинг не идут.
+    Итог сохраняется в настройку amo_lost_last_result (показывается в Настройках).
+    """
+    app = app or current_app
+    if not amo_configured(app):
+        _save_last_result(app, {"ok": False, "error": "amoCRM не настроен"},
+                          key="amo_lost_last_result")
+        return {"ok": False, "error": "amoCRM не настроен"}
+
+    client = AmoClient(amo_base_domain(app), amo_access_token(app))
+    try:
+        pipelines = client.get_pipelines()
+    except AmoError as exc:
+        _save_last_result(app, {"ok": False, "error": str(exc)},
+                          key="amo_lost_last_result")
+        return {"ok": False, "error": str(exc)}
+    pids = [p["id"] for p in pipelines if p.get("id")]
+    lost_statuses = [(pid, LOST_STATUS_ID) for pid in pids]
+    mgr_by_amo = {
+        u.amo_user_id: u.id
+        for u in User.query.filter(User.amo_user_id.isnot(None)).all()
+    }
+
+    imported = updated = seen = batch = 0
+    try:
+        for lead in client.iter_leads(None, max_pages=max_pages,
+                                      statuses=lost_statuses, order="desc"):
+            seen += 1
+            lead_id = lead.get("id")
+            closed_ts = int(lead.get("closed_at") or 0)
+            if not lead_id or not closed_ts:
+                continue
+            pid = lead.get("pipeline_id")
+            manager_id = mgr_by_amo.get(lead.get("responsible_user_id"))
+            closed_at = datetime.utcfromtimestamp(closed_ts)
+            existing = Deal.query.filter_by(amo_lead_id=lead_id).first()
+            if existing is not None:
+                # НЕ трогаем выигранные (вдруг обе привязки к одному lead) —
+                # проигрыш только если запись ещё не выигрыш
+                if existing.outcome != "won":
+                    existing.outcome = "lost"
+                    existing.status_id = LOST_STATUS_ID
+                    existing.pipeline_id = pid
+                    existing.won_at = closed_at
+                    if existing.amo_contact_id is None:
+                        existing.amo_contact_id = _main_contact_id(lead)
+                    if manager_id:
+                        existing.manager_id = manager_id
+                    updated += 1
+            else:
+                db.session.add(Deal(
+                    amo_lead_id=lead_id,
+                    manager_id=manager_id,
+                    amo_contact_id=_main_contact_id(lead),
+                    price=int(lead.get("price") or 0),
+                    name=(lead.get("name") or "")[:500],
+                    pipeline_id=pid,
+                    status_id=LOST_STATUS_ID,
+                    outcome="lost",
+                    won_at=closed_at,
+                ))
+                imported += 1
+            batch += 1
+            if batch >= 500:  # периодический коммит, чтобы не копить транзакцию
+                db.session.commit()
+                batch = 0
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        app.logger.warning("[deals] импорт проигранных упал: %s", exc)
+        _save_last_result(app, {"ok": False, "error": str(exc), "seen": seen},
+                          key="amo_lost_last_result")
+        return {"ok": False, "error": str(exc)}
+
+    result = {"ok": True, "imported": imported, "updated": updated, "seen": seen}
+    _save_last_result(app, result, key="amo_lost_last_result")
+    app.logger.info(
+        "[deals] импорт проигранных: просмотрено %s, добавлено %s, обновлено %s",
+        seen, imported, updated,
+    )
+    return result
 
 
 def status_histogram(app=None, max_pages: int = 30) -> dict:

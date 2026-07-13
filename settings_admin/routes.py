@@ -101,6 +101,13 @@ def index():
             deals_last = _json.loads(raw)
         except Exception:  # noqa: BLE001
             deals_last = None
+    lost_last = None
+    raw_lost = get_setting("amo_lost_last_result")
+    if raw_lost:
+        try:
+            lost_last = _json.loads(raw_lost)
+        except Exception:  # noqa: BLE001
+            lost_last = None
 
     return render_template(
         "settings/index.html",
@@ -111,6 +118,7 @@ def index():
         deals_lost=deals_lost,
         link_diag=link_diag,
         deals_last=deals_last,
+        lost_last=lost_last,
         token_set=bool(telegram_token()),
         chat_ids=", ".join(telegram_chat_ids()),
         telegram_hour=telegram_hour(),
@@ -299,6 +307,21 @@ def amo_import_won():
             f"По воронкам — {top}.",
             "success",
         )
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/amo/import-lost", methods=["POST"])
+@admin_required
+def amo_import_lost():
+    """Импорт проигранных сделок — в фоне (их десятки тысяч)."""
+    from ingest.amo_deals import import_lost
+
+    _run_bg(import_lost)
+    flash(
+        "Импорт проигранных запущен в фоне (их десятки тысяч — займёт пару минут). "
+        "Обновите страницу — строка «Проигранные» ниже покажет итог.",
+        "success",
+    )
     return redirect(url_for("settings.index"))
 
 
