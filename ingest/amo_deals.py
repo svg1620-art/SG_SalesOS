@@ -113,14 +113,17 @@ def poll_deals(app=None, congratulate=None) -> dict:
 
     congrats_after = datetime.utcnow() - timedelta(days=_CONGRATS_MAX_AGE_DAYS)
     new_count, congrats_sent, removed_count, max_updated = 0, 0, 0, since_ts or 0
+    diag = {"fetched": 0, "closed": 0, "in_pipeline": 0}
     try:
         leads = list(client.iter_leads(since_ts))
     except AmoError as exc:
         app.logger.warning("[deals] опрос не удался: %s", exc)
+        _save_last_result(app, {"ok": False, "error": str(exc), "new": 0})
         return {"ok": False, "error": str(exc), "new": 0}
 
     for lead in leads:
         try:
+            diag["fetched"] += 1
             updated = int(lead.get("updated_at") or 0)
             max_updated = max(max_updated, updated)
             lead_id = lead.get("id")
@@ -131,11 +134,15 @@ def poll_deals(app=None, congratulate=None) -> dict:
                 else "lost" if status == LOST_STATUS_ID
                 else None
             )
+            if outcome and closed_ts:
+                diag["closed"] += 1
             # воронка: если задана целевая — считаем только её сделки
             in_pipeline = (
                 target_pipeline is None
                 or int(lead.get("pipeline_id") or 0) == target_pipeline
             )
+            if outcome and closed_ts and in_pipeline:
+                diag["in_pipeline"] += 1
             # учитываем закрытые сделки (выигранные/проигранные) с датой закрытия
             if outcome is None or not closed_ts or not in_pipeline:
                 # самоочистка: сделка снова открыта / чужая воронка — убираем
@@ -202,14 +209,31 @@ def poll_deals(app=None, congratulate=None) -> dict:
     if max_updated:
         set_setting("amo_deals_last_sync", max_updated)
     app.logger.info(
-        "[deals] опрос завершён: новых %s, удалено (уехали из «оплата получена») %s, "
-        "поздравлений %s (backfill=%s)",
-        new_count, removed_count, congrats_sent, first_run,
+        "[deals] опрос завершён: получено %s, закрытых %s, в воронке %s, "
+        "новых %s, удалено %s (backfill=%s)",
+        diag["fetched"], diag["closed"], diag["in_pipeline"],
+        new_count, removed_count, first_run,
     )
-    return {
+    result = {
         "ok": True, "new": new_count, "removed": removed_count,
         "congrats": congrats_sent, "backfill": first_run, "last_sync": max_updated,
+        "fetched": diag["fetched"], "closed": diag["closed"],
+        "in_pipeline": diag["in_pipeline"],
+        "pipeline_id": target_pipeline,
     }
+    _save_last_result(app, result)
+    return result
+
+
+def _save_last_result(app, result: dict) -> None:
+    """Сохранить итог последнего опроса сделок (для показа в Настройках)."""
+    import json
+    try:
+        payload = dict(result)
+        payload["at"] = datetime.utcnow().isoformat(timespec="seconds")
+        set_setting("amo_deals_last_result", json.dumps(payload, ensure_ascii=False))
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def resync_deals(app=None) -> dict:

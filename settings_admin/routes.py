@@ -84,6 +84,16 @@ def index():
         "matched_by_lead": len(deal_leads & call_leads),
     }
 
+    # итог последнего опроса сделок
+    import json as _json
+    deals_last = None
+    raw = get_setting("amo_deals_last_result")
+    if raw:
+        try:
+            deals_last = _json.loads(raw)
+        except Exception:  # noqa: BLE001
+            deals_last = None
+
     return render_template(
         "settings/index.html",
         pipelines=pipelines,
@@ -91,6 +101,7 @@ def index():
         deals_won=deals_won,
         deals_lost=deals_lost,
         link_diag=link_diag,
+        deals_last=deals_last,
         token_set=bool(telegram_token()),
         chat_ids=", ".join(telegram_chat_ids()),
         telegram_hour=telegram_hour(),

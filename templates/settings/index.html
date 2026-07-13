@@ -192,6 +192,23 @@
        сделки (перемещения в статус «Успешно реализовано»). «Пересобрать» — если данные
        за месяц выглядят неверно: очистит и загрузит сделки заново без поздравлений.
        Поздравления в бота уходят только за свежие закрытия (не старше 2 дней).</p>
+    {% if deals_last %}
+    <p class="sg-muted sg-sm">🛰 Последний опрос сделок ({{ deals_last.at }}):
+      {% if deals_last.ok %}
+      получено лидов <b class="sg-mono">{{ deals_last.fetched }}</b>,
+      из них закрытых <b class="sg-mono">{{ deals_last.closed }}</b>,
+      в выбранной воронке <b class="sg-mono">{{ deals_last.in_pipeline }}</b>,
+      добавлено <b class="sg-mono">{{ deals_last.new }}</b>.
+      {% if deals_last.closed and not deals_last.in_pipeline %}
+      <span style="color:var(--sg-yellow)">Закрытые есть, но не в выбранной воронке — смените «Воронку для лидерборда» (или «Все воронки») и пересоберите.</span>
+      {% elif not deals_last.fetched %}
+      <span style="color:var(--sg-yellow)">amoCRM вернул 0 лидов за окно — проверьте токен/права.</span>
+      {% endif %}
+      {% else %}
+      <span style="color:var(--sg-red)">ошибка: {{ deals_last.error }}</span>
+      {% endif %}
+    </p>
+    {% endif %}
     <p class="sg-muted sg-sm">📊 Размечено для скоринга лидов:
       <b class="sg-mono">{{ deals_won }}</b> выиграно /
       <b class="sg-mono">{{ deals_lost }}</b> проиграно.
