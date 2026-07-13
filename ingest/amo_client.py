@@ -126,12 +126,14 @@ class AmoClient:
         return out
 
     def iter_leads(self, since_ts: int | None = None, max_pages: int = 50,
-                   closed_from: int | None = None, statuses=None):
+                   closed_from: int | None = None, statuses=None,
+                   pipeline_id: int | None = None):
         """Итератор по сделкам (leads).
 
         since_ts — фильтр по updated_at. closed_from — фильтр по closed_at.
         statuses — список (pipeline_id, status_id): серверный фильтр по этапам
         (напр. только закрытые сделки нужной воронки) — резко сокращает объём.
+        pipeline_id — фильтр по воронке (все этапы), если statuses не задан.
         """
         page = 1
         while page <= max_pages:
@@ -145,8 +147,10 @@ class AmoClient:
                 params.append(("filter[updated_at][from]", int(since_ts)))
             if closed_from:
                 params.append(("filter[closed_at][from]", int(closed_from)))
-            for i, (pipeline_id, status_id) in enumerate(statuses or []):
-                params.append((f"filter[statuses][{i}][pipeline_id]", int(pipeline_id)))
+            if pipeline_id and not statuses:
+                params.append(("filter[pipeline_id]", int(pipeline_id)))
+            for i, (pl_id, status_id) in enumerate(statuses or []):
+                params.append((f"filter[statuses][{i}][pipeline_id]", int(pl_id)))
                 params.append((f"filter[statuses][{i}][status_id]", int(status_id)))
             r = httpx.get(
                 f"{self.base}/api/v4/leads",

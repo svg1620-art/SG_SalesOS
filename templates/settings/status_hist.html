@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Распределение сделок по этапам — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('settings.index') }}">Настройки</a> / Распределение сделок по этапам
+  </div>
+  <h1 class="sg-h1">Распределение сделок по этапам</h1>
+  <p class="sg-muted">
+    Воронка:
+    <b class="sg-mono">{{ result.pipeline_id or 'все' }}</b>.
+    Просмотрено сделок: <b class="sg-mono">{{ result.total }}</b>{% if result.capped %}
+    <span class="sg-muted">(выборка ограничена — показаны не все, но картина видна)</span>{% endif %}.
+    Столбец «закрыто» — сколько из них имеют дату закрытия (<code>closed_at</code>).
+    Выигрыш идёт в лидерборд только из этапа <b class="sg-mono">142</b>
+    (в этом аккаунте — «Оплата получена»).
+  </p>
+
+  <table class="sg-table">
+    <thead>
+      <tr><th>id этапа</th><th>Название</th><th>Сделок</th><th>Из них закрыто</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in result.rows %}
+      <tr>
+        <td class="sg-mono"><b>{{ r.id }}</b></td>
+        <td>{{ r.name }}</td>
+        <td class="sg-mono">{{ r.count }}</td>
+        <td class="sg-mono">{{ r.closed }}</td>
+        <td>
+          {% if r.is_won %}<span class="sg-ok">✅ выигрыш (в лидерборд)</span>
+          {% elif r.is_lost %}<span class="sg-muted">❌ проигрыш</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% set won_row = result.rows | selectattr('is_won') | list | first %}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    {% if won_row and won_row.count %}
+    <p class="sg-ok">В этапе «Оплата получена» (142) найдено сделок:
+      <b>{{ won_row.count }}</b>, из них закрыто <b>{{ won_row.closed }}</b>.
+      Если лидерборд всё равно пуст — проверьте месяц и привязку менеджеров.</p>
+    {% else %}
+    <p style="color:var(--sg-yellow)">В этапе «Оплата получена» (142) сделок не найдено.
+      Значит, менеджеры отмечают «успех» в другом этапе этой воронки — посмотрите
+      таблицу выше и скажите, какой этап считать выигрышем. Настрою лидерборд на него.</p>
+    {% endif %}
+  </div>
+
+  <div class="sg-actions" style="margin-top:16px">
+    <a class="sg-btn sg-btn--primary" href="{{ url_for('settings.index') }}">Готово</a>
+  </div>
+</section>
+{% endblock %}

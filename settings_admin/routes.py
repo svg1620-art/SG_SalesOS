@@ -275,6 +275,19 @@ def amo_leaderboard_pipeline():
     return redirect(url_for("settings.index"))
 
 
+@settings_bp.route("/amo/status-hist", methods=["POST"])
+@admin_required
+def amo_status_hist():
+    """Диагностика: распределение сделок выбранной воронки по этапам."""
+    from ingest.amo_deals import status_histogram
+
+    result = status_histogram(current_app._get_current_object())
+    if not result.get("ok"):
+        flash(f"Не удалось получить распределение: {result.get('error')}", "error")
+        return redirect(url_for("settings.index"))
+    return render_template("settings/status_hist.html", result=result)
+
+
 @settings_bp.route("/amo/resync-deals", methods=["POST"])
 @admin_required
 def amo_resync_deals():

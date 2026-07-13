@@ -115,10 +115,11 @@ def poll_deals(app=None, congratulate=None) -> dict:
     new_count, congrats_sent, removed_count, max_updated = 0, 0, 0, since_ts or 0
     diag = {"fetched": 0, "closed": 0, "in_pipeline": 0}
 
-    # статусы выигрыша/проигрыша определяем по типу этапа из самой воронки
-    # (won: type==1 или id 142; lost: type==2 или id 143) — учитывает кастомные
-    # названия/id статуса «оплата получена». Серверный фильтр по этапам, чтобы
-    # не тянуть весь аккаунт.
+    # Выигрыш/проигрыш в amoCRM — это ЖЁСТКИЕ системные статусы: 142 «Успешно
+    # реализовано» и 143 «Закрыто и не реализовано». Их id нельзя изменить —
+    # можно только переименовать метку (в этом аккаунте 142 = «Оплата получена»).
+    # Поле type тут НЕ помогает: type==1 — это «Неразобранное», а не выигрыш.
+    # Серверный фильтр по этим этапам, чтобы не тянуть весь аккаунт.
     won_ids, lost_ids = {WON_STATUS_ID}, {LOST_STATUS_ID}
     statuses = []
     try:
@@ -132,20 +133,9 @@ def poll_deals(app=None, congratulate=None) -> dict:
         if p.get("id") and (not target_pipeline or p["id"] == target_pipeline)
     ]
     for p in target_pls:
-        for st in (p.get("statuses") or []):
-            sid, stype = st.get("id"), st.get("type")
-            if sid is None:
-                continue
-            if sid == WON_STATUS_ID or stype == 1:
-                won_ids.add(sid)
-            elif sid == LOST_STATUS_ID or stype == 2:
-                lost_ids.add(sid)
-    for p in target_pls:
-        for st in (p.get("statuses") or []):
-            sid = st.get("id")
-            if sid in won_ids or sid in lost_ids:
-                statuses.append((p["id"], sid))
-    # фолбэк, если воронки/этапы не получили
+        statuses.append((p["id"], WON_STATUS_ID))
+        statuses.append((p["id"], LOST_STATUS_ID))
+    # фолбэк, если воронки не получили
     if not statuses and target_pipeline:
         statuses = [(target_pipeline, WON_STATUS_ID), (target_pipeline, LOST_STATUS_ID)]
 
@@ -274,6 +264,59 @@ def _save_last_result(app, result: dict) -> None:
         set_setting("amo_deals_last_result", json.dumps(payload, ensure_ascii=False))
     except Exception:  # noqa: BLE001
         pass
+
+
+def status_histogram(app=None, max_pages: int = 16) -> dict:
+    """Распределение сделок целевой воронки по этапам — диагностика лидерборда.
+
+    Показывает, СКОЛЬКО сделок реально лежит в каждом этапе (и сколько из них
+    закрыто). Так видно, есть ли вообще выигранные сделки в статусе 142
+    «Оплата получена» — или менеджеры держат «успех» в другом этапе.
+    """
+    app = app or current_app
+    if not amo_configured(app):
+        return {"ok": False, "error": "amoCRM не настроен."}
+
+    from settings_store import leaderboard_pipeline_id
+    pid = leaderboard_pipeline_id(app)
+    client = AmoClient(amo_base_domain(app), amo_access_token(app))
+
+    names = {}
+    try:
+        for p in client.get_pipelines():
+            if pid and p.get("id") != pid:
+                continue
+            for s in (p.get("statuses") or []):
+                names[s.get("id")] = s.get("name") or str(s.get("id"))
+    except Exception:  # noqa: BLE001
+        pass
+
+    hist, closed, total = {}, {}, 0
+    try:
+        for lead in client.iter_leads(None, max_pages=max_pages, pipeline_id=pid):
+            sid = int(lead.get("status_id") or 0)
+            hist[sid] = hist.get(sid, 0) + 1
+            total += 1
+            if lead.get("closed_at"):
+                closed[sid] = closed.get(sid, 0) + 1
+    except AmoError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    rows = [
+        {
+            "id": sid,
+            "name": names.get(sid, str(sid)),
+            "count": cnt,
+            "closed": closed.get(sid, 0),
+            "is_won": sid == WON_STATUS_ID,
+            "is_lost": sid == LOST_STATUS_ID,
+        }
+        for sid, cnt in sorted(hist.items(), key=lambda kv: -kv[1])
+    ]
+    return {
+        "ok": True, "pipeline_id": pid, "total": total,
+        "capped": total >= max_pages * 250, "rows": rows,
+    }
 
 
 def resync_deals(app=None) -> dict:
