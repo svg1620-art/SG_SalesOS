@@ -94,7 +94,11 @@ class AmoClient:
         return users
 
     def get_pipelines(self) -> list[dict]:
-        """Список воронок amoCRM: [{id, name}]."""
+        """Воронки amoCRM со статусами: [{id, name, statuses:[{id,name,type}]}].
+
+        type: 1 — «успешно реализовано» (won), 2 — «закрыто не реализовано» (lost),
+        0 — обычный этап.
+        """
         try:
             r = httpx.get(
                 f"{self.base}/api/v4/leads/pipelines",
@@ -108,7 +112,18 @@ class AmoClient:
             raise AmoError(f"pipelines HTTP {r.status_code}: {r.text[:200]}")
         data = r.json()
         pipelines = (data.get("_embedded") or {}).get("pipelines") or []
-        return [{"id": p.get("id"), "name": p.get("name") or ""} for p in pipelines]
+        out = []
+        for p in pipelines:
+            statuses = ((p.get("_embedded") or {}).get("statuses")) or []
+            out.append({
+                "id": p.get("id"),
+                "name": p.get("name") or "",
+                "statuses": [
+                    {"id": s.get("id"), "name": s.get("name") or "", "type": s.get("type")}
+                    for s in statuses
+                ],
+            })
+        return out
 
     def iter_leads(self, since_ts: int | None = None, max_pages: int = 50,
                    closed_from: int | None = None, statuses=None):

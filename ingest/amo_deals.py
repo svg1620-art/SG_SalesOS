@@ -115,18 +115,39 @@ def poll_deals(app=None, congratulate=None) -> dict:
     new_count, congrats_sent, removed_count, max_updated = 0, 0, 0, since_ts or 0
     diag = {"fetched": 0, "closed": 0, "in_pipeline": 0}
 
-    # серверный фильтр по этапам: только закрытые сделки (142/143) нужной воронки
-    # (или всех воронок, если целевая не задана) — иначе тянет весь аккаунт
-    if target_pipeline:
-        pipeline_ids = [target_pipeline]
-    else:
-        try:
-            pipeline_ids = [p["id"] for p in client.get_pipelines() if p.get("id")]
-        except Exception:  # noqa: BLE001
-            pipeline_ids = []
-    statuses = [
-        (pid, s) for pid in pipeline_ids for s in (WON_STATUS_ID, LOST_STATUS_ID)
+    # статусы выигрыша/проигрыша определяем по типу этапа из самой воронки
+    # (won: type==1 или id 142; lost: type==2 или id 143) — учитывает кастомные
+    # названия/id статуса «оплата получена». Серверный фильтр по этапам, чтобы
+    # не тянуть весь аккаунт.
+    won_ids, lost_ids = {WON_STATUS_ID}, {LOST_STATUS_ID}
+    statuses = []
+    try:
+        pipelines = client.get_pipelines()
+    except Exception:  # noqa: BLE001
+        pipelines = []
+    if not isinstance(pipelines, list):
+        pipelines = []
+    target_pls = [
+        p for p in pipelines
+        if p.get("id") and (not target_pipeline or p["id"] == target_pipeline)
     ]
+    for p in target_pls:
+        for st in (p.get("statuses") or []):
+            sid, stype = st.get("id"), st.get("type")
+            if sid is None:
+                continue
+            if sid == WON_STATUS_ID or stype == 1:
+                won_ids.add(sid)
+            elif sid == LOST_STATUS_ID or stype == 2:
+                lost_ids.add(sid)
+    for p in target_pls:
+        for st in (p.get("statuses") or []):
+            sid = st.get("id")
+            if sid in won_ids or sid in lost_ids:
+                statuses.append((p["id"], sid))
+    # фолбэк, если воронки/этапы не получили
+    if not statuses and target_pipeline:
+        statuses = [(target_pipeline, WON_STATUS_ID), (target_pipeline, LOST_STATUS_ID)]
 
     # с серверным фильтром по этапам на бэкфилле берём ВСЮ историю закрытых
     # сделок воронки (набор мал), дальше — инкрементально по курсору updated_at
@@ -149,8 +170,8 @@ def poll_deals(app=None, congratulate=None) -> dict:
             status = int(lead.get("status_id") or 0)
             closed_ts = int(lead.get("closed_at") or 0)
             outcome = (
-                "won" if status == WON_STATUS_ID
-                else "lost" if status == LOST_STATUS_ID
+                "won" if status in won_ids
+                else "lost" if status in lost_ids
                 else None
             )
             if outcome and closed_ts:

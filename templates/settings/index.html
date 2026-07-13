@@ -192,6 +192,13 @@
        сделки (перемещения в статус «Успешно реализовано»). «Пересобрать» — если данные
        за месяц выглядят неверно: очистит и загрузит сделки заново без поздравлений.
        Поздравления в бота уходят только за свежие закрытия (не старше 2 дней).</p>
+    {% if pipeline_statuses %}
+    <p class="sg-muted sg-sm">🧩 Этапы выбранной воронки (id · название · тип):
+      {% for st in pipeline_statuses %}
+      <span class="sg-mono">{{ st.id }}</span>·{{ st.name }}<span class="sg-muted">·{{ {1:'✅won',2:'❌lost'}.get(st.type, st.type) }}</span>{% if not loop.last %}; {% endif %}
+      {% endfor %}
+    </p>
+    {% endif %}
     {% if deals_last %}
     <p class="sg-muted sg-sm">🛰 Последний опрос сделок ({{ deals_last.at }}):
       {% if deals_last.ok %}

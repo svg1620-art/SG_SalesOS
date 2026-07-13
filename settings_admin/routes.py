@@ -50,6 +50,14 @@ def index():
         except Exception as exc:  # noqa: BLE001
             current_app.logger.info("[settings] воронки amoCRM не получены: %s", exc)
 
+    # этапы выбранной воронки лидерборда (для проверки статуса «оплата получена»)
+    _lb_pid = leaderboard_pipeline_id()
+    pipeline_statuses = []
+    for _p in pipelines:
+        if _lb_pid and _p.get("id") == _lb_pid:
+            pipeline_statuses = _p.get("statuses") or []
+            break
+
     from models import Deal, Call, Client
     from extensions import db as _db
     deals_won = Deal.query.filter_by(outcome="won").count()
@@ -97,6 +105,7 @@ def index():
     return render_template(
         "settings/index.html",
         pipelines=pipelines,
+        pipeline_statuses=pipeline_statuses,
         leaderboard_pipeline_id=leaderboard_pipeline_id(),
         deals_won=deals_won,
         deals_lost=deals_lost,
