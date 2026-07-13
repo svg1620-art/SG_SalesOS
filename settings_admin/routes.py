@@ -50,9 +50,33 @@ def index():
         except Exception as exc:  # noqa: BLE001
             current_app.logger.info("[settings] воронки amoCRM не получены: %s", exc)
 
-    from models import Deal
+    from models import Deal, Call, Client
+    from extensions import db as _db
     deals_won = Deal.query.filter_by(outcome="won").count()
     deals_lost = Deal.query.filter_by(outcome="lost").count()
+
+    # диагностика связки «звонок → контакт → сделка»
+    from processing.lead_score import outcome_by_contact
+    oc = outcome_by_contact()
+    deal_contacts = set(oc.keys())
+    deals_no_contact = Deal.query.filter(
+        Deal.outcome.in_(["won", "lost"]), Deal.amo_contact_id.is_(None)
+    ).count()
+    call_contacts = set()
+    for (cid,) in _db.session.query(Call.amo_entity_id).filter(
+        Call.amo_entity_type == "contacts", Call.amo_entity_id.isnot(None)
+    ).distinct().all():
+        call_contacts.add(cid)
+    for (cid,) in _db.session.query(Client.amo_contact_id).filter(
+        Client.amo_contact_id.isnot(None)
+    ).distinct().all():
+        call_contacts.add(cid)
+    link_diag = {
+        "deal_contacts": len(deal_contacts),
+        "deals_no_contact": deals_no_contact,
+        "call_contacts": len(call_contacts),
+        "matched": len(deal_contacts & call_contacts),
+    }
 
     return render_template(
         "settings/index.html",
@@ -60,6 +84,7 @@ def index():
         leaderboard_pipeline_id=leaderboard_pipeline_id(),
         deals_won=deals_won,
         deals_lost=deals_lost,
+        link_diag=link_diag,
         token_set=bool(telegram_token()),
         chat_ids=", ".join(telegram_chat_ids()),
         telegram_hour=telegram_hour(),
