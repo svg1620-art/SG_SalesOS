@@ -72,7 +72,9 @@ def index():
     # выручка за месяц по менеджеру (только сделки выбранной воронки, если задана)
     from settings_store import leaderboard_pipeline_id
     pid = leaderboard_pipeline_id()
-    deals_q = Deal.query.filter(Deal.won_at >= start, Deal.won_at < end)
+    deals_q = Deal.query.filter(
+        Deal.outcome == "won", Deal.won_at >= start, Deal.won_at < end
+    )
     if pid is not None:
         deals_q = deals_q.filter(Deal.pipeline_id == pid)
     deals = deals_q.all()
@@ -116,12 +118,16 @@ def index():
 
     total_revenue = sum(r["revenue"] for r in rows)
 
-    # диагностика: сколько всего сделок в базе и в каких месяцах есть данные
-    total_deals = Deal.query.count()
+    # диагностика: сколько всего ВЫИГРАННЫХ сделок и в каких месяцах есть данные
+    won_q = Deal.query.filter(Deal.outcome == "won")
+    if pid is not None:
+        won_q = won_q.filter(Deal.pipeline_id == pid)
+    total_deals = won_q.count()
     months_with_data = []
     if not deals and total_deals:
         seen = {}
-        for (d_won,) in db.session.query(Deal.won_at).all():
+        for d in won_q.with_entities(Deal.won_at).all():
+            d_won = d[0]
             if d_won:
                 key = (d_won.year, d_won.month)
                 seen[key] = seen.get(key, 0) + 1

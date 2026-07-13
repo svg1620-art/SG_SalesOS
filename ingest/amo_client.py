@@ -118,6 +118,7 @@ class AmoClient:
                 ("order[updated_at]", "asc"),
                 ("page", page),
                 ("limit", 250),
+                ("with", "contacts"),  # чтобы получить связанный контакт сделки
             ]
             if since_ts:
                 params.append(("filter[updated_at][from]", int(since_ts)))

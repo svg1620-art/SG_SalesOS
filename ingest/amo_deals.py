@@ -24,7 +24,8 @@ from settings_store import (
 )
 from ingest.amo_client import AmoClient, AmoError
 
-WON_STATUS_ID = 142  # «Успешно реализовано» (системный статус amoCRM)
+WON_STATUS_ID = 142   # «Успешно реализовано» (системный статус amoCRM)
+LOST_STATUS_ID = 143  # «Закрыто и не реализовано»
 XP_STEP_RUB = 50000
 XP_PER_STEP = 50
 _FIRST_RUN_DAYS = 120  # на первом опросе — сделки, обновлённые за последние N дней
@@ -36,9 +37,9 @@ _MAX_CONGRATS_PER_RUN = 12
 
 
 def manager_revenue(manager_id: int) -> int:
-    """Суммарная выручка менеджера по всем успешным сделкам (руб)."""
+    """Суммарная выручка менеджера по всем ВЫИГРАННЫМ сделкам (руб)."""
     total = 0
-    for d in Deal.query.filter_by(manager_id=manager_id).all():
+    for d in Deal.query.filter_by(manager_id=manager_id, outcome="won").all():
         total += d.price or 0
     return total
 
@@ -52,10 +53,22 @@ def manager_revenue_in_month(manager_id: int, year: int, month: int) -> int:
     end = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
     total = 0
     for d in Deal.query.filter(
-        Deal.manager_id == manager_id, Deal.won_at >= start, Deal.won_at < end
+        Deal.manager_id == manager_id, Deal.outcome == "won",
+        Deal.won_at >= start, Deal.won_at < end,
     ).all():
         total += d.price or 0
     return total
+
+
+def _main_contact_id(lead) -> int | None:
+    """ID основного контакта сделки из _embedded.contacts."""
+    contacts = ((lead.get("_embedded") or {}).get("contacts")) or []
+    if not contacts:
+        return None
+    for c in contacts:
+        if c.get("is_main"):
+            return c.get("id")
+    return contacts[0].get("id")
 
 
 def _fmt_money(rub: int) -> str:
@@ -111,18 +124,21 @@ def poll_deals(app=None, congratulate=None) -> dict:
             updated = int(lead.get("updated_at") or 0)
             max_updated = max(max_updated, updated)
             lead_id = lead.get("id")
-            # выигранной считаем только сделку в статусе 142 (парсим как int —
-            # API может отдать строку) И с реальной датой закрытия closed_at.
             status = int(lead.get("status_id") or 0)
             closed_ts = int(lead.get("closed_at") or 0)
+            outcome = (
+                "won" if status == WON_STATUS_ID
+                else "lost" if status == LOST_STATUS_ID
+                else None
+            )
             # воронка: если задана целевая — считаем только её сделки
             in_pipeline = (
                 target_pipeline is None
                 or int(lead.get("pipeline_id") or 0) == target_pipeline
             )
-            if status != WON_STATUS_ID or not closed_ts or not in_pipeline:
-                # самоочистка: сделка не подходит (не выиграна / чужая воронка) —
-                # убираем, если раньше была учтена
+            # учитываем закрытые сделки (выигранные/проигранные) с датой закрытия
+            if outcome is None or not closed_ts or not in_pipeline:
+                # самоочистка: сделка снова открыта / чужая воронка — убираем
                 if lead_id:
                     stale = Deal.query.filter_by(amo_lead_id=lead_id).first()
                     if stale is not None:
@@ -130,8 +146,15 @@ def poll_deals(app=None, congratulate=None) -> dict:
                         db.session.commit()
                         removed_count += 1
                 continue
-            if lead_id and Deal.query.filter_by(amo_lead_id=lead_id).first():
-                continue  # уже учтена
+            existing = Deal.query.filter_by(amo_lead_id=lead_id).first() if lead_id else None
+            if existing is not None:
+                # исход мог измениться (выиграли/проиграли заново) — обновим
+                if existing.outcome != outcome:
+                    existing.outcome = outcome
+                    existing.status_id = status
+                    existing.won_at = datetime.utcfromtimestamp(closed_ts)
+                    db.session.commit()
+                continue
 
             price = int(lead.get("price") or 0)
             responsible = lead.get("responsible_user_id")
@@ -139,25 +162,27 @@ def poll_deals(app=None, congratulate=None) -> dict:
                 User.query.filter_by(amo_user_id=responsible).first()
                 if responsible else None
             )
-            # месяц выручки — строго по дате закрытия (перехода в «оплата получена»)
-            won_at = datetime.utcfromtimestamp(closed_ts)
+            won_at = datetime.utcfromtimestamp(closed_ts)  # дата закрытия
 
             deal = Deal(
                 amo_lead_id=lead_id,
                 manager_id=manager.id if manager else None,
+                amo_contact_id=_main_contact_id(lead),
                 price=price,
                 name=(lead.get("name") or "")[:500],
                 pipeline_id=lead.get("pipeline_id"),
-                status_id=WON_STATUS_ID,
+                status_id=status,
+                outcome=outcome,
                 won_at=won_at,
             )
             db.session.add(deal)
             db.session.commit()
             new_count += 1
 
-            # XP и поздравление — только за свежие закрытия, по выручке за месяц
+            # XP и поздравление — только за свежие ВЫИГРАННЫЕ сделки
             eligible = (
-                congratulate and manager and price > 0 and won_at is not None
+                outcome == "won"
+                and congratulate and manager and price > 0
                 and won_at >= congrats_after
                 and congrats_sent < _MAX_CONGRATS_PER_RUN
             )

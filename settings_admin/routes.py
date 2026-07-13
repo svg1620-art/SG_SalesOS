@@ -32,10 +32,16 @@ def index():
         except Exception as exc:  # noqa: BLE001
             current_app.logger.info("[settings] воронки amoCRM не получены: %s", exc)
 
+    from models import Deal
+    deals_won = Deal.query.filter_by(outcome="won").count()
+    deals_lost = Deal.query.filter_by(outcome="lost").count()
+
     return render_template(
         "settings/index.html",
         pipelines=pipelines,
         leaderboard_pipeline_id=leaderboard_pipeline_id(),
+        deals_won=deals_won,
+        deals_lost=deals_lost,
         token_set=bool(telegram_token()),
         chat_ids=", ".join(telegram_chat_ids()),
         telegram_hour=telegram_hour(),
