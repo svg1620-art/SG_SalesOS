@@ -8,11 +8,11 @@
   </div>
   <h1 class="sg-h1">Где лежат выигранные сделки</h1>
   <p class="sg-muted">
-    Прямой запрос закрытых сделок amoCRM (статусы <b class="sg-mono">142</b> «успех» и
-    <b class="sg-mono">143</b> «проигрыш») по всем воронкам. Всего закрытых просмотрено:
-    <b class="sg-mono">{{ result.total }}</b> — из них выиграно
-    <b class="sg-ok">{{ result.total_won }}</b>, проиграно
-    <b class="sg-mono">{{ result.total_lost }}</b>.
+    Прямой запрос закрытых сделок amoCRM по всем воронкам. Выиграно (статус
+    <b class="sg-mono">142</b> «Оплата получена») — <b class="sg-ok">{{ result.total_won }}</b>
+    (точный подсчёт). Проиграно (статус <b class="sg-mono">143</b>) —
+    <b class="sg-mono">{{ result.total_lost }}</b> <span class="sg-muted">(выборка свежих,
+    их в аккаунте могут быть десятки тысяч — в рейтинг не идут)</span>.
     Воронка лидерборда сейчас:
     <b>{{ result.target_name or ('#' ~ result.target if result.target else 'все воронки') }}</b>.
   </p>

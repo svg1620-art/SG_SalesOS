@@ -34,6 +34,11 @@ _FIRST_RUN_DAYS = 120  # на первом опросе — сделки, обн
 _CONGRATS_MAX_AGE_DAYS = 2
 # страховочный лимит поздравлений за один прогон (от лавины при сбоях)
 _MAX_CONGRATS_PER_RUN = 12
+# выигранных сделок немного — тянем практически все (60×250=15000 с запасом);
+# проигранных могут быть десятки тысяч — берём только свежую выборку (для
+# истории/скоринга, в рейтинг они не идут)
+_WON_MAX_PAGES = 60
+_LOST_MAX_PAGES = 40
 
 
 def manager_revenue(manager_id: int) -> int:
@@ -125,29 +130,36 @@ def poll_deals(app=None, congratulate=None) -> dict:
     # импорте — иначе смена воронки в настройках стирала бы реальные сделки
     # (именно из-за этого «лидерборд пропал»).
     won_ids, lost_ids = {WON_STATUS_ID}, {LOST_STATUS_ID}
-    statuses = []
     try:
         pipelines = client.get_pipelines()
     except Exception:  # noqa: BLE001
         pipelines = []
     if not isinstance(pipelines, list):
         pipelines = []
-    for p in pipelines:
-        if not p.get("id"):
-            continue
-        statuses.append((p["id"], WON_STATUS_ID))
-        statuses.append((p["id"], LOST_STATUS_ID))
-    # фолбэк, если воронки не получили
-    if not statuses and target_pipeline:
-        statuses = [(target_pipeline, WON_STATUS_ID), (target_pipeline, LOST_STATUS_ID)]
+    pids = [p["id"] for p in pipelines if p.get("id")]
+    if not pids and target_pipeline:
+        pids = [target_pipeline]
+    won_statuses = [(pid, WON_STATUS_ID) for pid in pids]
+    lost_statuses = [(pid, LOST_STATUS_ID) for pid in pids]
 
-    # с серверным фильтром по этапам на бэкфилле берём ВСЮ историю закрытых
-    # сделок воронки (набор мал), дальше — инкрементально по курсору updated_at
-    fetch_since = None if (statuses and first_run) else since_ts
+    # КЛЮЧЕВОЕ: в аккаунте могут быть ДЕСЯТКИ ТЫСЯЧ проигранных сделок (у нас
+    # 15 581 в статусе 143). Если тянуть выигранные и проигранные одним запросом,
+    # выигранных (их немного, ~543) может не хватить страниц — они «тонут» за
+    # проигранными. Поэтому тянем РАЗДЕЛЬНО: выигранные — все (свежие первыми),
+    # проигранные — свежие с лимитом (для истории/скоринга; в рейтинг не идут).
+    fetch_since = None if first_run else since_ts
     try:
-        leads = list(client.iter_leads(
-            fetch_since, max_pages=100, statuses=statuses or None
-        ))
+        leads = []
+        if won_statuses:
+            leads += list(client.iter_leads(
+                fetch_since, max_pages=_WON_MAX_PAGES,
+                statuses=won_statuses, order="desc",
+            ))
+        if lost_statuses:
+            leads += list(client.iter_leads(
+                fetch_since, max_pages=_LOST_MAX_PAGES,
+                statuses=lost_statuses, order="desc",
+            ))
     except AmoError as exc:
         app.logger.warning("[deals] опрос не удался: %s", exc)
         _save_last_result(app, {"ok": False, "error": str(exc), "new": 0})
@@ -292,25 +304,26 @@ def status_histogram(app=None, max_pages: int = 60) -> dict:
         return {"ok": False, "error": str(exc)}
     pname = {p.get("id"): (p.get("name") or str(p.get("id"))) for p in pipelines}
 
-    statuses = []
-    for p in pipelines:
-        if not p.get("id"):
-            continue
-        statuses.append((p["id"], WON_STATUS_ID))
-        statuses.append((p["id"], LOST_STATUS_ID))
-    if not statuses:
+    pids = [p["id"] for p in pipelines if p.get("id")]
+    if not pids:
         return {"ok": False, "error": "Не удалось получить воронки amoCRM."}
+    won_statuses = [(pid, WON_STATUS_ID) for pid in pids]
+    lost_statuses = [(pid, LOST_STATUS_ID) for pid in pids]
 
+    # выигранные тянем ОТДЕЛЬНО и полностью (их немного) — иначе десятки тысяч
+    # проигранных «перекрывают» их и выигранных не видно. Проигранные — с лимитом.
     won, lost, total = {}, {}, 0
     try:
-        for lead in client.iter_leads(None, max_pages=max_pages, statuses=statuses):
+        for lead in client.iter_leads(None, max_pages=max_pages,
+                                      statuses=won_statuses, order="desc"):
             pid = int(lead.get("pipeline_id") or 0)
-            sid = int(lead.get("status_id") or 0)
+            won[pid] = won.get(pid, 0) + 1
             total += 1
-            if sid == WON_STATUS_ID:
-                won[pid] = won.get(pid, 0) + 1
-            elif sid == LOST_STATUS_ID:
-                lost[pid] = lost.get(pid, 0) + 1
+        for lead in client.iter_leads(None, max_pages=_LOST_MAX_PAGES,
+                                      statuses=lost_statuses, order="desc"):
+            pid = int(lead.get("pipeline_id") or 0)
+            lost[pid] = lost.get(pid, 0) + 1
+            total += 1
     except AmoError as exc:
         return {"ok": False, "error": str(exc)}
 

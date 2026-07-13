@@ -127,18 +127,21 @@ class AmoClient:
 
     def iter_leads(self, since_ts: int | None = None, max_pages: int = 50,
                    closed_from: int | None = None, statuses=None,
-                   pipeline_id: int | None = None):
+                   pipeline_id: int | None = None, order: str = "asc"):
         """Итератор по сделкам (leads).
 
         since_ts — фильтр по updated_at. closed_from — фильтр по closed_at.
         statuses — список (pipeline_id, status_id): серверный фильтр по этапам
         (напр. только закрытые сделки нужной воронки) — резко сокращает объём.
         pipeline_id — фильтр по воронке (все этапы), если statuses не задан.
+        order — направление сортировки по updated_at ('asc'|'desc'); 'desc'
+        отдаёт свежие сделки первыми (важно, когда проигранных десятки тысяч).
         """
+        order = "desc" if str(order).lower() == "desc" else "asc"
         page = 1
         while page <= max_pages:
             params = [
-                ("order[updated_at]", "asc"),
+                ("order[updated_at]", order),
                 ("page", page),
                 ("limit", 250),
                 ("with", "contacts"),  # чтобы получить связанный контакт сделки
