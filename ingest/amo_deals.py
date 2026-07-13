@@ -282,13 +282,13 @@ def _save_last_result(app, result: dict) -> None:
         pass
 
 
-def status_histogram(app=None, max_pages: int = 60) -> dict:
-    """Где лежат ВЫИГРАННЫЕ/проигранные сделки — по воронкам (диагностика).
+def status_histogram(app=None, max_pages: int = 30) -> dict:
+    """Где лежат ВЫИГРАННЫЕ сделки — по воронкам (быстрая диагностика).
 
-    Прямой серверный запрос закрытых сделок (статусы 142/143) по ВСЕМ воронкам,
-    группировка по воронке. Так сразу видно, в какой воронке реально копятся
-    выигранные сделки — и почему лидерборд, настроенный на другую воронку, пуст.
-    Это авторитетный подсчёт (а не выборка): amoCRM отдаёт ровно закрытые сделки.
+    Синхронный веб-запрос: считаем ТОЛЬКО выигранные (статус 142) по всем
+    воронкам — их немного (~сотни, 1-3 страницы), страница открывается за
+    секунды. Проигранные (их десятки тысяч) НЕ тянем — иначе запрос висит
+    минутами и таймаутится. Для лидерборда важно именно «где выигрыши».
     """
     app = app or current_app
     if not amo_configured(app):
@@ -308,41 +308,29 @@ def status_histogram(app=None, max_pages: int = 60) -> dict:
     if not pids:
         return {"ok": False, "error": "Не удалось получить воронки amoCRM."}
     won_statuses = [(pid, WON_STATUS_ID) for pid in pids]
-    lost_statuses = [(pid, LOST_STATUS_ID) for pid in pids]
 
-    # выигранные тянем ОТДЕЛЬНО и полностью (их немного) — иначе десятки тысяч
-    # проигранных «перекрывают» их и выигранных не видно. Проигранные — с лимитом.
-    won, lost, total = {}, {}, 0
+    won = {}
     try:
         for lead in client.iter_leads(None, max_pages=max_pages,
                                       statuses=won_statuses, order="desc"):
             pid = int(lead.get("pipeline_id") or 0)
             won[pid] = won.get(pid, 0) + 1
-            total += 1
-        for lead in client.iter_leads(None, max_pages=_LOST_MAX_PAGES,
-                                      statuses=lost_statuses, order="desc"):
-            pid = int(lead.get("pipeline_id") or 0)
-            lost[pid] = lost.get(pid, 0) + 1
-            total += 1
     except AmoError as exc:
         return {"ok": False, "error": str(exc)}
 
-    pids = set(won) | set(lost)
     rows = [
         {
             "id": pid,
             "name": pname.get(pid, str(pid)),
-            "won": won.get(pid, 0),
-            "lost": lost.get(pid, 0),
+            "won": cnt,
             "is_target": target is not None and pid == target,
         }
-        for pid in pids
+        for pid, cnt in won.items()
     ]
-    rows.sort(key=lambda r: (-r["won"], -r["lost"]))
+    rows.sort(key=lambda r: -r["won"])
     return {
         "ok": True, "target": target, "target_name": pname.get(target),
-        "total": total, "total_won": sum(won.values()),
-        "total_lost": sum(lost.values()), "rows": rows,
+        "total_won": sum(won.values()), "rows": rows,
     }
 
 
