@@ -364,9 +364,11 @@ def reprocess(call_id):
         flash("Звонок уже обрабатывается.", "warning")
         return redirect(url_for("calls.detail", call_id=call.id))
 
-    # можно переоценить по другому чек-листу
+    # можно переоценить по другому чек-листу; "auto" — по чек-листу отдела менеджера
     checklist_id_raw = request.form.get("checklist_id")
-    if checklist_id_raw and checklist_id_raw.isdigit():
+    if checklist_id_raw == "auto":
+        call.checklist_id = None  # воркер подберёт активный чек-лист отдела
+    elif checklist_id_raw and checklist_id_raw.isdigit():
         chosen = db.session.get(Checklist, int(checklist_id_raw))
         if chosen is None:
             flash("Выбранный чек-лист не найден.", "error")

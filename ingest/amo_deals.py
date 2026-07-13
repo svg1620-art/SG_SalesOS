@@ -114,9 +114,7 @@ def poll_deals(app=None, congratulate=None) -> dict:
     congrats_after = datetime.utcnow() - timedelta(days=_CONGRATS_MAX_AGE_DAYS)
     new_count, congrats_sent, removed_count, max_updated = 0, 0, 0, since_ts or 0
     try:
-        # тянем только ЗАКРЫТЫЕ сделки (closed_at ≥ окна) — их немного,
-        # это резко ускоряет опрос и не грузит систему
-        leads = list(client.iter_leads(since_ts, closed_from=since_ts))
+        leads = list(client.iter_leads(since_ts))
     except AmoError as exc:
         app.logger.warning("[deals] опрос не удался: %s", exc)
         return {"ok": False, "error": str(exc), "new": 0}
@@ -216,8 +214,22 @@ def poll_deals(app=None, congratulate=None) -> dict:
 
 def resync_deals(app=None) -> dict:
     """Полностью пересобрать сделки: удалить все, сбросить курсор, загрузить
-    заново по дате закрытия — БЕЗ поздравлений. Чинит неверные месяцы/спам."""
+    заново по дате закрытия — БЕЗ поздравлений. Чинит неверные месяцы/спам.
+
+    Безопасно: перед удалением проверяем связь с amoCRM (get_account). Если
+    amoCRM недоступен — НЕ удаляем, чтобы не остаться с пустым лидербордом.
+    """
     app = app or current_app
+    if not amo_configured(app):
+        return {"ok": False, "error": "amoCRM не настроен."}
+
+    client = AmoClient(amo_base_domain(app), amo_access_token(app))
+    try:
+        client.get_account()  # проверка связи ДО удаления
+    except AmoError as exc:
+        app.logger.warning("[deals] пересбор отменён — amoCRM недоступен: %s", exc)
+        return {"ok": False, "error": f"amoCRM недоступен, данные не тронуты: {exc}"}
+
     deleted = Deal.query.delete()
     set_setting("amo_deals_last_sync", "")
     db.session.commit()
