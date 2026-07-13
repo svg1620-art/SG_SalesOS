@@ -114,8 +114,27 @@ def poll_deals(app=None, congratulate=None) -> dict:
     congrats_after = datetime.utcnow() - timedelta(days=_CONGRATS_MAX_AGE_DAYS)
     new_count, congrats_sent, removed_count, max_updated = 0, 0, 0, since_ts or 0
     diag = {"fetched": 0, "closed": 0, "in_pipeline": 0}
+
+    # серверный фильтр по этапам: только закрытые сделки (142/143) нужной воронки
+    # (или всех воронок, если целевая не задана) — иначе тянет весь аккаунт
+    if target_pipeline:
+        pipeline_ids = [target_pipeline]
+    else:
+        try:
+            pipeline_ids = [p["id"] for p in client.get_pipelines() if p.get("id")]
+        except Exception:  # noqa: BLE001
+            pipeline_ids = []
+    statuses = [
+        (pid, s) for pid in pipeline_ids for s in (WON_STATUS_ID, LOST_STATUS_ID)
+    ]
+
+    # с серверным фильтром по этапам на бэкфилле берём ВСЮ историю закрытых
+    # сделок воронки (набор мал), дальше — инкрементально по курсору updated_at
+    fetch_since = None if (statuses and first_run) else since_ts
     try:
-        leads = list(client.iter_leads(since_ts))
+        leads = list(client.iter_leads(
+            fetch_since, max_pages=100, statuses=statuses or None
+        ))
     except AmoError as exc:
         app.logger.warning("[deals] опрос не удался: %s", exc)
         _save_last_result(app, {"ok": False, "error": str(exc), "new": 0})
