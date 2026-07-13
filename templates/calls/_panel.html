@@ -54,9 +54,9 @@
       {% if current_user.is_admin and checklists %}
       <form method="post" action="{{ url_for('calls.reprocess', call_id=call.id) }}" class="sg-scorehead__re sg-reproc">
         <select class="sg-input sg-input--sm" name="checklist_id" title="Чек-лист для переоценки">
-          <option value="auto">🏢 По чек-листу отдела (авто)</option>
+          <option value="auto" selected>🏢 По чек-листу отдела (авто)</option>
           {% for cl in checklists %}
-          <option value="{{ cl.id }}" {{ 'selected' if call.checklist_id == cl.id }}>{{ cl.name }}{% if cl.department %} — {{ cl.department.name }}{% endif %}</option>
+          <option value="{{ cl.id }}">{{ cl.name }}{% if cl.department %} — {{ cl.department.name }}{% endif %}</option>
           {% endfor %}
         </select>
         <button class="sg-btn sg-btn--sm" type="submit">↻ Переоценить</button>
