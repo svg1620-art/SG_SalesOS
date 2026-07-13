@@ -275,6 +275,33 @@ def amo_leaderboard_pipeline():
     return redirect(url_for("settings.index"))
 
 
+@settings_bp.route("/amo/import-won", methods=["POST"])
+@admin_required
+def amo_import_won():
+    """Быстрый синхронный импорт выигранных сделок (наполнить лидерборд)."""
+    from ingest.amo_deals import import_won
+
+    try:
+        result = import_won(current_app._get_current_object())
+    except Exception as exc:  # noqa: BLE001
+        flash(f"Ошибка импорта: {exc}", "error")
+        return redirect(url_for("settings.index"))
+
+    if not result.get("ok"):
+        flash(f"Импорт не выполнен: {result.get('error')}", "error")
+    else:
+        by_pl = result.get("by_pipeline") or {}
+        top = ", ".join(f"{k}: {v}" for k, v in sorted(
+            by_pl.items(), key=lambda kv: -kv[1])[:6])
+        flash(
+            f"Выигранные импортированы: добавлено {result['imported']}, "
+            f"обновлено {result['updated']} (просмотрено {result['seen']}). "
+            f"По воронкам — {top}.",
+            "success",
+        )
+    return redirect(url_for("settings.index"))
+
+
 @settings_bp.route("/amo/status-hist", methods=["POST"])
 @admin_required
 def amo_status_hist():

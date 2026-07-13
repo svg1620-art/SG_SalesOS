@@ -180,6 +180,9 @@
     </form>
 
     <div class="sg-actions">
+      <form method="post" action="{{ url_for('settings.amo_import_won') }}">
+        <button class="sg-btn sg-btn--primary" type="submit">✅ Импортировать выигранные (быстро)</button>
+      </form>
       <form method="post" action="{{ url_for('settings.amo_poll_deals') }}">
         <button class="sg-btn" type="submit">💰 Опросить сделки сейчас</button>
       </form>
