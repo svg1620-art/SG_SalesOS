@@ -1,0 +1,30 @@
+{# Фрагмент: скоринг потенциала лида (HTMX-swap) #}
+{% if not result.ok %}
+  <div class="sg-flash sg-flash--error">{{ result.error }}</div>
+{% else %}
+  {% set lvl = {'hot': '🔥 горячий', 'warm': '🟡 тёплый', 'cold': '❄️ холодный'} %}
+  <div class="sg-lead sg-lead--{{ result.level }}">
+    <div class="sg-lead__head">
+      <span class="sg-lead__num sg-mono">{{ result.potential }}</span>
+      <span class="sg-lead__max">/100</span>
+      <span class="sg-lead__lvl">{{ lvl.get(result.level, result.level) }}</span>
+    </div>
+    {% if result.summary %}<p class="sg-lead__summary">{{ result.summary }}</p>{% endif %}
+    {% if result.drivers %}
+    <ul class="sg-lead-drivers">
+      {% for d in result.drivers %}
+      <li class="sg-lead-driver sg-lead-driver--{{ d.status }}">
+        {{ '➕' if d.status == 'plus' else '➖' }} <b>{{ d.signal }}</b>{% if d.note %} — {{ d.note }}{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if result.action %}<div class="sg-lead__action">🎯 {{ result.action }}</div>{% endif %}
+    <div class="sg-actions" style="margin-top:10px">
+      <button class="sg-btn sg-btn--sm"
+              hx-post="{{ url_for('calls.lead_score', call_id=call.id) }}"
+              hx-target="#lead-score-box-{{ call.id }}" hx-swap="innerHTML"
+              hx-indicator="#lead-score-load-{{ call.id }}">↻ Пересчитать</button>
+    </div>
+  </div>
+{% endif %}

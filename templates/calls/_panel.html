@@ -70,6 +70,33 @@
     </div>
     {% endif %}
 
+    {# --- Потенциал сделки (скоринг лида) от НейроGuru (по запросу) --- #}
+    <div class="sg-card sg-card--pad">
+      <div class="sg-page__head">
+        <h3 class="sg-h3">🎯 Потенциал сделки — НейроGuru
+          {% if deal_outcome == 'won' %}<span class="sg-badge sg-badge--active">факт: выиграна 🏆</span>
+          {% elif deal_outcome == 'lost' %}<span class="sg-badge sg-badge--lost">факт: проиграна</span>{% endif %}
+        </h3>
+        <button class="sg-btn sg-btn--sm sg-btn--primary"
+                hx-post="{{ url_for('calls.lead_score', call_id=call.id) }}"
+                hx-target="#lead-score-box-{{ call.id }}" hx-swap="innerHTML"
+                hx-indicator="#lead-score-load-{{ call.id }}">
+          Оценить потенциал
+        </button>
+      </div>
+      <div id="lead-score-box-{{ call.id }}">
+        {% if call.lead_score_json %}
+          {% with result = call.lead_score_json %}
+            {% include "calls/_lead_score.html" %}
+          {% endwith %}
+        {% else %}
+        <p class="sg-muted">Нажмите — НейроGuru оценит вероятность сделки по этому
+          первичному разговору и подскажет, как поднять шанс.</p>
+        {% endif %}
+      </div>
+      <p id="lead-score-load-{{ call.id }}" class="sg-muted sg-sm htmx-indicator">⏳ Оцениваю…</p>
+    </div>
+
     {# --- Рекомендация следующего шага от НейроGuru (по запросу) --- #}
     <div class="sg-card sg-card--pad">
       <div class="sg-page__head">

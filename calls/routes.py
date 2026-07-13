@@ -257,7 +257,16 @@ def _panel_context(call):
         "amo_url": amo_entity_url(
             amo_base_domain(), call.amo_entity_type, call.amo_entity_id
         ),
+        "deal_outcome": _deal_outcome(call),
     }
+
+
+def _deal_outcome(call):
+    from processing.lead_score import deal_outcome_for_call
+    try:
+        return deal_outcome_for_call(call)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 @calls_bp.route("/<int:call_id>")
@@ -277,6 +286,29 @@ def panel(call_id):
     """HTMX-фрагмент: статус во время обработки, результат по готовности."""
     call = _get_call_or_404(call_id)
     return render_template("calls/_panel.html", **_panel_context(call))
+
+
+@calls_bp.route("/<int:call_id>/lead-score", methods=["POST", "GET"])
+@login_required
+def lead_score(call_id):
+    """Скоринг потенциала лида (HTMX-фрагмент). POST — оценить и сохранить."""
+    from flask import current_app
+    from processing.lead_score import score_lead
+
+    call = _get_call_or_404(call_id)
+    if request.method == "POST":
+        result = score_lead(current_app._get_current_object(), call)
+        if result.get("ok"):
+            call.lead_score = result["potential"]
+            call.lead_score_json = result
+            call.lead_score_at = datetime.utcnow()
+            db.session.commit()
+    else:
+        if call.lead_score_json:
+            result = call.lead_score_json
+        else:
+            result = {"ok": False, "error": "Потенциал ещё не оценён."}
+    return render_template("calls/_lead_score.html", result=result, call=call)
 
 
 @calls_bp.route("/<int:call_id>/next-steps", methods=["POST", "GET"])

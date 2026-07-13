@@ -196,6 +196,10 @@ class Call(db.Model):
     # рекомендация следующего шага от НейроGuru (по запросу): [{action, why}]
     next_steps_json = db.Column(db.JSON)
     next_steps_at = db.Column(db.DateTime)
+    # скоринг потенциала лида (по запросу): 0-100 + разбор
+    lead_score = db.Column(db.Integer, index=True)
+    lead_score_json = db.Column(db.JSON)  # {potential, level, drivers, summary, action}
+    lead_score_at = db.Column(db.DateTime)
     overall_score = db.Column(db.Integer)
     zone = db.Column(db.String(10))  # green|yellow|red
     diarization = db.Column(db.String(10))  # stereo|heuristic
