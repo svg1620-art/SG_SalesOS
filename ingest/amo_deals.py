@@ -114,7 +114,9 @@ def poll_deals(app=None, congratulate=None) -> dict:
     congrats_after = datetime.utcnow() - timedelta(days=_CONGRATS_MAX_AGE_DAYS)
     new_count, congrats_sent, removed_count, max_updated = 0, 0, 0, since_ts or 0
     try:
-        leads = list(client.iter_leads(since_ts))
+        # тянем только ЗАКРЫТЫЕ сделки (closed_at ≥ окна) — их немного,
+        # это резко ускоряет опрос и не грузит систему
+        leads = list(client.iter_leads(since_ts, closed_from=since_ts))
     except AmoError as exc:
         app.logger.warning("[deals] опрос не удался: %s", exc)
         return {"ok": False, "error": str(exc), "new": 0}

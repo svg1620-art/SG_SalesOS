@@ -18,6 +18,24 @@ def _clamp_hour(raw, default):
         return default
 
 
+def _run_bg(target):
+    """Запустить долгую задачу в фоновом потоке (чтобы не блокировать веб-воркер).
+
+    target — функция, принимающая app. Внутри — свой app_context.
+    """
+    import threading
+    app = current_app._get_current_object()
+
+    def _job():
+        with app.app_context():
+            try:
+                target(app)
+            except Exception:  # noqa: BLE001
+                app.logger.exception("[settings] фоновая задача упала")
+
+    threading.Thread(target=_job, daemon=True).start()
+
+
 @settings_bp.route("/", methods=["GET"])
 @admin_required
 def index():
@@ -186,21 +204,12 @@ def amo_poll():
 def amo_poll_deals():
     from ingest.amo_deals import poll_deals
 
-    try:
-        result = poll_deals(current_app._get_current_object())
-    except Exception as exc:  # noqa: BLE001
-        flash(f"Ошибка опроса сделок: {exc}", "error")
-        return redirect(url_for("settings.index"))
-
-    if result.get("ok"):
-        flash(
-            f"Опрос сделок: новых {result['new']}, удалено {result.get('removed', 0)}, "
-            f"поздравлений {result.get('congrats', 0)}"
-            f"{' (первичная загрузка без поздравлений)' if result.get('backfill') else ''}.",
-            "success",
-        )
-    else:
-        flash(f"Опрос сделок не выполнен: {result.get('error')}", "error")
+    _run_bg(poll_deals)
+    flash(
+        "Опрос сделок запущен в фоне. Обновите страницу через минуту — "
+        "счётчик размеченных сделок обновится.",
+        "success",
+    )
     return redirect(url_for("settings.index"))
 
 
@@ -218,23 +227,15 @@ def amo_leaderboard_pipeline():
 @settings_bp.route("/amo/resync-deals", methods=["POST"])
 @admin_required
 def amo_resync_deals():
-    """Очистить и загрузить сделки заново по дате закрытия, без поздравлений."""
+    """Очистить и загрузить сделки заново — в фоне, чтобы не вешать систему."""
     from ingest.amo_deals import resync_deals
 
-    try:
-        result = resync_deals(current_app._get_current_object())
-    except Exception as exc:  # noqa: BLE001
-        flash(f"Ошибка пересинхронизации: {exc}", "error")
-        return redirect(url_for("settings.index"))
-
-    if result.get("ok"):
-        flash(
-            f"Сделки пересобраны: удалено {result.get('deleted', 0)}, "
-            f"загружено {result['new']} (по дате закрытия, без поздравлений).",
-            "success",
-        )
-    else:
-        flash(f"Пересинхронизация не выполнена: {result.get('error')}", "error")
+    _run_bg(resync_deals)
+    flash(
+        "Пересбор сделок запущен в фоне. Обновите страницу через 1-2 минуты — "
+        "счётчик размеченных сделок будет расти по мере загрузки.",
+        "success",
+    )
     return redirect(url_for("settings.index"))
 
 

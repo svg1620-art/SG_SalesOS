@@ -110,8 +110,14 @@ class AmoClient:
         pipelines = (data.get("_embedded") or {}).get("pipelines") or []
         return [{"id": p.get("id"), "name": p.get("name") or ""} for p in pipelines]
 
-    def iter_leads(self, since_ts: int | None = None, max_pages: int = 50):
-        """Итератор по сделкам (leads), обновлённым с since_ts."""
+    def iter_leads(self, since_ts: int | None = None, max_pages: int = 50,
+                   closed_from: int | None = None):
+        """Итератор по сделкам (leads).
+
+        since_ts — фильтр по updated_at. closed_from — фильтр по closed_at
+        (только закрытые сделки после этой даты; резко сокращает объём — для
+        опроса сделок нам нужны лишь закрытые).
+        """
         page = 1
         while page <= max_pages:
             params = [
@@ -122,6 +128,8 @@ class AmoClient:
             ]
             if since_ts:
                 params.append(("filter[updated_at][from]", int(since_ts)))
+            if closed_from:
+                params.append(("filter[closed_at][from]", int(closed_from)))
             r = httpx.get(
                 f"{self.base}/api/v4/leads",
                 headers=self._headers(), params=params, timeout=30,
