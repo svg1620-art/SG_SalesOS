@@ -54,6 +54,14 @@
         <option value="red" {{ 'selected' if filters.zone == 'red' }}>🔴 Красная</option>
       </select>
     </label>
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">Исход сделки</span>
+      <select class="sg-input sg-input--sm" name="outcome">
+        <option value="">Все</option>
+        <option value="won" {{ 'selected' if filters.outcome == 'won' }}>🏆 Успех</option>
+        <option value="lost" {{ 'selected' if filters.outcome == 'lost' }}>❌ Закрыто и не реализовано</option>
+      </select>
+    </label>
     <button class="sg-btn sg-btn--primary sg-btn--sm" type="submit">Применить</button>
     <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.index') }}">Сброс</a>
     {% if current_user.is_admin %}
@@ -79,6 +87,7 @@
           <th>Статус</th>
           <th>Балл</th>
           <th>Баланс 🗣/👂</th>
+          <th>Исход</th>
           <th>Зона</th>
         </tr>
       </thead>
@@ -107,6 +116,12 @@
               <span class="sg-mono sg-sm">{{ bal.talk }}/{{ bal.listen }}</span>
             </div>
             {% else %}<span class="sg-muted sg-sm">—</span>{% endif %}
+          </td>
+          <td class="sg-sm">
+            {% set oc = call_outcomes.get(c.id) %}
+            {% if oc == 'won' %}<span class="sg-badge sg-badge--active">🏆 Успех</span>
+            {% elif oc == 'lost' %}<span class="sg-badge sg-badge--lost">❌ Не реализовано</span>
+            {% else %}<span class="sg-muted">—</span>{% endif %}
           </td>
           <td>{{ zone_badge(c.zone) }}</td>
         </tr>

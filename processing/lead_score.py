@@ -26,6 +26,33 @@ def _transcript_text(call, limit_chars=6000) -> str:
     return "\n".join(lines)[:limit_chars]
 
 
+def call_contact_id(call):
+    """ID контакта звонка (client.amo_contact_id, иначе сама сущность-контакт)."""
+    if call.client and call.client.amo_contact_id:
+        return call.client.amo_contact_id
+    if call.amo_entity_type == "contacts" and call.amo_entity_id:
+        return call.amo_entity_id
+    return None
+
+
+def outcome_by_contact() -> dict:
+    """{amo_contact_id: 'won'|'lost'} — исход последней закрытой сделки контакта."""
+    from models import Deal
+    result = {}
+    rows = (
+        Deal.query.filter(
+            Deal.outcome.in_(["won", "lost"]),
+            Deal.amo_contact_id.isnot(None),
+        )
+        .order_by(Deal.won_at.asc())  # asc → перезапись оставит самую свежую
+        .with_entities(Deal.amo_contact_id, Deal.outcome)
+        .all()
+    )
+    for contact_id, outcome in rows:
+        result[contact_id] = outcome
+    return result
+
+
 def deal_outcome_for_call(call):
     """Фактический исход сделки клиента ('won'|'lost'|None) — для валидации.
 

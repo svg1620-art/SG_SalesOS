@@ -58,6 +58,7 @@ def index():
         dt_naive.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=tz)
     )
     zone = request.args.get("zone") or ""
+    outcome = request.args.get("outcome") or ""  # won | lost — исход сделки
     manager_id = request.args.get("manager_id")
     manager_id = int(manager_id) if manager_id and manager_id.isdigit() else None
 
@@ -72,6 +73,13 @@ def index():
 
     calls = query.all()
     calls.sort(key=lambda c: c.started_at or c.created_at, reverse=True)
+
+    # исход сделки по контакту звонка
+    from processing.lead_score import outcome_by_contact, call_contact_id
+    oc_map = outcome_by_contact()
+    call_outcomes = {c.id: oc_map.get(call_contact_id(c)) for c in calls}
+    if outcome in {"won", "lost"}:
+        calls = [c for c in calls if call_outcomes.get(c.id) == outcome]
     calls = calls[:500]
 
     managers = (
@@ -86,10 +94,12 @@ def index():
         "to": dt_naive.strftime("%Y-%m-%d"),
         "manager_id": manager_id,
         "zone": zone,
+        "outcome": outcome,
     }
     return render_template(
         "calls/index.html", calls=calls, managers=managers, filters=filters,
-        balances=balances, query_string=request.query_string.decode(),
+        balances=balances, call_outcomes=call_outcomes,
+        query_string=request.query_string.decode(),
     )
 
 
@@ -533,6 +543,11 @@ def _filtered_calls_from_args():
         query = query.filter(Call.status == status)
     calls = query.all()
     calls.sort(key=lambda c: c.started_at or c.created_at)
+    outcome = request.args.get("outcome")
+    if outcome in {"won", "lost"}:
+        from processing.lead_score import outcome_by_contact, call_contact_id
+        oc_map = outcome_by_contact()
+        calls = [c for c in calls if oc_map.get(call_contact_id(c)) == outcome]
     return calls
 
 
