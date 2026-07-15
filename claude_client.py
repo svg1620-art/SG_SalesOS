@@ -21,6 +21,7 @@ def claude_complete(
     max_tokens: int = 4096,
     model: str | None = None,
     temperature: float | None = None,
+    require_complete: bool = False,
 ) -> str:
     """Один вызов Claude, возвращает склеенный текст ответа.
 
@@ -30,6 +31,10 @@ def claude_complete(
     temperature по умолчанию НЕ передаётся: новые модели (claude-sonnet-5 и др.)
     не принимают этот параметр — используем дефолт модели. Передавать явно только
     если модель точно его поддерживает.
+
+    require_complete=True → если ответ обрезан по лимиту токенов
+    (stop_reason == 'max_tokens'), бросаем понятную ошибку вместо возврата
+    неполного (обрезанного) JSON. Для строгого JSON-анализа.
     """
     resolved_model = model or current_app.config.get("CLAUDE_MODEL")
     if not resolved_model:
@@ -47,6 +52,12 @@ def claude_complete(
         kwargs["temperature"] = temperature
 
     message = client.messages.create(**kwargs)
+    if require_complete and getattr(message, "stop_reason", None) == "max_tokens":
+        raise RuntimeError(
+            "Ответ модели обрезан по лимиту токенов — звонок слишком длинный "
+            "для одного ответа. Повторите обработку (лимит увеличен) или "
+            "используйте более короткий чек-лист."
+        )
     return "".join(
         block.text for block in message.content if getattr(block, "type", None) == "text"
     )
