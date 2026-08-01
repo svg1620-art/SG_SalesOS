@@ -74,9 +74,11 @@ def index():
     calls = query.all()
     calls.sort(key=lambda c: c.started_at or c.created_at, reverse=True)
 
-    # исход сделки: по лиду или по контакту звонка
-    from processing.lead_score import outcome_lookup, call_outcome
-    by_contact, by_lead = outcome_lookup()
+    # исход сделки: по лиду или по контакту звонка. Выбираем сделки ТОЛЬКО по
+    # id текущих звонков (иначе на больших аккаунтах тянули всю таблицу сделок).
+    from processing.lead_score import outcome_lookup, call_outcome, call_ids_for_lookup
+    _cids, _lids = call_ids_for_lookup(calls)
+    by_contact, by_lead = outcome_lookup(_cids, _lids)
     call_outcomes = {c.id: call_outcome(c, by_contact, by_lead) for c in calls}
     if outcome in {"won", "lost"}:
         calls = [c for c in calls if call_outcomes.get(c.id) == outcome]
@@ -545,8 +547,11 @@ def _filtered_calls_from_args():
     calls.sort(key=lambda c: c.started_at or c.created_at)
     outcome = request.args.get("outcome")
     if outcome in {"won", "lost"}:
-        from processing.lead_score import outcome_lookup, call_outcome
-        by_contact, by_lead = outcome_lookup()
+        from processing.lead_score import (
+            outcome_lookup, call_outcome, call_ids_for_lookup,
+        )
+        _cids, _lids = call_ids_for_lookup(calls)
+        by_contact, by_lead = outcome_lookup(_cids, _lids)
         calls = [c for c in calls if call_outcome(c, by_contact, by_lead) == outcome]
     return calls
 

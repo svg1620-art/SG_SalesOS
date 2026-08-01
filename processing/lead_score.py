@@ -35,13 +35,32 @@ def call_contact_id(call):
     return None
 
 
-def outcome_lookup():
-    """Карты исхода: (по контакту, по лиду). Ключи — id, значения 'won'|'lost'."""
+def outcome_lookup(contact_ids=None, lead_ids=None):
+    """Карты исхода: (по контакту, по лиду). Ключи — id, значения 'won'|'lost'.
+
+    Если переданы contact_ids/lead_ids — выбираем ТОЛЬКО эти сделки (иначе на
+    аккаунтах с десятками тысяч закрытых сделок запрос тянул всю таблицу на
+    каждой загрузке «Звонков» и страница висла). Без аргументов — вся таблица
+    (для диагностики/экспорта).
+    """
     from models import Deal
+    from sqlalchemy import or_
+
     by_contact, by_lead = {}, {}
+    q = Deal.query.filter(Deal.outcome.in_(["won", "lost"]))
+    if contact_ids is not None or lead_ids is not None:
+        cids = [c for c in (contact_ids or []) if c is not None]
+        lids = [x for x in (lead_ids or []) if x is not None]
+        conds = []
+        if cids:
+            conds.append(Deal.amo_contact_id.in_(cids))
+        if lids:
+            conds.append(Deal.amo_lead_id.in_(lids))
+        if not conds:
+            return {}, {}  # искать нечего
+        q = q.filter(or_(*conds))
     rows = (
-        Deal.query.filter(Deal.outcome.in_(["won", "lost"]))
-        .order_by(Deal.won_at.asc())  # asc → перезапись оставит самую свежую
+        q.order_by(Deal.won_at.asc())  # asc → перезапись оставит самую свежую
         .with_entities(Deal.amo_contact_id, Deal.amo_lead_id, Deal.outcome)
         .all()
     )
@@ -51,6 +70,18 @@ def outcome_lookup():
         if lead_id is not None:
             by_lead[lead_id] = outcome
     return by_contact, by_lead
+
+
+def call_ids_for_lookup(calls):
+    """Собрать (contact_ids, lead_ids) из набора звонков — для scoped outcome_lookup."""
+    contact_ids, lead_ids = set(), set()
+    for c in calls:
+        cid = call_contact_id(c)
+        if cid is not None:
+            contact_ids.add(cid)
+        if c.amo_entity_type == "leads" and c.amo_entity_id:
+            lead_ids.add(c.amo_entity_id)
+    return contact_ids, lead_ids
 
 
 def outcome_by_contact() -> dict:
