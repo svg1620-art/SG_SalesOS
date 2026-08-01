@@ -21,6 +21,10 @@ _KEYS = {
     "transcribe_provider": "TRANSCRIBE_PROVIDER",
     "deepgram_api_key": "DEEPGRAM_API_KEY",
     "deepgram_model": "DEEPGRAM_MODEL",
+    "llm_provider": "LLM_PROVIDER",
+    "deepseek_api_key": "DEEPSEEK_API_KEY",
+    "deepseek_model": "DEEPSEEK_MODEL",
+    "deepseek_base_url": "DEEPSEEK_BASE_URL",
     # amo_last_sync — только в БД, без env
 }
 
@@ -139,6 +143,24 @@ def deepgram_api_key(app=None):
 
 def deepgram_model(app=None) -> str:
     return (effective("deepgram_model", app) or "nova-2").strip()
+
+
+def llm_provider(app=None) -> str:
+    """Провайдер анализа: 'anthropic' (Claude, по умолчанию) | 'deepseek'."""
+    val = (effective("llm_provider", app) or "anthropic").strip().lower()
+    return "deepseek" if val == "deepseek" else "anthropic"
+
+
+def deepseek_api_key(app=None):
+    return effective("deepseek_api_key", app)
+
+
+def deepseek_model(app=None) -> str:
+    return (effective("deepseek_model", app) or "deepseek-chat").strip()
+
+
+def deepseek_base_url(app=None) -> str:
+    return (effective("deepseek_base_url", app) or "https://api.deepseek.com").strip()
 
 
 def leaderboard_pipeline_id(app=None):

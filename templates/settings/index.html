@@ -109,6 +109,47 @@
     </div>
   </form>
 
+  {# --- Анализ (LLM) --- #}
+  <form method="post" action="{{ url_for('settings.save_llm') }}" class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Анализ (LLM)
+      <span class="sg-badge sg-badge--active">{{ 'DeepSeek' if llm_provider == 'deepseek' else 'Claude' }}</span>
+    </h3>
+    <p class="sg-muted sg-sm">
+      Модель для анализа звонка, скоринга лида, «следующего шага», генерации
+      чек-листа и дневной сводки. <b>Claude</b> — по умолчанию (сильнее в русском
+      коучинге). <b>DeepSeek</b> — дешевле (OpenAI-совместимый API).
+    </p>
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Провайдер</span>
+        <select class="sg-input" name="llm_provider">
+          <option value="anthropic" {{ 'selected' if llm_provider == 'anthropic' }}>Claude (Anthropic)</option>
+          <option value="deepseek" {{ 'selected' if llm_provider == 'deepseek' }}>DeepSeek</option>
+        </select>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Модель DeepSeek</span>
+        <input class="sg-input sg-mono" name="deepseek_model" value="{{ deepseek_model }}"
+               placeholder="deepseek-chat">
+        <span class="sg-muted sg-sm"><code class="sg-mono">deepseek-chat</code> (V3) или <code class="sg-mono">deepseek-reasoner</code> (R1).</span>
+      </label>
+    </div>
+
+    <label class="sg-field">
+      <span class="sg-field__label">Ключ DeepSeek (API Key)
+        {% if deepseek_key_set %}<span class="sg-badge sg-badge--active">задан</span>{% else %}<span class="sg-badge">не задан</span>{% endif %}
+      </span>
+      <input class="sg-input sg-mono" name="deepseek_api_key" autocomplete="off"
+             placeholder="{{ 'оставьте пустым, чтобы не менять' if deepseek_key_set else 'ключ из platform.deepseek.com' }}">
+      {% if deepseek_key_set %}<span class="sg-muted sg-sm">Чтобы удалить ключ, впишите <code class="sg-mono">__clear__</code>.</span>{% endif %}
+    </label>
+
+    <div class="sg-actions">
+      <button class="sg-btn sg-btn--primary" type="submit">Сохранить анализ (LLM)</button>
+    </div>
+  </form>
+
   {# --- amoCRM --- #}
   <form method="post" action="{{ url_for('settings.save_amo') }}" class="sg-card sg-card--pad">
     <h3 class="sg-h3">amoCRM (авто-импорт звонков)

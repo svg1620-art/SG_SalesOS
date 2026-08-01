@@ -50,6 +50,11 @@ class Config:
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL")
     CLAUDE_MODEL_DIGEST = os.environ.get("CLAUDE_MODEL_DIGEST")
+    # Провайдер текстового анализа (LLM): 'anthropic' (по умолчанию) | 'deepseek'
+    LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic")
+    DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+    DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+    DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
     OPENAI_TRANSCRIBE_MODEL = os.environ.get("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe")
     # Провайдер транскрибации: 'openai' (по умолчанию) | 'deepgram'
     TRANSCRIBE_PROVIDER = os.environ.get("TRANSCRIBE_PROVIDER", "openai")

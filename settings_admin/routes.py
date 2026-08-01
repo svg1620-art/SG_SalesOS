@@ -7,6 +7,7 @@ from settings_store import (
     telegram_token, amo_base_domain, amo_access_token, amo_entity, amo_configured,
     amo_since_days, amo_min_duration, recording_proxy, leaderboard_pipeline_id,
     transcribe_provider, deepgram_api_key, deepgram_model,
+    llm_provider, deepseek_api_key, deepseek_model,
 )
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
@@ -138,6 +139,9 @@ def index():
         transcribe_provider=transcribe_provider(),
         deepgram_key_set=bool(deepgram_api_key()),
         deepgram_model=deepgram_model(),
+        llm_provider=llm_provider(),
+        deepseek_key_set=bool(deepseek_api_key()),
+        deepseek_model=deepseek_model(),
     )
 
 
@@ -161,6 +165,25 @@ def save():
     reschedule_jobs(current_app._get_current_object())
 
     flash("Настройки сохранены.", "success")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/llm", methods=["POST"])
+@admin_required
+def save_llm():
+    provider = (request.form.get("llm_provider") or "anthropic").strip().lower()
+    set_setting("llm_provider", "deepseek" if provider == "deepseek" else "anthropic")
+
+    key = (request.form.get("deepseek_api_key") or "").strip()
+    if key == "__clear__":
+        set_setting("deepseek_api_key", "")
+    elif key:
+        set_setting("deepseek_api_key", key)
+
+    model = (request.form.get("deepseek_model") or "").strip()
+    set_setting("deepseek_model", model or "deepseek-chat")
+
+    flash("Настройки анализа (LLM) сохранены.", "success")
     return redirect(url_for("settings.index"))
 
 
