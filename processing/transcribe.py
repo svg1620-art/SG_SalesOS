@@ -149,8 +149,8 @@ def transcribe_call(call) -> tuple[list[dict], str]:
     Провайдер выбирается настройкой TRANSCRIBE_PROVIDER: 'openai' (по умолчанию)
     или 'deepgram'. Deepgram делает стерео/диаризацию одним запросом.
     """
-    provider = (current_app.config.get("TRANSCRIBE_PROVIDER") or "openai").lower()
-    if provider == "deepgram":
+    from settings_store import transcribe_provider
+    if transcribe_provider() == "deepgram":
         from processing.transcribe_deepgram import transcribe_call as _dg
         return _dg(call)
 

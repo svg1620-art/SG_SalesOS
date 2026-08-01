@@ -68,6 +68,47 @@
     </form>
   </div>
 
+  {# --- Транскрибация --- #}
+  <form method="post" action="{{ url_for('settings.save_transcribe') }}" class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Транскрибация
+      <span class="sg-badge sg-badge--active">{{ 'Deepgram' if transcribe_provider == 'deepgram' else 'OpenAI' }}</span>
+    </h3>
+    <p class="sg-muted sg-sm">
+      Провайдер расшифровки звонков. <b>Deepgram</b> для стерео (Мегафон) делает
+      разделение менеджер/клиент по каналам одним запросом и точнее по таймингам.
+      <b>OpenAI</b> (gpt-4o-transcribe) — прежний способ.
+    </p>
+
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Провайдер</span>
+        <select class="sg-input" name="transcribe_provider">
+          <option value="openai" {{ 'selected' if transcribe_provider == 'openai' }}>OpenAI (gpt-4o-transcribe)</option>
+          <option value="deepgram" {{ 'selected' if transcribe_provider == 'deepgram' }}>Deepgram</option>
+        </select>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Модель Deepgram</span>
+        <input class="sg-input sg-mono" name="deepgram_model" value="{{ deepgram_model }}"
+               placeholder="nova-2">
+        <span class="sg-muted sg-sm">Русский поддерживают <code class="sg-mono">nova-2</code> и <code class="sg-mono">nova-3</code>.</span>
+      </label>
+    </div>
+
+    <label class="sg-field">
+      <span class="sg-field__label">Ключ Deepgram (API Key)
+        {% if deepgram_key_set %}<span class="sg-badge sg-badge--active">задан</span>{% else %}<span class="sg-badge">не задан</span>{% endif %}
+      </span>
+      <input class="sg-input sg-mono" name="deepgram_api_key" autocomplete="off"
+             placeholder="{{ 'оставьте пустым, чтобы не менять' if deepgram_key_set else 'вставьте ключ из console.deepgram.com' }}">
+      {% if deepgram_key_set %}<span class="sg-muted sg-sm">Чтобы удалить ключ, впишите <code class="sg-mono">__clear__</code>.</span>{% endif %}
+    </label>
+
+    <div class="sg-actions">
+      <button class="sg-btn sg-btn--primary" type="submit">Сохранить транскрибацию</button>
+    </div>
+  </form>
+
   {# --- amoCRM --- #}
   <form method="post" action="{{ url_for('settings.save_amo') }}" class="sg-card sg-card--pad">
     <h3 class="sg-h3">amoCRM (авто-импорт звонков)

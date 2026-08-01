@@ -18,6 +18,9 @@ _KEYS = {
     "amo_access_token": "AMO_ACCESS_TOKEN",
     "amo_entity": "AMO_ENTITY",
     "recording_proxy": "RECORDING_PROXY",
+    "transcribe_provider": "TRANSCRIBE_PROVIDER",
+    "deepgram_api_key": "DEEPGRAM_API_KEY",
+    "deepgram_model": "DEEPGRAM_MODEL",
     # amo_last_sync — только в БД, без env
 }
 
@@ -122,6 +125,20 @@ def amo_min_duration(app=None) -> int:
         return max(0, int(val))
     except (TypeError, ValueError):
         return 10
+
+
+def transcribe_provider(app=None) -> str:
+    """Провайдер транскрибации: 'openai' (по умолчанию) | 'deepgram'."""
+    val = (effective("transcribe_provider", app) or "openai").strip().lower()
+    return "deepgram" if val == "deepgram" else "openai"
+
+
+def deepgram_api_key(app=None):
+    return effective("deepgram_api_key", app)
+
+
+def deepgram_model(app=None) -> str:
+    return (effective("deepgram_model", app) or "nova-2").strip()
 
 
 def leaderboard_pipeline_id(app=None):

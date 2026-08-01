@@ -6,6 +6,7 @@ from settings_store import (
     get_setting, set_setting, telegram_chat_ids, telegram_hour, digest_hour,
     telegram_token, amo_base_domain, amo_access_token, amo_entity, amo_configured,
     amo_since_days, amo_min_duration, recording_proxy, leaderboard_pipeline_id,
+    transcribe_provider, deepgram_api_key, deepgram_model,
 )
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
@@ -134,6 +135,9 @@ def index():
         amo_min_duration=amo_min_duration(),
         recording_proxy=recording_proxy() or "",
         poll_min=current_app.config.get("POLL_INTERVAL_MIN"),
+        transcribe_provider=transcribe_provider(),
+        deepgram_key_set=bool(deepgram_api_key()),
+        deepgram_model=deepgram_model(),
     )
 
 
@@ -157,6 +161,26 @@ def save():
     reschedule_jobs(current_app._get_current_object())
 
     flash("Настройки сохранены.", "success")
+    return redirect(url_for("settings.index"))
+
+
+@settings_bp.route("/transcribe", methods=["POST"])
+@admin_required
+def save_transcribe():
+    provider = (request.form.get("transcribe_provider") or "openai").strip().lower()
+    set_setting("transcribe_provider", "deepgram" if provider == "deepgram" else "openai")
+
+    # ключ Deepgram: пусто — не менять; спец-значение __clear__ — очистить
+    key = (request.form.get("deepgram_api_key") or "").strip()
+    if key == "__clear__":
+        set_setting("deepgram_api_key", "")
+    elif key:
+        set_setting("deepgram_api_key", key)
+
+    model = (request.form.get("deepgram_model") or "").strip()
+    set_setting("deepgram_model", model or "nova-2")
+
+    flash("Настройки транскрибации сохранены.", "success")
     return redirect(url_for("settings.index"))
 
 

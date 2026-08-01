@@ -12,7 +12,6 @@ openai/httpx. Формат результата тот же, что у OpenAI-т
 import os
 
 import httpx
-from flask import current_app
 from pydub import AudioSegment
 
 _DG_URL = "https://api.deepgram.com/v1/listen"
@@ -26,9 +25,10 @@ _CONTENT_TYPES = {
 
 
 def _api_key() -> str:
-    key = current_app.config.get("DEEPGRAM_API_KEY")
+    from settings_store import deepgram_api_key
+    key = deepgram_api_key()
     if not key:
-        raise RuntimeError("DEEPGRAM_API_KEY не задан в окружении.")
+        raise RuntimeError("Ключ Deepgram не задан (Настройки → Транскрибация).")
     return key
 
 
@@ -57,7 +57,8 @@ def _request(path: str, params: dict) -> dict:
 
 
 def _base_params() -> dict:
-    model = current_app.config.get("DEEPGRAM_MODEL") or "nova-2"
+    from settings_store import deepgram_model
+    model = deepgram_model()
     return {
         "model": model,
         "language": "ru",
