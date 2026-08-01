@@ -15,7 +15,13 @@ dialogs_bp = Blueprint("dialogs", __name__, url_prefix="/dialogs")
 @dialogs_bp.route("/")
 @login_required
 def index():
-    query = Dialog.query
+    from sqlalchemy.orm import joinedload
+
+    # eager-load client/manager — иначе шаблон делает N+1 запросов на каждую
+    # строку (на больших списках страница висит)
+    query = Dialog.query.options(
+        joinedload(Dialog.client), joinedload(Dialog.manager)
+    )
     if not current_user.is_admin:
         # только диалоги, где у менеджера есть звонки
         query = query.join(Call, Call.dialog_id == Dialog.id).filter(
