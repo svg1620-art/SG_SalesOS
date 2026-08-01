@@ -145,7 +145,15 @@ def transcribe_call(call) -> tuple[list[dict], str]:
     """Транскрибировать звонок. Возвращает (transcript, diarization_mode).
 
     diarization_mode: 'stereo' (разделение по каналам) | 'heuristic' (моно).
+
+    Провайдер выбирается настройкой TRANSCRIBE_PROVIDER: 'openai' (по умолчанию)
+    или 'deepgram'. Deepgram делает стерео/диаризацию одним запросом.
     """
+    provider = (current_app.config.get("TRANSCRIBE_PROVIDER") or "openai").lower()
+    if provider == "deepgram":
+        from processing.transcribe_deepgram import transcribe_call as _dg
+        return _dg(call)
+
     path = call.audio_path
     if not path or not os.path.exists(path):
         raise RuntimeError(f"Аудиофайл не найден: {path}")

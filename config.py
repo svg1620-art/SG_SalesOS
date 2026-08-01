@@ -51,6 +51,10 @@ class Config:
     CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL")
     CLAUDE_MODEL_DIGEST = os.environ.get("CLAUDE_MODEL_DIGEST")
     OPENAI_TRANSCRIBE_MODEL = os.environ.get("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe")
+    # Провайдер транскрибации: 'openai' (по умолчанию) | 'deepgram'
+    TRANSCRIBE_PROVIDER = os.environ.get("TRANSCRIBE_PROVIDER", "openai")
+    DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY")
+    DEEPGRAM_MODEL = os.environ.get("DEEPGRAM_MODEL", "nova-2")
 
     # --- Хранилище аудио (Railway Volume) ---
     AUDIO_DIR = os.environ.get("AUDIO_DIR", "/data")
