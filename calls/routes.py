@@ -62,7 +62,12 @@ def index():
     manager_id = request.args.get("manager_id")
     manager_id = int(manager_id) if manager_id and manager_id.isdigit() else None
 
-    query = Call.query.filter(Call.started_at >= date_from, Call.started_at <= date_to)
+    from sqlalchemy.orm import joinedload
+    # eager-load client/manager — иначе список делает N+1 запросов (c.client,
+    # c.manager) на каждый звонок и страница висит на больших объёмах
+    query = Call.query.options(
+        joinedload(Call.client), joinedload(Call.manager)
+    ).filter(Call.started_at >= date_from, Call.started_at <= date_to)
     if not current_user.is_admin:
         query = query.filter(Call.manager_id == current_user.id)
         manager_id = None  # менеджеру не даём выбор чужих
@@ -71,7 +76,9 @@ def index():
     if zone in {"green", "yellow", "red"}:
         query = query.filter(Call.zone == zone)
 
-    calls = query.all()
+    # берём не всю историю окна, а свежие (список всё равно ограничен 500) —
+    # чтобы не грузить в память тысячи транскрибаций на больших аккаунтах
+    calls = query.order_by(Call.started_at.desc()).limit(2000).all()
     calls.sort(key=lambda c: c.started_at or c.created_at, reverse=True)
 
     # исход сделки: по лиду или по контакту звонка. Выбираем сделки ТОЛЬКО по
