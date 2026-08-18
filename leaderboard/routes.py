@@ -91,8 +91,11 @@ def index():
     # у кого есть сделки за месяц (частая ситуация: продавец не отмечен в отделе)
     shown_ids = {m.id for m in managers}
     extra_ids = [mid for mid in revenue_by_mgr if mid not in shown_ids]
+    # только активные: уволенных (неактивных) в рейтинг не тянем, даже если у них
+    # были сделки в этом месяце (история по сделкам сохраняется в базе)
     extra_managers = (
-        User.query.filter(User.id.in_(extra_ids)).all() if extra_ids else []
+        User.query.filter(User.id.in_(extra_ids), User.is_active.is_(True)).all()
+        if extra_ids else []
     )
     all_managers = list(managers) + list(extra_managers)
 

@@ -130,6 +130,10 @@ def _manager_cards(period_calls, date_from, date_to, dept_manager_ids, period_da
     cards = []
     for mid, mcalls in cur_by.items():
         manager = db.session.get(User, mid) if mid else None
+        # уволенных (неактивных) не показываем в рейтинге — история остаётся,
+        # но в карточках/лидерборде они не висят
+        if manager is not None and not manager.is_active:
+            continue
         cur = len(mcalls)
         prev = prev_by.get(mid, 0)
         if prev > 0:
@@ -244,8 +248,9 @@ def index():
             u.id for u in User.query.filter_by(department_id=department_id).all()
         }
 
-    # менеджеры для фильтра: все или только выбранного отдела
-    mgr_query = User.query
+    # менеджеры для фильтра: только активные (уволенных не показываем),
+    # опционально ограниченные отделом
+    mgr_query = User.query.filter(User.is_active.is_(True))
     if department_id is not None:
         mgr_query = mgr_query.filter(User.department_id == department_id)
     managers = mgr_query.order_by(User.full_name, User.email).all()
@@ -286,6 +291,9 @@ def index():
     leaderboard = []
     for mid, mcalls in by_manager.items():
         manager = db.session.get(User, mid) if mid else None
+        # уволенных (неактивных) исключаем из лидерборда (история сохраняется)
+        if manager is not None and not manager.is_active:
+            continue
         mcalls.sort(key=lambda c: c.started_at or c.created_at)
         scored = [c.overall_score for c in mcalls if c.overall_score is not None]
         leaderboard.append(
