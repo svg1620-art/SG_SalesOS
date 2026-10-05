@@ -367,3 +367,117 @@ class AmoToken(db.Model):
     refresh_token = db.Column(db.Text)
     expires_at = db.Column(db.DateTime)
     base_domain = db.Column(db.String(255))
+
+
+# =========================================================================
+# Модуль «Операционный пульт» (Ops Metrics) — Этап 1: сбор данных.
+# ВНИМАНИЕ: таблица сырых действий называется ops_activity_events (а НЕ
+# activity_events из §5 ТЗ), потому что имя activity_events уже занято
+# существующей ActivityEvent (трекинг использования платформы). Так мы не
+# ломаем существующий функционал.
+# =========================================================================
+
+class OpsActivityEvent(db.Model):
+    """Сырое действие менеджера из amoCRM (звонок/сообщение/задача/примечание)."""
+
+    __tablename__ = "ops_activity_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    # дедупликация; namespace: 'note:<id>' | 'event:<id>'
+    amo_event_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    amo_user_id = db.Column(db.BigInteger, nullable=True, index=True)
+    # call_out | call_in | msg_out | msg_in | task_done | note
+    type = db.Column(db.String(20), nullable=False, index=True)
+    contact_id = db.Column(db.BigInteger, nullable=True, index=True)
+    lead_id = db.Column(db.BigInteger, nullable=True, index=True)
+    occurred_at = db.Column(db.DateTime, nullable=False, index=True)
+    duration_sec = db.Column(db.Integer, nullable=True)
+    call_status = db.Column(db.Integer, nullable=True)
+    is_connected = db.Column(db.Boolean, nullable=False, default=False)
+    call_id = db.Column(db.Integer, db.ForeignKey("calls.id"), nullable=True)
+    raw = db.Column(db.JSON)
+
+    def __repr__(self) -> str:
+        return f"<OpsActivityEvent {self.type} {self.amo_event_id}>"
+
+
+class FunnelStageMap(db.Model):
+    """Маппинг этапа воронки amoCRM → шаг воронки модуля."""
+
+    __tablename__ = "funnel_stage_map"
+
+    id = db.Column(db.Integer, primary_key=True)
+    pipeline_id = db.Column(db.BigInteger, nullable=False)
+    status_id = db.Column(db.Integer, nullable=False)
+    # none | qualified | meeting_set | meeting_held | invoice | won | lost
+    step = db.Column(db.String(20), nullable=False, default="none")
+    step_order = db.Column(db.Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        db.UniqueConstraint("pipeline_id", "status_id", name="uq_funnel_stage_map_pl_st"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<FunnelStageMap {self.pipeline_id}/{self.status_id}={self.step}>"
+
+
+class FunnelEvent(db.Model):
+    """Первое достижение шага воронки лидом (когортная база L2/L3)."""
+
+    __tablename__ = "funnel_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    lead_id = db.Column(db.BigInteger, nullable=False, index=True)
+    step = db.Column(db.String(20), nullable=False, index=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    occurred_at = db.Column(db.DateTime, nullable=False, index=True)
+    amount = db.Column(db.Numeric, nullable=True)
+    pipeline_id = db.Column(db.BigInteger, nullable=True)
+    client_key = db.Column(db.String(64), nullable=True, index=True)
+    is_first_revenue = db.Column(db.Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("lead_id", "step", name="uq_funnel_events_lead_step"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<FunnelEvent lead={self.lead_id} {self.step}>"
+
+
+class OpsSetting(db.Model):
+    """Настройки модуля Ops (key/value). Отдельно от общих Setting."""
+
+    __tablename__ = "ops_settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    value = db.Column(db.Text)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class OpsSyncLog(db.Model):
+    """Журнал синхронизаций событий amoCRM."""
+
+    __tablename__ = "ops_sync_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    kind = db.Column(db.String(20), nullable=False)       # incremental | backfill
+    status = db.Column(db.String(20), nullable=False)     # running | ok | error
+    started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    cursor_from = db.Column(db.DateTime, nullable=True)
+    cursor_to = db.Column(db.DateTime, nullable=True)
+    counts = db.Column(db.JSON)                            # {calls, messages, status_changes, ...}
+    message = db.Column(db.Text, nullable=True)
+
+
+class WorkCalendar(db.Model):
+    """Производственный календарь: рабочий день или нет."""
+
+    __tablename__ = "work_calendar"
+
+    date = db.Column(db.Date, primary_key=True)
+    is_working_day = db.Column(db.Boolean, nullable=False, default=True)

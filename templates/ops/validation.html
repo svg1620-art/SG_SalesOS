@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Ops · Валидация данных — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">Ops / Валидация данных</div>
+  <h1 class="sg-h1">Валидация данных (Этап 1)</h1>
+  <p class="sg-muted">
+    Проверка качества синхронизации событий amoCRM до построения метрик.
+    Порог дозвона: <b class="sg-mono">{{ connect_min_sec }}</b> с.
+    <a href="{{ url_for('ops.funnel') }}">→ Маппинг воронки</a>
+  </p>
+
+  {# --- Управление синхронизацией --- #}
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Синхронизация</h3>
+    <div class="sg-actions">
+      <form method="post" action="{{ url_for('ops.sync_incremental') }}">
+        <button class="sg-btn sg-btn--primary" type="submit">↻ Инкрементальная синхронизация</button>
+      </form>
+      <form method="post" action="{{ url_for('ops.sync_backfill') }}"
+            onsubmit="return confirm('Запустить бэкфилл за 90 дней? Может занять несколько минут.');">
+        <button class="sg-btn" type="submit">⏮ Бэкфилл 90 дней</button>
+      </form>
+    </div>
+    {% if recent_syncs %}
+    <table class="sg-table" style="margin-top:12px">
+      <thead><tr><th>Тип</th><th>Статус</th><th>Начало</th><th>Окно</th><th>Итоги</th><th>Ошибка</th></tr></thead>
+      <tbody>
+        {% for s in recent_syncs %}
+        <tr>
+          <td>{{ s.kind }}</td>
+          <td>{% if s.status == 'ok' %}<span class="sg-ok">ok</span>{% elif s.status == 'running' %}<span style="color:var(--sg-yellow)">running</span>{% else %}<span style="color:var(--sg-red)">error</span>{% endif %}</td>
+          <td class="sg-mono sg-sm">{{ s.started_at.strftime('%d.%m %H:%M') if s.started_at }}</td>
+          <td class="sg-mono sg-sm">{{ s.cursor_from.strftime('%d.%m') if s.cursor_from }}–{{ s.cursor_to.strftime('%d.%m') if s.cursor_to }}</td>
+          <td class="sg-mono sg-sm">{{ s.counts }}</td>
+          <td class="sg-sm" style="color:var(--sg-red)">{{ s.message or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="sg-muted sg-sm" style="margin-top:8px">Синхронизаций ещё не было.</p>
+    {% endif %}
+  </div>
+
+  {# --- 1. Глубина истории --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">1. Глубина истории событий</h3>
+    {% if depth_rows %}
+    <table class="sg-table">
+      <thead><tr><th>Тип</th><th>Самое раннее</th><th>Всего</th></tr></thead>
+      <tbody>
+        {% for r in depth_rows %}
+        <tr><td class="sg-mono">{{ r.type }}</td>
+            <td class="sg-mono sg-sm">{{ r.earliest.strftime('%d.%m.%Y %H:%M') if r.earliest }}</td>
+            <td class="sg-mono">{{ r.count }}</td></tr>
+        {% endfor %}
+        <tr><td class="sg-mono">funnel_events</td>
+            <td class="sg-mono sg-sm">{{ funnel_min.strftime('%d.%m.%Y %H:%M') if funnel_min else '—' }}</td>
+            <td class="sg-mono">{{ funnel_count }}</td></tr>
+      </tbody>
+    </table>
+    {% else %}
+    <p class="sg-muted sg-sm">Событий пока нет — запустите синхронизацию.</p>
+    {% endif %}
+  </div>
+
+  {# --- 2. Качество звонков за вчера --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">2. Звонки за вчера: длительность и статус</h3>
+    <p class="sg-muted sg-sm">
+      Всего: <b class="sg-mono">{{ calls_quality.total }}</b>,
+      с длительностью+статусом: <b class="sg-mono sg-ok">{{ calls_quality.with_meta }}</b>,
+      без: <b class="sg-mono" style="color:{{ 'var(--sg-red)' if calls_quality.without_meta else 'inherit' }}">{{ calls_quality.without_meta }}</b>.
+      {% if calls_quality.total == 0 %}<span style="color:var(--sg-yellow)">Нет звонков за вчера в БД.</span>{% endif %}
+    </p>
+  </div>
+
+  {# --- 3. Сообщения по менеджерам за 14 дней --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">3. Исходящие сообщения (чаты) за 14 дней</h3>
+    <table class="sg-table">
+      <thead><tr><th>Менеджер</th><th>msg_out</th><th></th></tr></thead>
+      <tbody>
+        {% for r in msg_rows %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td class="sg-mono">{{ r.count }}</td>
+          <td class="sg-sm">
+            {% if r.no_amo %}<span style="color:var(--sg-yellow)">нет amo_user_id</span>
+            {% elif r.warn %}<span style="color:var(--sg-yellow)">0 — проверьте права токена на «Чаты» или сопоставление</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# --- 4. Сверка с amoCRM --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">4. Сверка звонков с amoCRM (вчера)</h3>
+    <table class="sg-table">
+      <thead><tr><th>Менеджер</th><th>amo_user_id</th><th>Звонков в БД</th></tr></thead>
+      <tbody>
+        {% for r in sverka_rows %}
+        <tr><td>{{ r.name }}</td><td class="sg-mono">{{ r.amo_user_id }}</td><td class="sg-mono">{{ r.db_calls }}</td></tr>
+        {% else %}
+        <tr><td colspan="3" class="sg-muted sg-sm">Нет активных менеджеров с amo_user_id.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <form method="post" action="{{ url_for('ops.validation_crosscheck') }}" style="margin-top:8px">
+      <button class="sg-btn" type="submit">Сверить с amoCRM (живой запрос)</button>
+    </form>
+  </div>
+
+  {# --- 5. Неразмеченные этапы --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">5. Неразмеченные этапы воронок</h3>
+    {% if pipelines_error %}
+      <span style="color:var(--sg-red)">Воронки не получены: {{ pipelines_error }}</span>
+    {% elif unmapped %}
+      <p class="sg-muted sg-sm">Эти этапы не размечены — события по ним не попадут в воронку.
+        <a href="{{ url_for('ops.funnel') }}">Разметить →</a></p>
+      <ul>
+        {% for u in unmapped %}
+        <li>{{ u.pipeline }} → <b>{{ u.status }}</b> <span class="sg-mono sg-muted">#{{ u.status_id }}</span></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <span class="sg-ok">Все этапы размечены ✓</span>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -173,6 +173,46 @@ class AmoClient:
                 return
             page += 1
 
+    def iter_events(self, types, since_ts: int | None = None,
+                    until_ts: int | None = None, max_pages: int = 100):
+        """Итератор по событиям amoCRM (GET /api/v4/events).
+
+        types — список типов: outgoing_call, incoming_call, outgoing_chat_message,
+        incoming_chat_message, lead_status_changed и т.п.
+        since_ts/until_ts — фильтр по created_at (unix). Порядок — по возрастанию
+        created_at (для стабильного курсора). Пагинация с лимитом страниц.
+        """
+        page = 1
+        while page <= max_pages:
+            params = [
+                ("order[created_at]", "asc"),
+                ("page", page),
+                ("limit", 100),
+            ]
+            for t in (types or []):
+                params.append(("filter[type][]", t))
+            if since_ts:
+                params.append(("filter[created_at][from]", int(since_ts)))
+            if until_ts:
+                params.append(("filter[created_at][to]", int(until_ts)))
+            r = httpx.get(
+                f"{self.base}/api/v4/events",
+                headers=self._headers(), params=params, timeout=30,
+            )
+            if r.status_code == 204:
+                return
+            if r.status_code != 200:
+                raise AmoError(f"events HTTP {r.status_code}: {r.text[:200]}")
+            data = r.json()
+            events = (data.get("_embedded") or {}).get("events") or []
+            if not events:
+                return
+            for ev in events:
+                yield ev
+            if not (data.get("_links") or {}).get("next"):
+                return
+            page += 1
+
     def add_note(self, entity: str, entity_id: int, text: str) -> dict:
         """Добавить примечание (note_type=common) в ленту сущности amoCRM.
 

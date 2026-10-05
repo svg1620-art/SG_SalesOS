@@ -24,6 +24,7 @@ def create_app(config_object: type = Config) -> Flask:
     _register_cli(app)
     _maybe_seed_admin(app)
     _ensure_departments(app)
+    _ensure_ops_seed(app)
     _maybe_start_scheduler(app)
 
     return app
@@ -48,6 +49,7 @@ def _register_blueprints(app: Flask) -> None:
     from departments import departments_bp
     from settings_admin import settings_bp
     from leaderboard import leaderboard_bp
+    from ops import ops_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -58,6 +60,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(departments_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(leaderboard_bp)
+    app.register_blueprint(ops_bp)
 
 
 def _register_activity_hook(app: Flask) -> None:
@@ -149,6 +152,50 @@ def _ensure_departments(app: Flask) -> None:
             app.logger.warning("[departments] сид пропущен: %s", exc)
 
 
+def _ensure_ops_seed(app: Flask) -> None:
+    """Сид настроек Ops и производственного календаря (идемпотентно).
+
+    Обёрнуто в try/except: во время `flask db upgrade` таблиц ещё нет.
+    """
+    with app.app_context():
+        try:
+            from ops_store import seed_ops_settings
+            seed_ops_settings(app)
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            app.logger.warning("[ops] сид настроек пропущен: %s", exc)
+        try:
+            _seed_work_calendar(app)
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            app.logger.warning("[ops] сид календаря пропущен: %s", exc)
+
+
+def _seed_work_calendar(app: Flask) -> None:
+    """Базовый производственный календарь на текущий + следующий год.
+
+    Пн–Пт — рабочие, Сб/Вс — нет. Праздники РФ уточняются вручную позже
+    (правкой work_calendar). Идемпотентно: существующие даты не трогаем.
+    """
+    from datetime import date, timedelta
+    from models import WorkCalendar
+
+    year = date.today().year
+    start = date(year, 1, 1)
+    end = date(year + 1, 12, 31)
+    existing = {d for (d,) in db.session.query(WorkCalendar.date).all()}
+    added = 0
+    cur = start
+    while cur <= end:
+        if cur not in existing:
+            db.session.add(WorkCalendar(date=cur, is_working_day=cur.weekday() < 5))
+            added += 1
+        cur += timedelta(days=1)
+    if added:
+        db.session.commit()
+        app.logger.info("[ops] календарь: добавлено %s дней", added)
+
+
 def _maybe_start_scheduler(app: Flask) -> None:
     """Запускаем планировщик, если включён (SCHEDULER_ENABLED).
 
@@ -202,9 +249,25 @@ def _add_schedule_jobs(app: Flask) -> None:
             except Exception as exc:  # noqa: BLE001
                 app.logger.warning("[deals] опрос сделок пропущен: %s", exc)
 
+    def _run_ops_sync():
+        with app.app_context():
+            from settings_store import amo_configured
+            if not amo_configured(app):
+                return
+            try:
+                from ingest.ops_sync import sync_incremental
+                sync_incremental(app)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[ops_sync] инкремент пропущен: %s", exc)
+
     tz = app.config.get("TZ") or "UTC"
     t_hour, d_hour = telegram_hour(app), digest_hour(app)
     poll_min = max(1, int(app.config.get("POLL_INTERVAL_MIN") or 15))
+    try:
+        from ops_store import sync_interval_min
+        ops_min = sync_interval_min()
+    except Exception:  # noqa: BLE001
+        ops_min = 5
 
     scheduler.add_job(
         _run_pulse, CronTrigger(hour=t_hour, minute=0, timezone=tz),
@@ -217,6 +280,10 @@ def _add_schedule_jobs(app: Flask) -> None:
     scheduler.add_job(
         _run_amo, IntervalTrigger(minutes=poll_min),
         id="amo_poll", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _run_ops_sync, IntervalTrigger(minutes=ops_min),
+        id="ops_sync", replace_existing=True, max_instances=1, coalesce=True,
     )
     app.logger.info(
         "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",

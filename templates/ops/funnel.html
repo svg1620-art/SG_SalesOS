@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Маппинг воронки — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('ops.validation') }}">Ops</a> / Маппинг воронки
+  </div>
+  <h1 class="sg-h1">Маппинг воронки</h1>
+  <p class="sg-muted">
+    Для каждого этапа воронки amoCRM выберите шаг модуля. Статусы
+    <b class="sg-mono">142</b>/<b class="sg-mono">143</b> размечаются автоматически
+    как «Успех»/«Проигрыш». По этому маппингу строятся события воронки
+    (квалификации, встречи, счета).
+  </p>
+
+  {% if pipelines_error %}
+    <div class="sg-card sg-card--pad" style="margin:12px 0">
+      <span style="color:var(--sg-red)">Не удалось получить воронки amoCRM: {{ pipelines_error }}</span>
+    </div>
+  {% endif %}
+
+  {% if pipelines %}
+  <form method="post" action="{{ url_for('ops.funnel_save') }}">
+    {% for p in pipelines %}
+    <div class="sg-card sg-card--pad" style="margin-bottom:16px">
+      <h3 class="sg-h3">{{ p.name }} <span class="sg-mono sg-muted">#{{ p.id }}</span></h3>
+      <table class="sg-table">
+        <thead><tr><th>Этап (id)</th><th>Шаг модуля</th></tr></thead>
+        <tbody>
+          {% for st in p.statuses %}
+          <tr>
+            <td>{{ st.name }} <span class="sg-mono sg-muted">#{{ st.id }}</span></td>
+            <td>
+              {% if st.id == won_status %}
+                <span class="sg-ok">✅ Успех (won) — авто</span>
+              {% elif st.id == lost_status %}
+                <span class="sg-muted">❌ Проигрыш (lost) — авто</span>
+              {% else %}
+                <select class="sg-input" name="step_{{ p.id }}_{{ st.id }}">
+                  {% for s in step_choices %}
+                    {% if s not in ('won','lost') %}
+                    <option value="{{ s }}" {{ 'selected' if current.get((p.id, st.id)) == s or (current.get((p.id, st.id)) is none and s == 'none') }}>{{ step_labels[s] }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+    <div class="sg-actions">
+      <button class="sg-btn sg-btn--primary" type="submit">Сохранить маппинг</button>
+      <a class="sg-btn" href="{{ url_for('ops.validation') }}">К валидации</a>
+    </div>
+  </form>
+  {% elif not pipelines_error %}
+    <p class="sg-muted">Воронки не найдены.</p>
+  {% endif %}
+</section>
+{% endblock %}
