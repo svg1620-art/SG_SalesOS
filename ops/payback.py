@@ -59,6 +59,57 @@ def first_revenue(manager_id: int, mf: date):
     return sum(int(d.price or 0) for d in rows), len(rows)
 
 
+def bonus_info(manager_id: int, mf: date) -> dict:
+    """Расчётный бонус от первой выручки по выполнению плана (правило заказчика).
+
+    ≥ bonus_plan_met_pct% плана → bonus_rate_plan_met; ≥ bonus_min_pct% →
+    bonus_rate_below; ниже → 0. База — сумма первой выручки за месяц.
+    has_plan=False, если план не задан (тогда бонус не считаем, ручной не трогаем).
+    """
+    from models import ManagerPlan
+    mf = month_first(mf)
+    plan_row = db.session.get(ManagerPlan, {"manager_id": manager_id, "month": mf})
+    plan = float(plan_row.revenue_plan) if plan_row and plan_row.revenue_plan else 0.0
+    rev, _cnt = first_revenue(manager_id, mf)
+    if plan <= 0:
+        return {"has_plan": False, "plan": plan, "rev": rev, "pct": None,
+                "rate": None, "bonus": None}
+    pct = rev / plan
+    met = ops_float("bonus_plan_met_pct", 100) / 100.0
+    minp = ops_float("bonus_min_pct", 80) / 100.0
+    if pct >= met:
+        rate = ops_float("bonus_rate_plan_met", 0.09)
+    elif pct >= minp:
+        rate = ops_float("bonus_rate_below", 0.06)
+    else:
+        rate = 0.0
+    return {"has_plan": True, "plan": plan, "rev": rev, "pct": pct,
+            "rate": rate, "bonus": round(rate * rev, 2)}
+
+
+def recompute_bonuses(mf: date) -> dict:
+    """Проставить расчётный бонус в bonus_paid менеджерам (если bonus_auto=1).
+
+    Трогаем только строки затрат менеджеров, у которых задан план месяца —
+    чтобы случайно не обнулить ручной бонус там, где план не выставлен.
+    """
+    mf = month_first(mf)
+    if ops_int("bonus_auto", 1) != 1:
+        return {"auto": False, "updated": 0}
+    updated = 0
+    rows = StaffCost.query.filter_by(month=mf, cost_role="manager").all()
+    for sc in rows:
+        info = bonus_info(sc.user_id, mf)
+        if info["has_plan"]:
+            val = info["bonus"] or 0
+            if float(sc.bonus_paid or 0) != float(val):
+                sc.bonus_paid = val
+                updated += 1
+    if updated:
+        db.session.commit()
+    return {"auto": True, "updated": updated}
+
+
 def active_days(manager: User, mf: date) -> int:
     """Рабочие дни месяца, в которые менеджер активен (найм..деактивация − отсутствия)."""
     first, last, _ = _month_bounds(mf)

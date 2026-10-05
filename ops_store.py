@@ -28,6 +28,12 @@ OPS_DEFAULTS = {
     "rampup_months": "3",
     "rampup_factors": "0.3,0.6,0.9",
     "gross_margin_rate": "1.0",
+    # авто-бонус от первой выручки (§ правило заказчика)
+    "bonus_auto": "1",                 # 1 — считать бонус автоматически в bonus_paid
+    "bonus_rate_plan_met": "0.09",     # выполнил план (≥ bonus_plan_met_pct) → 9%
+    "bonus_rate_below": "0.06",        # 80–99% плана → 6%
+    "bonus_plan_met_pct": "100",       # порог «план выполнен», %
+    "bonus_min_pct": "80",             # ниже этого % выручки бонус не начисляется
     "payroll_tax_rate": "0.302",
     "overhead_default": "0",
     # пульт РОПа (Этап 3)

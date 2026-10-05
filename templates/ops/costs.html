@@ -36,7 +36,19 @@
             </select>
           </td>
           <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_salary" style="width:110px" value="{{ (sc.salary_fixed|int) if sc and sc.salary_fixed else '' }}"></td>
-          <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_bonus" style="width:100px" value="{{ (sc.bonus_paid|int) if sc and sc.bonus_paid else '' }}"></td>
+          <td>
+            {% if bonus_auto and r.is_manager %}
+              {# авто-бонус от первой выручки: поле не редактируется #}
+              <span class="sg-mono">{{ (sc.bonus_paid|int) if sc and sc.bonus_paid else 0 }}</span>
+              {% if r.bonus_info and r.bonus_info.has_plan %}
+                <div class="sg-sm sg-muted">план {{ (r.bonus_info.pct*100)|round|int }}% · {{ (r.bonus_info.rate*100)|round|int }}%</div>
+              {% elif r.bonus_info %}
+                <div class="sg-sm" style="color:var(--sg-yellow)">нет плана</div>
+              {% endif %}
+            {% else %}
+              <input class="sg-input sg-mono" name="u{{ r.user.id }}_bonus" style="width:100px" value="{{ (sc.bonus_paid|int) if sc and sc.bonus_paid else '' }}">
+            {% endif %}
+          </td>
           <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_tax" style="width:70px" value="{{ sc.payroll_tax_rate if sc else '0.302' }}"></td>
           <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_overhead" style="width:100px" value="{{ (sc.overhead|int) if sc and sc.overhead else '' }}"></td>
           <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_lead" style="width:90px" value="{{ (sc.lead_cost|int) if sc and sc.lead_cost is not none else '' }}"></td>
@@ -55,5 +67,10 @@
   </form>
   <p class="sg-muted sg-sm">Полная стоимость = (оклад+бонус)×(1+взносы)+накладные+лиды. Затраты РОПа распределяются
     между активными менеджерами пропорционально отработанным дням. Незаполненные строки в окупаемости — «нет данных».</p>
+  {% if bonus_auto %}
+  <p class="sg-muted sg-sm">💡 Бонус менеджеров считается автоматически от <b>первой выручки</b> по выполнению плана:
+    ≥100% → 9%, 80–99% → 6%, &lt;80% → 0% (ставки/пороги — в настройках). Для менеджера нужен заданный
+    <a href="{{ url_for('ops.plans') }}">план выручки</a> на месяц.</p>
+  {% endif %}
 </section>
 {% endblock %}

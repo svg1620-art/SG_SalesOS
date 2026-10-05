@@ -449,20 +449,26 @@ def _cost_users(mf):
 @admin_required
 def costs():
     from models import StaffCost
-    from ops.payback import own_cost
+    from ops.payback import own_cost, recompute_bonuses, bonus_info
+    from ops_store import ops_int
     mf = _month_arg()
+    recompute_bonuses(mf)  # освежить авто-бонус перед показом
+    bonus_auto = ops_int("bonus_auto", 1) == 1
     users = _cost_users(mf)
     sc_map = {s.user_id: s for s in StaffCost.query.filter_by(month=mf).all()}
     rows = []
     for u in users:
         sc = sc_map.get(u.id)
+        info = bonus_info(u.id, mf) if u.role == "manager" else None
         rows.append({
             "user": u, "sc": sc,
             "default_role": "rop" if u.role == "admin" else "manager",
             "full_cost": own_cost(sc),
+            "bonus_info": info,
+            "is_manager": u.role == "manager",
         })
     return render_template("ops/costs.html", rows=rows, month=mf,
-                           month_value=mf.strftime("%Y-%m"))
+                           month_value=mf.strftime("%Y-%m"), bonus_auto=bonus_auto)
 
 
 @ops_bp.route("/costs", methods=["POST"])
@@ -504,8 +510,10 @@ def costs_save():
             db.session.add(row)
             copied += 1
         db.session.commit()
+        from ops.payback import recompute_bonuses
+        recompute_bonuses(mf)
         recompute_allocations(mf)
-        flash(f"Скопировано с {prev.strftime('%m.%Y')}: {copied}. Доли РОПа пересчитаны.", "success")
+        flash(f"Скопировано с {prev.strftime('%m.%Y')}: {copied}. Бонусы и доли РОПа пересчитаны.", "success")
         return redirect(url_for("ops.costs", month=mf.strftime("%Y-%m")))
 
     existing = {s.user_id: s for s in StaffCost.query.filter_by(month=mf).all()}
@@ -534,8 +542,10 @@ def costs_save():
         row.comment = comment or None
         row.updated_by = current_user.id
     db.session.commit()
+    from ops.payback import recompute_bonuses
+    recompute_bonuses(mf)  # авто-бонус от первой выручки (перетирает ручной у менеджеров с планом)
     recompute_allocations(mf)
-    flash("Затраты сохранены, доли РОПа пересчитаны.", "success")
+    flash("Затраты сохранены. Бонусы и доли РОПа пересчитаны.", "success")
     return redirect(url_for("ops.costs", month=mf.strftime("%Y-%m")))
 
 
@@ -551,8 +561,13 @@ def payback_recompute_fr():
 @ops_bp.route("/payback")
 @admin_required
 def payback():
-    from ops.payback import payback_for, cumulative_net, factor_diagnosis, month_first
+    from ops.payback import (
+        payback_for, cumulative_net, factor_diagnosis, month_first,
+        recompute_bonuses, recompute_allocations,
+    )
     mf = _month_arg()
+    recompute_bonuses(mf)       # авто-бонус от первой выручки
+    recompute_allocations(mf)   # доли РОПа с учётом свежих бонусов
     managers = _sales_managers()
 
     # сводка: менеджер × последние 6 месяцев (payback_ratio)
