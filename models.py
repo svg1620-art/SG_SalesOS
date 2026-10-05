@@ -44,6 +44,8 @@ class User(UserMixin, db.Model):
     amo_user_id = db.Column(db.BigInteger, nullable=True, index=True)
     # план по звонкам в день (норма); None/0 — план не задан
     daily_call_plan = db.Column(db.Integer, nullable=True)
+    # дата найма (для адаптации/окупаемости); Ops-модуль
+    hire_date = db.Column(db.Date, nullable=True)
     # последняя активность (для контроля использования платформы)
     last_seen_at = db.Column(db.DateTime, nullable=True, index=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
@@ -481,3 +483,86 @@ class WorkCalendar(db.Model):
 
     date = db.Column(db.Date, primary_key=True)
     is_working_day = db.Column(db.Boolean, nullable=False, default=True)
+
+
+# --- Ops Metrics Этап 2: материализованные агрегаты, планы, отсутствия --------
+
+class ManagerDayStat(db.Model):
+    """Дневные агрегаты метрик по менеджеру (материализованные, пересчёт upsert)."""
+
+    __tablename__ = "manager_day_stats"
+
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    date = db.Column(db.Date, primary_key=True)
+    # L1 — ритм
+    calls_out = db.Column(db.Integer, nullable=False, default=0)
+    calls_connected = db.Column(db.Integer, nullable=False, default=0)
+    talk_time_sec = db.Column(db.Integer, nullable=False, default=0)
+    messages_out = db.Column(db.Integer, nullable=False, default=0)
+    touches = db.Column(db.Integer, nullable=False, default=0)
+    new_leads_contacted = db.Column(db.Integer, nullable=False, default=0)
+    speed_to_lead_median_min = db.Column(db.Float, nullable=True)
+    first_action_at = db.Column(db.DateTime, nullable=True)
+    last_action_at = db.Column(db.DateTime, nullable=True)
+    idle_gaps_count = db.Column(db.Integer, nullable=False, default=0)
+    tasks_overdue = db.Column(db.Integer, nullable=False, default=0)
+    # L2 — воронка
+    qualified = db.Column(db.Integer, nullable=False, default=0)
+    meetings_set = db.Column(db.Integer, nullable=False, default=0)
+    meetings_held = db.Column(db.Integer, nullable=False, default=0)
+    # L3 — результат
+    invoices = db.Column(db.Integer, nullable=False, default=0)
+    invoices_sum = db.Column(db.Numeric, nullable=False, default=0)
+    payments = db.Column(db.Integer, nullable=False, default=0)
+    payments_sum = db.Column(db.Numeric, nullable=False, default=0)
+    # качество (из существующего ОКК)
+    avg_call_score = db.Column(db.Float, nullable=True)
+    is_working_day = db.Column(db.Boolean, nullable=False, default=True)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class ManagerHourStat(db.Model):
+    """Почасовые агрегаты (для тепловой карты)."""
+
+    __tablename__ = "manager_hour_stats"
+
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    date = db.Column(db.Date, primary_key=True)
+    hour = db.Column(db.Integer, primary_key=True)
+    calls_out = db.Column(db.Integer, nullable=False, default=0)
+    calls_connected = db.Column(db.Integer, nullable=False, default=0)
+    messages_out = db.Column(db.Integer, nullable=False, default=0)
+    talk_time_sec = db.Column(db.Integer, nullable=False, default=0)
+
+
+class ManagerPlan(db.Model):
+    """План по менеджеру на месяц (1-е число месяца)."""
+
+    __tablename__ = "manager_plans"
+
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    month = db.Column(db.Date, primary_key=True)  # 1-е число месяца
+    revenue_plan = db.Column(db.Numeric, nullable=True)
+    qualified_plan = db.Column(db.Integer, nullable=True)
+    meetings_plan = db.Column(db.Integer, nullable=True)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    manager = db.relationship("User")
+
+
+class ManagerAbsence(db.Model):
+    """Отсутствие менеджера (отпуск/больничный/прочее)."""
+
+    __tablename__ = "manager_absences"
+
+    id = db.Column(db.Integer, primary_key=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    date_from = db.Column(db.Date, nullable=False)
+    date_to = db.Column(db.Date, nullable=False)
+    kind = db.Column(db.String(20), nullable=False, default="vacation")  # vacation|sick|other
+
+    manager = db.relationship("User")

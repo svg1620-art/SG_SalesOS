@@ -221,7 +221,7 @@ def _zone_counts(calls):
 @login_required
 def index():
     if not current_user.is_admin:
-        return redirect(url_for("dashboard.manager_home"))
+        return redirect(url_for("dashboard.me_today"))
 
     # --- фильтры (в часовом поясе приложения, TZ) ---
     tz = app_tz()
@@ -484,3 +484,142 @@ def manager_home():
         recent_calls=recent_calls,
         next_step_calls=next_step_calls,
     )
+
+
+# --- Ops Metrics Этап 2: экран менеджера «Мой день» ----------------------
+
+_MDAY_CARDS = [
+    ("calls_connected", "Дозвоны"),
+    ("calls_out", "Попытки"),
+    ("touches", "Касания"),
+    ("messages_out", "Сообщения"),
+    ("talk_time_sec", "Время в разговоре"),
+    ("qualified", "Квалификации"),
+    ("meetings_set", "Встречи назначены"),
+    ("meetings_held", "Встречи проведены"),
+    ("invoices", "Счета"),
+    ("payments", "Оплаты"),
+]
+_HEATMAP_METRICS = {"calls_connected": "Дозвоны", "calls_out": "Попытки",
+                    "messages_out": "Сообщения"}
+
+
+@dashboard_bp.route("/me/today")
+@login_required
+def me_today():
+    """«Мой день»: цифры дня, тепловая карта, блок месяца (без миссий — Этап 5)."""
+    from datetime import date as _date, timedelta as _td
+    from calendar import monthrange
+    from models import ManagerDayStat, ManagerHourStat, ManagerPlan, WorkCalendar
+    from ops.metrics import recompute_day, avg_day_baseline, recent_working_days
+
+    # кого смотрим: менеджер — себя; админ может смотреть любого (?manager_id=)
+    target = current_user
+    if current_user.is_admin:
+        mid = request.args.get("manager_id")
+        if mid and mid.isdigit():
+            target = db.session.get(User, int(mid)) or current_user
+    elif request.args.get("manager_id"):
+        abort(403)
+
+    today = now_local().date()
+    # освежаем агрегаты за сегодня перед показом
+    try:
+        recompute_day(target.id, today)
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+
+    stat = db.session.get(ManagerDayStat, {"manager_id": target.id, "date": today})
+    baseline = avg_day_baseline(target.id, today)
+
+    def _val(field):
+        return int(getattr(stat, field) or 0) if stat else 0
+
+    cards = []
+    for field, label in _MDAY_CARDS:
+        cur = _val(field)
+        base = baseline.get(field)
+        if field == "talk_time_sec":
+            cur_disp = f"{cur // 60} мин"
+        else:
+            cur_disp = str(cur)
+        direction = None
+        if base is not None and base > 0:
+            direction = "up" if cur > base else "down" if cur < base else "flat"
+        cards.append({"label": label, "value": cur_disp, "raw": cur,
+                      "baseline": base, "direction": direction})
+    connect_rate = (
+        round(_val("calls_connected") / _val("calls_out") * 100)
+        if _val("calls_out") else None
+    )
+
+    # тепловая карта: часы × последние 10 рабочих дней
+    metric = request.args.get("metric", "calls_connected")
+    if metric not in _HEATMAP_METRICS:
+        metric = "calls_connected"
+    wh_from = _ops_int("work_hours_from", 9)
+    wh_to = _ops_int("work_hours_to", 20)
+    hours = list(range(wh_from, wh_to))
+    hm_days = recent_working_days(today, 10)
+    hrows = ManagerHourStat.query.filter(
+        ManagerHourStat.manager_id == target.id,
+        ManagerHourStat.date.in_(hm_days),
+    ).all()
+    hm = {(r.date, r.hour): getattr(r, metric) for r in hrows}
+    hm_max = max([v for v in hm.values()] or [0])
+    heatmap = []
+    for d in hm_days:  # свежие сверху
+        row = {"date": d, "cells": []}
+        for h in hours:
+            v = hm.get((d, h), 0)
+            row["cells"].append({"hour": h, "value": v,
+                                 "intensity": (v / hm_max) if hm_max else 0})
+        heatmap.append(row)
+
+    # блок «Месяц»
+    first = today.replace(day=1)
+    last_day = monthrange(today.year, today.month)[1]
+    month_end = today.replace(day=last_day)
+    plan = db.session.get(ManagerPlan, {"manager_id": target.id, "month": first})
+    revenue_plan = float(plan.revenue_plan) if plan and plan.revenue_plan else 0
+    paid_rows = ManagerDayStat.query.filter(
+        ManagerDayStat.manager_id == target.id,
+        ManagerDayStat.date >= first, ManagerDayStat.date <= today,
+    ).all()
+    paid_mtd = sum(float(r.payments_sum or 0) for r in paid_rows)
+    wd_left = 0
+    cur = today
+    while cur <= month_end:
+        w = db.session.get(WorkCalendar, cur)
+        if (w.is_working_day if w is not None else cur.weekday() < 5):
+            wd_left += 1
+        cur += _td(days=1)
+    month = {
+        "plan": revenue_plan,
+        "fact": paid_mtd,
+        "progress": round(paid_mtd / revenue_plan * 100) if revenue_plan else None,
+        "remaining": max(0, revenue_plan - paid_mtd),
+        "working_days_left": wd_left,
+        "need_per_day": (
+            round(max(0, revenue_plan - paid_mtd) / wd_left) if revenue_plan and wd_left else None
+        ),
+    }
+
+    first_action_label = (
+        to_local(stat.first_action_at).strftime("%H:%M")
+        if stat and stat.first_action_at else None
+    )
+
+    return render_template(
+        "dashboard/me_today.html",
+        target=target, is_self=(target.id == current_user.id),
+        today=today, stat=stat, cards=cards, connect_rate=connect_rate,
+        first_action_label=first_action_label,
+        heatmap=heatmap, hours=hours, metric=metric, heatmap_metrics=_HEATMAP_METRICS,
+        month=month,
+    )
+
+
+def _ops_int(key, default):
+    from ops_store import ops_int
+    return ops_int(key, default)

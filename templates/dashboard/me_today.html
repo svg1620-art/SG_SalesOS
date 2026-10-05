@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Мой день — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    {% if not is_self %}<a href="{{ url_for('dashboard.index') }}">Дашборд</a> / Глазами менеджера{% endif %}
+  </div>
+  <h1 class="sg-h1">Мой день
+    {% if not is_self %}<span class="sg-muted">· {{ target.full_name or target.email }}</span>{% endif %}
+  </h1>
+  <p class="sg-muted sg-sm">{{ today.strftime('%d.%m.%Y') }}
+    {% if connect_rate is not none %}· connect rate <b class="sg-mono">{{ connect_rate }}%</b>{% endif %}
+    {% if first_action_label %}· старт {{ first_action_label }}{% endif %}
+  </p>
+
+  {# --- Сегодня в цифрах --- #}
+  <div class="sg-cards-grid">
+    {% for c in cards %}
+    <div class="sg-card sg-card--pad sg-mday-card">
+      <div class="sg-muted sg-sm">{{ c.label }}</div>
+      <div class="sg-mday-value sg-mono">{{ c.value }}</div>
+      {% if c.baseline is not none %}
+      <div class="sg-sm">
+        {% if c.direction == 'up' %}<span class="sg-ok">▲</span>
+        {% elif c.direction == 'down' %}<span style="color:var(--sg-red)">▼</span>
+        {% else %}<span class="sg-muted">=</span>{% endif %}
+        <span class="sg-muted">vs мой средний {{ c.baseline }}</span>
+      </div>
+      {% else %}
+      <div class="sg-sm sg-muted">нет истории</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {# --- Тепловая карта --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Активность по часам</h3>
+    <div class="sg-sm" style="margin-bottom:8px">
+      {% for key, label in heatmap_metrics.items() %}
+        <a class="sg-chip {{ 'sg-chip--active' if metric == key }}"
+           href="{{ url_for('dashboard.me_today', metric=key, manager_id=(target.id if not is_self else None)) }}">{{ label }}</a>
+      {% endfor %}
+    </div>
+    <div class="sg-heatmap" style="overflow-x:auto">
+      <table class="sg-heatmap__table">
+        <thead>
+          <tr><th class="sg-sm sg-muted">День</th>
+            {% for h in hours %}<th class="sg-sm sg-mono">{{ h }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in heatmap %}
+          <tr>
+            <td class="sg-sm sg-mono">{{ row.date.strftime('%d.%m') }}</td>
+            {% for cell in row.cells %}
+            <td class="sg-heatmap__cell"
+                title="{{ cell.hour }}:00 — {{ cell.value }}"
+                style="background: rgba(20,103,245,{{ 0.08 + 0.85 * cell.intensity }})">
+              <span class="sg-sm">{{ cell.value or '' }}</span>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# --- Месяц --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Месяц</h3>
+    {% if month.plan %}
+    <p>
+      Оплаты за месяц: <b class="sg-mono">{{ '{:,}'.format(month.fact|int).replace(',', ' ') }} ₽</b>
+      из плана <b class="sg-mono">{{ '{:,}'.format(month.plan|int).replace(',', ' ') }} ₽</b>
+      {% if month.progress is not none %}(<b class="sg-mono">{{ month.progress }}%</b>){% endif %}
+    </p>
+    <p class="sg-muted sg-sm">
+      Осталось <b class="sg-mono">{{ '{:,}'.format(month.remaining|int).replace(',', ' ') }} ₽</b>,
+      рабочих дней до конца месяца: <b class="sg-mono">{{ month.working_days_left }}</b>.
+      {% if month.need_per_day %}Нужно в день ≈ <b class="sg-mono">{{ '{:,}'.format(month.need_per_day|int).replace(',', ' ') }} ₽</b>.{% endif %}
+    </p>
+    {% else %}
+    <p class="sg-muted">План на месяц не задан. {% if current_user.is_admin %}<a href="{{ url_for('ops.plans') }}">Задать →</a>{% endif %}</p>
+    {% endif %}
+    <p class="sg-muted sg-sm">Оплаты — по закрытым сделкам (первая выручка учитывается с Этапа 4).</p>
+  </div>
+
+  <div class="sg-actions" style="margin-top:16px">
+    <a class="sg-btn" href="{{ url_for('dashboard.manager_home') }}">Качество →</a>
+  </div>
+</section>
+
+<style>
+  .sg-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px}
+  .sg-mday-value{font-size:1.6rem;font-weight:700;line-height:1.1;margin:2px 0}
+  .sg-heatmap__table{border-collapse:collapse}
+  .sg-heatmap__table th,.sg-heatmap__cell{padding:4px 6px;text-align:center;min-width:30px}
+  .sg-heatmap__cell{border:1px solid rgba(255,255,255,.04);border-radius:4px}
+  .sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}
+  .sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+</style>
+{% endblock %}

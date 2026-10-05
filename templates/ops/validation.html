@@ -8,8 +8,13 @@
   <p class="sg-muted">
     Проверка качества синхронизации событий amoCRM до построения метрик.
     Порог дозвона: <b class="sg-mono">{{ connect_min_sec }}</b> с.
-    <a href="{{ url_for('ops.funnel') }}">→ Маппинг воронки</a>
   </p>
+  <div class="sg-sm" style="margin:-6px 0 10px">
+    <a class="sg-chip" href="{{ url_for('ops.funnel') }}">Маппинг воронки</a>
+    <a class="sg-chip" href="{{ url_for('ops.plans') }}">Планы</a>
+    <a class="sg-chip" href="{{ url_for('ops.absences') }}">Отсутствия</a>
+  </div>
+  <style>.sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}</style>
 
   {# --- Управление синхронизацией --- #}
   <div class="sg-card sg-card--pad">

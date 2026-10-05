@@ -153,6 +153,159 @@ def _yesterday_bounds():
     return local_to_utc_naive(start_local), local_to_utc_naive(end_local)
 
 
+def _month_arg():
+    """Выбранный месяц (1-е число) из ?month=YYYY-MM, иначе текущий."""
+    from datetime import date
+    raw = (request.args.get("month") or request.form.get("month") or "").strip()
+    try:
+        y, mo = map(int, raw.split("-"))
+        return date(y, mo, 1)
+    except Exception:  # noqa: BLE001
+        t = now_local().date()
+        return t.replace(day=1)
+
+
+def _sales_managers():
+    return (
+        User.query.filter(User.is_active.is_(True), User.role == "manager")
+        .order_by(User.full_name, User.email).all()
+    )
+
+
+@ops_bp.route("/plans", methods=["GET"])
+@admin_required
+def plans():
+    from models import ManagerPlan
+    month = _month_arg()
+    plans_map = {
+        p.manager_id: p
+        for p in ManagerPlan.query.filter_by(month=month).all()
+    }
+    rows = [{"m": m, "plan": plans_map.get(m.id)} for m in _sales_managers()]
+    return render_template(
+        "ops/plans.html", rows=rows, month=month,
+        month_value=month.strftime("%Y-%m"),
+    )
+
+
+@ops_bp.route("/plans", methods=["POST"])
+@admin_required
+def plans_save():
+    from datetime import date
+    from models import ManagerPlan
+    month = _month_arg()
+    action = request.form.get("action")
+
+    existing = {p.manager_id: p for p in ManagerPlan.query.filter_by(month=month).all()}
+
+    if action == "copy":
+        # скопировать с прошлого месяца (revenue/qualified/meetings) там, где пусто
+        prev = (month.replace(day=1) - timedelta(days=1)).replace(day=1)
+        prev_map = {p.manager_id: p for p in ManagerPlan.query.filter_by(month=prev).all()}
+        copied = 0
+        for m in _sales_managers():
+            src = prev_map.get(m.id)
+            if src is None:
+                continue
+            row = existing.get(m.id) or ManagerPlan(manager_id=m.id, month=month)
+            row.revenue_plan = src.revenue_plan
+            row.qualified_plan = src.qualified_plan
+            row.meetings_plan = src.meetings_plan
+            db.session.add(row)
+            copied += 1
+        db.session.commit()
+        flash(f"Скопировано планов с {prev.strftime('%m.%Y')}: {copied}.", "success")
+        return redirect(url_for("ops.plans", month=month.strftime("%Y-%m")))
+
+    def _num(raw):
+        raw = (raw or "").strip().replace(" ", "")
+        if not raw:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            return None
+
+    def _intn(raw):
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+
+    for m in _sales_managers():
+        rev = _num(request.form.get(f"revenue_{m.id}"))
+        qual = _intn(request.form.get(f"qualified_{m.id}"))
+        meet = _intn(request.form.get(f"meetings_{m.id}"))
+        row = existing.get(m.id)
+        if rev is None and qual is None and meet is None:
+            if row is not None:
+                db.session.delete(row)
+            continue
+        if row is None:
+            row = ManagerPlan(manager_id=m.id, month=month)
+            db.session.add(row)
+        row.revenue_plan = rev
+        row.qualified_plan = qual
+        row.meetings_plan = meet
+    db.session.commit()
+    flash("Планы сохранены.", "success")
+    return redirect(url_for("ops.plans", month=month.strftime("%Y-%m")))
+
+
+@ops_bp.route("/absences", methods=["GET"])
+@admin_required
+def absences():
+    from models import ManagerAbsence
+    items = (
+        ManagerAbsence.query.order_by(ManagerAbsence.date_from.desc()).limit(200).all()
+    )
+    mgr_names = {m.id: (m.full_name or m.email) for m in _sales_managers()}
+    return render_template(
+        "ops/absences.html", items=items, managers=_sales_managers(),
+        mgr_names=mgr_names,
+    )
+
+
+@ops_bp.route("/absences", methods=["POST"])
+@admin_required
+def absences_add():
+    from datetime import datetime as _dt
+    from models import ManagerAbsence
+    mid = request.form.get("manager_id")
+    kind = request.form.get("kind") or "vacation"
+    try:
+        df = _dt.strptime(request.form.get("date_from"), "%Y-%m-%d").date()
+        dt = _dt.strptime(request.form.get("date_to"), "%Y-%m-%d").date()
+    except Exception:  # noqa: BLE001
+        flash("Укажите корректные даты.", "error")
+        return redirect(url_for("ops.absences"))
+    if not (mid and mid.isdigit()) or dt < df:
+        flash("Проверьте менеджера и порядок дат.", "error")
+        return redirect(url_for("ops.absences"))
+    db.session.add(ManagerAbsence(
+        manager_id=int(mid), date_from=df, date_to=dt,
+        kind=kind if kind in ("vacation", "sick", "other") else "other",
+    ))
+    db.session.commit()
+    flash("Отсутствие добавлено.", "success")
+    return redirect(url_for("ops.absences"))
+
+
+@ops_bp.route("/absences/<int:absence_id>/delete", methods=["POST"])
+@admin_required
+def absences_delete(absence_id):
+    from models import ManagerAbsence
+    row = db.session.get(ManagerAbsence, absence_id)
+    if row is not None:
+        db.session.delete(row)
+        db.session.commit()
+        flash("Отсутствие удалено.", "success")
+    return redirect(url_for("ops.absences"))
+
+
 @ops_bp.route("/validation")
 @admin_required
 def validation():

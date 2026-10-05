@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Отсутствия — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('ops.validation') }}">Ops</a> / Отсутствия
+  </div>
+  <h1 class="sg-h1">Отсутствия менеджеров</h1>
+  <p class="sg-muted sg-sm">Отпуск/больничный не прерывают серию и влияют на распределение затрат РОПа (следующие этапы).</p>
+
+  <form method="post" action="{{ url_for('ops.absences_add') }}" class="sg-card sg-card--pad">
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">Менеджер</span>
+        <select class="sg-input" name="manager_id">
+          {% for m in managers %}<option value="{{ m.id }}">{{ m.full_name or m.email }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">Тип</span>
+        <select class="sg-input" name="kind">
+          <option value="vacation">Отпуск</option>
+          <option value="sick">Больничный</option>
+          <option value="other">Другое</option>
+        </select>
+      </label>
+    </div>
+    <div class="sg-grid-2">
+      <label class="sg-field">
+        <span class="sg-field__label">С</span>
+        <input class="sg-input sg-mono" type="date" name="date_from" required>
+      </label>
+      <label class="sg-field">
+        <span class="sg-field__label">По</span>
+        <input class="sg-input sg-mono" type="date" name="date_to" required>
+      </label>
+    </div>
+    <div class="sg-actions">
+      <button class="sg-btn sg-btn--primary" type="submit">Добавить</button>
+    </div>
+  </form>
+
+  <table class="sg-table" style="margin-top:16px">
+    <thead><tr><th>Менеджер</th><th>Тип</th><th>С</th><th>По</th><th></th></tr></thead>
+    <tbody>
+      {% for a in items %}
+      <tr>
+        <td>{{ mgr_names.get(a.manager_id, '#' ~ a.manager_id) }}</td>
+        <td>{{ {'vacation':'Отпуск','sick':'Больничный','other':'Другое'}.get(a.kind, a.kind) }}</td>
+        <td class="sg-mono sg-sm">{{ a.date_from.strftime('%d.%m.%Y') }}</td>
+        <td class="sg-mono sg-sm">{{ a.date_to.strftime('%d.%m.%Y') }}</td>
+        <td>
+          <form method="post" action="{{ url_for('ops.absences_delete', absence_id=a.id) }}"
+                onsubmit="return confirm('Удалить отсутствие?');">
+            <button class="sg-btn sg-btn--danger" type="submit">Удалить</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="sg-muted">Отсутствий не зарегистрировано.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

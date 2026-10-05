@@ -163,7 +163,8 @@
         <a href="{{ url_for('ops.validation') }}">⚙ Ops</a>
         <a href="{{ url_for('settings.index') }}">Настройки</a>
       {% else %}
-        <a href="{{ url_for('dashboard.manager_home') }}">Кабинет</a>
+        <a href="{{ url_for('dashboard.me_today') }}">Мой день</a>
+        <a href="{{ url_for('dashboard.manager_home') }}">Качество</a>
         <a href="{{ url_for('calls.index') }}">Мои звонки</a>
         <a href="{{ url_for('dialogs.index') }}">Диалоги</a>
         {% if current_user.department and current_user.department.name == 'Отдел продаж' %}

@@ -259,6 +259,20 @@ def _add_schedule_jobs(app: Flask) -> None:
                 sync_incremental(app)
             except Exception as exc:  # noqa: BLE001
                 app.logger.warning("[ops_sync] инкремент пропущен: %s", exc)
+            # пересчёт агрегатов за сегодня после синхронизации
+            try:
+                from ops.metrics import recompute_today
+                recompute_today(app)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[ops_metrics] пересчёт за сегодня пропущен: %s", exc)
+
+    def _run_ops_recompute_yesterday():
+        with app.app_context():
+            try:
+                from ops.metrics import recompute_yesterday
+                recompute_yesterday(app)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[ops_metrics] пересчёт за вчера пропущен: %s", exc)
 
     tz = app.config.get("TZ") or "UTC"
     t_hour, d_hour = telegram_hour(app), digest_hour(app)
@@ -284,6 +298,10 @@ def _add_schedule_jobs(app: Flask) -> None:
     scheduler.add_job(
         _run_ops_sync, IntervalTrigger(minutes=ops_min),
         id="ops_sync", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _run_ops_recompute_yesterday, CronTrigger(hour=0, minute=30, timezone=tz),
+        id="ops_recompute_yesterday", replace_existing=True, max_instances=1, coalesce=True,
     )
     app.logger.info(
         "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Планы менеджеров — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">
+    <a href="{{ url_for('ops.validation') }}">Ops</a> / Планы
+  </div>
+  <h1 class="sg-h1">Планы менеджеров</h1>
+
+  <form method="get" action="{{ url_for('ops.plans') }}" class="sg-actions" style="align-items:flex-end">
+    <label class="sg-field" style="max-width:220px">
+      <span class="sg-field__label">Месяц</span>
+      <input class="sg-input sg-mono" type="month" name="month" value="{{ month_value }}">
+    </label>
+    <button class="sg-btn" type="submit">Показать</button>
+  </form>
+
+  <form method="post" action="{{ url_for('ops.plans') }}" style="margin-top:12px">
+    <input type="hidden" name="month" value="{{ month_value }}">
+    <table class="sg-table">
+      <thead>
+        <tr><th>Менеджер</th><th>План выручки, ₽</th><th>Квалификации/мес</th><th>Встречи/мес</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.m.full_name or r.m.email }}</td>
+          <td><input class="sg-input sg-mono" name="revenue_{{ r.m.id }}"
+                     value="{{ (r.plan.revenue_plan|int) if r.plan and r.plan.revenue_plan else '' }}"
+                     placeholder="напр. 500000"></td>
+          <td><input class="sg-input sg-mono" type="number" min="0" name="qualified_{{ r.m.id }}"
+                     value="{{ r.plan.qualified_plan if r.plan and r.plan.qualified_plan is not none else '' }}"
+                     placeholder="авто"></td>
+          <td><input class="sg-input sg-mono" type="number" min="0" name="meetings_{{ r.m.id }}"
+                     value="{{ r.plan.meetings_plan if r.plan and r.plan.meetings_plan is not none else '' }}"
+                     placeholder="авто"></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="sg-muted">Нет активных менеджеров отдела продаж.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="sg-actions" style="margin-top:12px">
+      <button class="sg-btn sg-btn--primary" type="submit">Сохранить планы</button>
+      <button class="sg-btn" type="submit" name="action" value="copy"
+              onclick="return confirm('Скопировать планы с прошлого месяца?');">Скопировать с прошлого месяца</button>
+    </div>
+  </form>
+  <p class="sg-muted sg-sm">Пустые «квалификации/встречи» выводятся обратной воронкой из плана выручки (следующие этапы).</p>
+</section>
+{% endblock %}

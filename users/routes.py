@@ -53,6 +53,18 @@ def _parse_plan(raw):
     return val if val > 0 else None
 
 
+def _parse_hire_date(raw):
+    """Дата найма из YYYY-MM-DD; пусто/некорректно → None."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    from datetime import datetime as _dt
+    try:
+        return _dt.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
 def _departments():
     return Department.query.order_by(Department.name).all()
 
@@ -96,6 +108,7 @@ def create():
             department_id=_parse_department_id(request.form.get("department_id")),
             amo_user_id=_parse_amo_user_id(request.form.get("amo_user_id")),
             daily_call_plan=_parse_plan(request.form.get("daily_call_plan")),
+            hire_date=_parse_hire_date(request.form.get("hire_date")),
         )
         user.set_password(password)
         db.session.add(user)
@@ -156,6 +169,7 @@ def edit(user_id):
         user.department_id = _parse_department_id(request.form.get("department_id"))
         user.amo_user_id = _parse_amo_user_id(request.form.get("amo_user_id"))
         user.daily_call_plan = _parse_plan(request.form.get("daily_call_plan"))
+        user.hire_date = _parse_hire_date(request.form.get("hire_date"))
         db.session.commit()
         flash("Пользователь сохранён.", "success")
         return redirect(url_for("users.index"))
