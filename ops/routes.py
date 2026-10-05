@@ -1,6 +1,7 @@
-"""Модуль «Операционный пульт» — Этап 1: маппинг воронки, валидация, синхронизация."""
+"""Модуль «Операционный пульт»: маппинг, валидация, синхронизация (Этап 1),
+планы/отсутствия (Этап 2), пульт РОПа и конверсии (Этап 3)."""
 import threading
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint, render_template, redirect, url_for, request, flash, current_app,
@@ -304,6 +305,128 @@ def absences_delete(absence_id):
         db.session.commit()
         flash("Отсутствие удалено.", "success")
     return redirect(url_for("ops.absences"))
+
+
+def _dept_filter():
+    """(departments, selected_id, manager_ids|None) для фильтра по отделу."""
+    from models import Department
+    departments = Department.query.order_by(Department.name).all()
+    raw = request.args.get("department_id")
+    dep_id = int(raw) if raw and raw.isdigit() else None
+    mgr_ids = None
+    if dep_id is not None:
+        mgr_ids = {u.id for u in User.query.filter_by(department_id=dep_id).all()}
+    return departments, dep_id, mgr_ids
+
+
+_STATUS_RANK = {"red": 0, "yellow": 1, "green": 2}
+
+
+@ops_bp.route("/board")
+@admin_required
+def board():
+    from ops.board import board_rows
+    departments, dep_id, mgr_ids = _dept_filter()
+    rows = board_rows(dept_manager_ids=mgr_ids)
+
+    sort = request.args.get("sort", "status")
+    keymap = {
+        "status": lambda r: (_STATUS_RANK.get(r["status"], 9), -(r["calls_connected"])),
+        "name": lambda r: r["name"].lower(),
+        "calls": lambda r: -r["calls_connected"],
+        "connect": lambda r: -(r["connect_rate"] or 0),
+        "quality": lambda r: -(r["avg_call_score"] or 0),
+        "month": lambda r: -((r["month"] or {}).get("progress_pct") or 0),
+    }
+    rows.sort(key=keymap.get(sort, keymap["status"]))
+
+    summary = {"green": 0, "yellow": 0, "red": 0}
+    for r in rows:
+        summary[r["status"]] = summary.get(r["status"], 0) + 1
+
+    return render_template(
+        "ops/board.html", rows=rows, summary=summary, sort=sort,
+        departments=departments, department_id=dep_id,
+        now_label=now_local().strftime("%H:%M"),
+    )
+
+
+@ops_bp.route("/board/refresh", methods=["POST"])
+@admin_required
+def board_refresh():
+    from ops.metrics import recompute_today
+    _run_bg(recompute_today)
+    flash("Пересчёт метрик за сегодня запущен. Обновите страницу через несколько секунд.", "success")
+    return redirect(url_for("ops.board", department_id=request.form.get("department_id") or None))
+
+
+@ops_bp.route("/board/conversions")
+@admin_required
+def board_conversions():
+    from datetime import timedelta as _td
+    from ops.board import (
+        funnel_counts, flow_conversions, cohort_conversions, team_heatmap,
+        FLOW_STAGES, COHORT_PAIRS,
+    )
+    departments, dep_id, mgr_ids = _dept_filter()
+    mode = request.args.get("mode", "cohort")
+    mode = "flow" if mode == "flow" else "cohort"
+
+    today = now_local().date()
+    try:
+        to_d = datetime.strptime(request.args.get("to", ""), "%Y-%m-%d").date()
+    except Exception:  # noqa: BLE001
+        to_d = today
+    try:
+        from_d = datetime.strptime(request.args.get("from", ""), "%Y-%m-%d").date()
+    except Exception:  # noqa: BLE001
+        from_d = today - _td(days=30)
+
+    managers = (
+        User.query.filter(User.is_active.is_(True), User.role == "manager")
+        .order_by(User.full_name, User.email).all()
+    )
+    if mgr_ids is not None:
+        managers = [m for m in managers if m.id in mgr_ids]
+    mids = [m.id for m in managers]
+
+    counts = funnel_counts(from_d, to_d, mids)
+    team_funnel = counts["team"]
+
+    # конверсии: team + по менеджерам
+    if mode == "flow":
+        columns = [f"{l1}→{l2}" for (k1, l1), (k2, l2) in zip(FLOW_STAGES, FLOW_STAGES[1:])]
+        team_conv = flow_conversions(team_funnel)
+        per_rows = []
+        for m in managers:
+            c = counts["per_manager"].get(m.id, {k: 0 for k, _ in FLOW_STAGES})
+            per_rows.append({"name": m.full_name or m.email,
+                             "conv": flow_conversions(c)})
+    else:
+        columns = [label for _, _, label in COHORT_PAIRS]
+        team_conv = cohort_conversions(from_d, to_d, None)
+        per_rows = []
+        for m in managers:
+            per_rows.append({"name": m.full_name or m.email,
+                             "conv": cohort_conversions(from_d, to_d, m.id)})
+
+    # медианы колонок (для подсветки отклонений)
+    medians = []
+    for i in range(len(columns)):
+        vals = [pr["conv"][i]["value"] for pr in per_rows if pr["conv"][i]["value"] is not None]
+        from statistics import median as _med
+        medians.append(_med(vals) if vals else None)
+
+    heat = team_heatmap()
+    weekday_names = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+
+    return render_template(
+        "ops/board_conversions.html",
+        mode=mode, columns=columns, team_conv=team_conv, per_rows=per_rows,
+        medians=medians, team_funnel=team_funnel, flow_stages=FLOW_STAGES,
+        from_d=from_d, to_d=to_d, departments=departments, department_id=dep_id,
+        heat=heat, weekday_names=weekday_names,
+    )
 
 
 @ops_bp.route("/validation")

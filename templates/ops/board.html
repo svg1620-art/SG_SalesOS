@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Оперативный пульт — SG SalesOS{% endblock %}
+
+{% macro sort_link(key, label) %}
+  <a href="{{ url_for('ops.board', sort=key, department_id=department_id) }}"
+     class="{{ 'sg-ok' if sort == key }}">{{ label }}</a>
+{% endmacro %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">Ops / Оперативный пульт</div>
+  <h1 class="sg-h1">Оперативный пульт <span class="sg-muted sg-sm">· {{ now_label }}</span></h1>
+
+  <div class="sg-sm" style="margin-bottom:10px">
+    <a class="sg-chip sg-chip--active" href="{{ url_for('ops.board') }}">Сейчас</a>
+    <a class="sg-chip" href="{{ url_for('ops.board_conversions') }}">Воронка и конверсии</a>
+    <a class="sg-chip" href="{{ url_for('ops.validation') }}">Валидация</a>
+    <a class="sg-chip" href="{{ url_for('ops.plans') }}">Планы</a>
+  </div>
+
+  <div class="sg-actions" style="align-items:flex-end;margin-bottom:12px">
+    <form method="get" action="{{ url_for('ops.board') }}">
+      <label class="sg-field" style="max-width:260px">
+        <span class="sg-field__label">Отдел</span>
+        <select class="sg-input" name="department_id" onchange="this.form.submit()">
+          <option value="">Все отделы</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {{ 'selected' if department_id == d.id }}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+    <form method="post" action="{{ url_for('ops.board_refresh') }}">
+      <input type="hidden" name="department_id" value="{{ department_id or '' }}">
+      <button class="sg-btn" type="submit">↻ Пересчитать сейчас</button>
+    </form>
+    <div class="sg-muted sg-sm">
+      🟢 {{ summary.green }} · 🟡 {{ summary.yellow }} · 🔴 {{ summary.red }}
+    </div>
+  </div>
+
+  <table class="sg-table">
+    <thead>
+      <tr>
+        <th>{{ sort_link('status','●') }}</th>
+        <th>{{ sort_link('name','Менеджер') }}</th>
+        <th>Старт</th>
+        <th>{{ sort_link('calls','Дозвоны') }}</th>
+        <th>{{ sort_link('connect','Connect') }}</th>
+        <th>Касания</th>
+        <th>Сообщ.</th>
+        <th>Квал / Назн / Пров</th>
+        <th>Посл. действие</th>
+        <th>{{ sort_link('month','Месяц') }}</th>
+        <th>{{ sort_link('quality','Качество') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><span class="sg-dot sg-dot--{{ r.status }}" title="{{ r.status }}">●</span></td>
+        <td><a href="{{ url_for('dashboard.me_today', manager_id=r.manager.id) }}">{{ r.name }}</a></td>
+        <td class="sg-mono sg-sm {{ '' if r.first_action_label else 'sg-muted' }}">{{ r.first_action_label or '—' }}</td>
+        <td class="sg-mono">
+          {{ r.calls_connected }}{% if r.norm_calls %}<span class="sg-muted sg-sm">/{{ r.norm_calls }}</span>{% endif %}
+          {% if r.calls_pct_of_norm is not none %}
+          <div class="sg-bar"><div class="sg-bar__fill" style="width:{{ [r.calls_pct_of_norm, 100]|min }}%"></div></div>
+          {% endif %}
+        </td>
+        <td class="sg-mono">{{ r.connect_rate_pct ~ '%' if r.connect_rate_pct is not none else '—' }}</td>
+        <td class="sg-mono">{{ r.touches }}</td>
+        <td class="sg-mono">{{ r.messages_out }}</td>
+        <td class="sg-mono sg-sm">{{ r.qualified }} / {{ r.meetings_set }} / {{ r.meetings_held }}</td>
+        <td class="sg-sm {{ 'sg-red-text' if r.minutes_since_last and r.minutes_since_last > 120 }}">{{ r.last_action_label }}</td>
+        <td class="sg-mono sg-sm">
+          {% if r.month.progress_pct is not none %}{{ r.month.progress_pct }}%{% else %}—{% endif %}
+          {% if r.month.forecast_pct is not none %}<span class="sg-muted">(прогноз {{ r.month.forecast_pct }}%)</span>{% endif %}
+        </td>
+        <td class="sg-mono">{{ r.avg_call_score if r.avg_call_score is not none else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="11" class="sg-muted">Нет активных менеджеров / данных за сегодня.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="sg-muted sg-sm">Норма дозвонов — «план звонков в день» менеджера (или медиана команды).
+    Светофор и нормы перейдут на тиры миссий на Этапе 5. Выручка — по оплатам (первая выручка — Этап 4).</p>
+</section>
+
+<style>
+  .sg-dot{font-size:1.1rem}
+  .sg-dot--green{color:#17b26a}.sg-dot--yellow{color:#f5c542}.sg-dot--red{color:var(--sg-red,#e5484d)}
+  .sg-red-text{color:var(--sg-red,#e5484d)}
+  .sg-bar{height:5px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:3px;max-width:90px}
+  .sg-bar__fill{height:100%;background:var(--sg-blue,#1467F5);border-radius:3px}
+  .sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}
+  .sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+</style>
+{% endblock %}

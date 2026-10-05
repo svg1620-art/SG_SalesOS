@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Воронка и конверсии — SG SalesOS{% endblock %}
+
+{% macro pct(v) %}{% if v is not none %}{{ (v*100)|round|int }}%{% else %}—{% endif %}{% endmacro %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">Ops / Воронка и конверсии</div>
+  <h1 class="sg-h1">Воронка и конверсии</h1>
+
+  <div class="sg-sm" style="margin-bottom:10px">
+    <a class="sg-chip" href="{{ url_for('ops.board') }}">Сейчас</a>
+    <a class="sg-chip sg-chip--active" href="{{ url_for('ops.board_conversions') }}">Воронка и конверсии</a>
+    <a class="sg-chip" href="{{ url_for('ops.validation') }}">Валидация</a>
+  </div>
+
+  <form method="get" action="{{ url_for('ops.board_conversions') }}" class="sg-actions" style="align-items:flex-end">
+    <label class="sg-field" style="max-width:160px"><span class="sg-field__label">С</span>
+      <input class="sg-input sg-mono" type="date" name="from" value="{{ from_d.isoformat() }}"></label>
+    <label class="sg-field" style="max-width:160px"><span class="sg-field__label">По</span>
+      <input class="sg-input sg-mono" type="date" name="to" value="{{ to_d.isoformat() }}"></label>
+    <label class="sg-field" style="max-width:220px"><span class="sg-field__label">Отдел</span>
+      <select class="sg-input" name="department_id">
+        <option value="">Все</option>
+        {% for d in departments %}<option value="{{ d.id }}" {{ 'selected' if department_id == d.id }}>{{ d.name }}</option>{% endfor %}
+      </select></label>
+    <input type="hidden" name="mode" value="{{ mode }}">
+    <button class="sg-btn" type="submit">Показать</button>
+  </form>
+
+  {# воронка команды #}
+  <div class="sg-card sg-card--pad" style="margin-top:12px">
+    <h3 class="sg-h3">Воронка команды</h3>
+    <table class="sg-table">
+      <thead><tr>{% for key, label in flow_stages %}<th>{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody><tr>{% for key, label in flow_stages %}<td class="sg-mono">{{ team_funnel[key] }}</td>{% endfor %}</tr></tbody>
+    </table>
+  </div>
+
+  {# конверсии #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 class="sg-h3">Конверсии по ступеням</h3>
+      <div class="sg-sm">
+        <a class="sg-chip {{ 'sg-chip--active' if mode=='cohort' }}" href="{{ url_for('ops.board_conversions', mode='cohort', from=from_d.isoformat(), to=to_d.isoformat(), department_id=department_id) }}">Когортная</a>
+        <a class="sg-chip {{ 'sg-chip--active' if mode=='flow' }}" href="{{ url_for('ops.board_conversions', mode='flow', from=from_d.isoformat(), to=to_d.isoformat(), department_id=department_id) }}">Потоковая</a>
+      </div>
+    </div>
+    <p class="sg-muted sg-sm">
+      {% if mode == 'cohort' %}Когортная: вошёл в ступень в периоде → дошёл до следующей (окно сделки). Основная метрика.
+      {% else %}Потоковая: деление сумм соседних ступеней за период. Быстрая оценка.{% endif %}
+    </p>
+    <table class="sg-table">
+      <thead><tr><th>Менеджер</th>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        <tr><td><b>Команда</b></td>
+          {% for cell in team_conv %}<td class="sg-mono"><b>{{ pct(cell.value) }}</b></td>{% endfor %}
+        </tr>
+        {% for pr in per_rows %}
+        <tr>
+          <td>{{ pr.name }}</td>
+          {% for i in range(columns|length) %}
+          {% set v = pr.conv[i].value %}
+          {% set med = medians[i] %}
+          <td class="sg-mono"
+              style="{% if v is not none and med %}background:rgba({{ '23,178,106' if v >= med else '229,72,77' }},{{ 0.10 + 0.30 * ([ (v-med)|abs / med, 1]|min if med else 0) }}){% endif %}">
+            {{ pct(v) }}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="sg-muted sg-sm">Цвет — отклонение от медианы команды по колонке (зелёный выше, красный ниже).
+      {% if mode == 'cohort' %}«Дозвон→Квал» доступен только в потоковом виде.{% endif %}</p>
+  </div>
+
+  {# тепловая карта команды #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Окна прозвона: connect rate «день недели × час»</h3>
+    <div style="overflow-x:auto">
+      <table class="sg-heatmap__table">
+        <thead><tr><th class="sg-sm sg-muted">День</th>{% for h in heat.hours %}<th class="sg-sm sg-mono">{{ h }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for wd in range(7) %}
+          <tr>
+            <td class="sg-sm">{{ weekday_names[wd] }}</td>
+            {% for h in heat.hours %}
+              {% set pair = heat.agg.get((wd, h)) %}
+              {% set cr = (pair[0]/pair[1]) if pair and pair[1] else none %}
+              <td class="sg-heatmap__cell" title="{{ pct(cr) }}"
+                  style="{% if cr is not none %}background:rgba(20,103,245,{{ 0.08 + 0.85*cr }}){% endif %}">
+                <span class="sg-sm">{{ (cr*100)|round|int if cr is not none else '' }}</span>
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if heat.best %}
+    <p class="sg-muted sg-sm">Лучшие окна:
+      {% for b in heat.best %}{{ weekday_names[b.weekday] }} {{ b.hour }}:00 ({{ (b.cr*100)|round|int }}%){% if not loop.last %}, {% endif %}{% endfor %}.</p>
+    {% endif %}
+  </div>
+</section>
+
+<style>
+  .sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}
+  .sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+  .sg-heatmap__table{border-collapse:collapse}
+  .sg-heatmap__table th,.sg-heatmap__cell{padding:4px 6px;text-align:center;min-width:32px}
+  .sg-heatmap__cell{border:1px solid rgba(255,255,255,.04);border-radius:4px}
+</style>
+{% endblock %}

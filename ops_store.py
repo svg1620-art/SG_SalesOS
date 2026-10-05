@@ -29,6 +29,14 @@ OPS_DEFAULTS = {
     "gross_margin_rate": "1.0",
     "payroll_tax_rate": "0.302",
     "overhead_default": "0",
+    # пульт РОПа (Этап 3)
+    "k_dedup": "0.5",
+    "board_red_calls_pct": "40",      # к 15:00 дозвонов < X% нормы → 🔴
+    "board_yellow_calls_pct": "70",   # к 15:00 дозвонов < X% нормы → 🟡
+    "board_connect_rate_min_pct": "60",  # connect rate < X% медианы команды → 🟡
+    "board_afternoon_hour": "15",     # час, с которого применяется правило дозвонов
+    "heatmap_window_days": "30",      # окно командной тепловой карты
+    "forecast_baseline_days": "20",   # раб. дней для run-rate прогноза
 }
 
 
