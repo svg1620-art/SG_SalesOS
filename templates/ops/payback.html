@@ -44,6 +44,38 @@
     <p class="sg-muted sg-sm">🟢 ≥1.0 окупил · 🟡 0.8–1.0 на грани · 🔴 &lt;0.8 не окупил · «—» нет данных по затратам. В адаптации пороги снижены.</p>
   </div>
 
+  {# --- атрибуция первой выручки по менеджерам --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Атрибуция первой выручки — {{ month.strftime('%m.%Y') }}</h3>
+    <p class="sg-muted sg-sm">Всего первой выручки: <b class="sg-mono">{{ money(attribution.total) }}</b>,
+      из них распределено по менеджерам: <b class="sg-mono sg-ok">{{ money(attribution.attributed) }}</b>.</p>
+    <table class="sg-table">
+      <thead><tr><th>Менеджер</th><th>Первая выручка</th></tr></thead>
+      <tbody>
+        {% for r in attribution.rows %}
+        <tr><td>{{ r.name }}</td><td class="sg-mono">{{ money(r.sum) }}</td></tr>
+        {% else %}
+        <tr><td colspan="2" class="sg-muted">Нет привязанной к менеджерам выручки за месяц.</td></tr>
+        {% endfor %}
+        {% if attribution.unattributed %}
+        <tr>
+          <td style="color:var(--sg-red)">⚠ Не привязано к менеджеру</td>
+          <td class="sg-mono" style="color:var(--sg-red)">{{ money(attribution.unattributed) }}</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    {% if attribution.unattributed %}
+    <p class="sg-sm" style="color:var(--sg-yellow)">
+      Эта выручка идёт «одной суммой», потому что у сделок не сопоставлен ответственный amoCRM с менеджером
+      (поле <code class="sg-mono">amo_user_id</code>). Исправить:
+      <a href="{{ url_for('settings.index') }}">Настройки → «Синхронизировать пользователей»</a> (свяжет по email),
+      затем в Настройках «Импортировать выигранные» и здесь «↻ Пересчитать первую выручку».
+      Если у сотрудника нет email как в amoCRM — проставьте <code class="sg-mono">amo_user_id</code> вручную в карточке пользователя.
+    </p>
+    {% endif %}
+  </div>
+
   {% if detail %}
   {% set pb = detail.pb %}
   <div class="sg-card sg-card--pad" style="margin-top:16px">

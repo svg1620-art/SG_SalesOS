@@ -565,6 +565,7 @@ def payback():
         payback_for, cumulative_net, factor_diagnosis, month_first,
         recompute_bonuses, recompute_allocations,
     )
+    from models import Deal
     mf = _month_arg()
     recompute_bonuses(mf)       # авто-бонус от первой выручки
     recompute_allocations(mf)   # доли РОПа с учётом свежих бонусов
@@ -582,6 +583,28 @@ def payback():
     for m in managers:
         cells = [payback_for(m, mo) for mo in months]
         summary.append({"manager": m, "cells": cells})
+
+    # --- атрибуция первой выручки за выбранный месяц (диагностика «почему одной суммой») ---
+    from ops.payback import first_revenue, _month_bounds
+    _f, _l, _nxt = _month_bounds(mf)
+    attr_rows = []
+    attr_total = 0
+    for m in managers:
+        s, _c = first_revenue(m.id, mf)
+        if s:
+            attr_rows.append({"name": m.full_name or m.email, "sum": s})
+        attr_total += s
+    attr_rows.sort(key=lambda r: -r["sum"])
+    from datetime import datetime as _dt
+    unattr = db.session.query(db.func.coalesce(db.func.sum(Deal.price), 0)).filter(
+        Deal.outcome == "won", Deal.is_first_revenue.is_(True), Deal.manager_id.is_(None),
+        Deal.won_at >= _dt(mf.year, mf.month, mf.day),
+        Deal.won_at < _dt(_nxt.year, _nxt.month, _nxt.day),
+    ).scalar() or 0
+    attribution = {
+        "rows": attr_rows, "attributed": attr_total,
+        "unattributed": int(unattr), "total": attr_total + int(unattr),
+    }
 
     # выбранный менеджер — детальный разбор
     sel_id = request.args.get("manager_id")
@@ -609,6 +632,7 @@ def payback():
     return render_template(
         "ops/payback.html", managers=managers, months=months, summary=summary,
         detail=detail, month=mf, month_value=mf.strftime("%Y-%m"),
+        attribution=attribution,
     )
 
 
