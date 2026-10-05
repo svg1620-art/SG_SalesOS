@@ -1,20 +1,16 @@
 {% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
 {% block title %}Ops · Валидация данных — SG SalesOS{% endblock %}
 
 {% block content %}
 <section class="sg-page">
   <div class="sg-breadcrumbs sg-sm">Ops / Валидация данных</div>
   <h1 class="sg-h1">Валидация данных (Этап 1)</h1>
+  {{ ops_nav('validation') }}
   <p class="sg-muted">
     Проверка качества синхронизации событий amoCRM до построения метрик.
     Порог дозвона: <b class="sg-mono">{{ connect_min_sec }}</b> с.
   </p>
-  <div class="sg-sm" style="margin:-6px 0 10px">
-    <a class="sg-chip" href="{{ url_for('ops.funnel') }}">Маппинг воронки</a>
-    <a class="sg-chip" href="{{ url_for('ops.plans') }}">Планы</a>
-    <a class="sg-chip" href="{{ url_for('ops.absences') }}">Отсутствия</a>
-  </div>
-  <style>.sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}</style>
 
   {# --- Управление синхронизацией --- #}
   <div class="sg-card sg-card--pad">

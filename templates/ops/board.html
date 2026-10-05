@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
 {% block title %}Оперативный пульт — SG SalesOS{% endblock %}
 
 {% macro sort_link(key, label) %}
@@ -10,14 +11,7 @@
 <section class="sg-page">
   <div class="sg-breadcrumbs sg-sm">Ops / Оперативный пульт</div>
   <h1 class="sg-h1">Оперативный пульт <span class="sg-muted sg-sm">· {{ now_label }}</span></h1>
-
-  <div class="sg-sm" style="margin-bottom:10px">
-    <a class="sg-chip sg-chip--active" href="{{ url_for('ops.board') }}">Сейчас</a>
-    <a class="sg-chip" href="{{ url_for('ops.board_conversions') }}">Воронка и конверсии</a>
-    <a class="sg-chip" href="{{ url_for('ops.payback') }}">Окупаемость</a>
-    <a class="sg-chip" href="{{ url_for('ops.validation') }}">Валидация</a>
-    <a class="sg-chip" href="{{ url_for('ops.plans') }}">Планы</a>
-  </div>
+  {{ ops_nav('board') }}
 
   <div class="sg-actions" style="align-items:flex-end;margin-bottom:12px">
     <form method="get" action="{{ url_for('ops.board') }}">

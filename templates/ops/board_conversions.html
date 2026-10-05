@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
 {% block title %}Воронка и конверсии — SG SalesOS{% endblock %}
 
 {% macro pct(v) %}{% if v is not none %}{{ (v*100)|round|int }}%{% else %}—{% endif %}{% endmacro %}
@@ -7,12 +8,7 @@
 <section class="sg-page">
   <div class="sg-breadcrumbs sg-sm">Ops / Воронка и конверсии</div>
   <h1 class="sg-h1">Воронка и конверсии</h1>
-
-  <div class="sg-sm" style="margin-bottom:10px">
-    <a class="sg-chip" href="{{ url_for('ops.board') }}">Сейчас</a>
-    <a class="sg-chip sg-chip--active" href="{{ url_for('ops.board_conversions') }}">Воронка и конверсии</a>
-    <a class="sg-chip" href="{{ url_for('ops.validation') }}">Валидация</a>
-  </div>
+  {{ ops_nav('conversions') }}
 
   <form method="get" action="{{ url_for('ops.board_conversions') }}" class="sg-actions" style="align-items:flex-end">
     <label class="sg-field" style="max-width:160px"><span class="sg-field__label">С</span>
