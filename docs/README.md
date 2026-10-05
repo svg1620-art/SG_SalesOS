@@ -6,7 +6,8 @@
 ## С чего начать (порядок чтения)
 
 1. **[ONBOARDING.md](ONBOARDING.md)** — быстрый старт за 15 минут: что это, как поднять локально, куда смотреть.
-2. **[PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md)** — полный обзор проекта (единый большой документ).
+2. **[OVERVIEW.md](OVERVIEW.md)** — обзор для бизнеса: про что проект, связи, доступы, логика, отчёты.
+3. **[PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md)** — полный обзор проекта (единый большой документ).
 3. **[ARCHITECTURE.md](ARCHITECTURE.md)** — компоненты, поток обработки, карта модулей, модель потоков.
 4. **[DATA_MODEL.md](DATA_MODEL.md)** — все таблицы, поля, связи, статусы, дедуп.
 5. **[AI_PROVIDERS.md](AI_PROVIDERS.md)** — транскрибация (OpenAI/Deepgram) и анализ (Claude/DeepSeek), переключение.
