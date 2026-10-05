@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Затраты — SG SalesOS{% endblock %}
+
+{% macro money(v) %}{% if v is not none %}{{ '{:,.0f}'.format(v).replace(',', ' ') }}{% else %}—{% endif %}{% endmacro %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm"><a href="{{ url_for('ops.payback') }}">Окупаемость</a> / Затраты</div>
+  <h1 class="sg-h1">Затраты сотрудников</h1>
+
+  <form method="get" class="sg-actions" style="align-items:flex-end">
+    <label class="sg-field" style="max-width:200px"><span class="sg-field__label">Месяц</span>
+      <input class="sg-input sg-mono" type="month" name="month" value="{{ month_value }}"></label>
+    <button class="sg-btn" type="submit">Показать</button>
+  </form>
+
+  <form method="post" action="{{ url_for('ops.costs_save') }}" style="margin-top:12px">
+    <input type="hidden" name="month" value="{{ month_value }}">
+    <div style="overflow-x:auto">
+    <table class="sg-table">
+      <thead><tr>
+        <th>Сотрудник</th><th>Роль</th><th>Оклад</th><th>Бонус</th>
+        <th>Взносы</th><th>Накладные</th><th>Лиды</th><th>Полная стоимость</th><th>Комментарий</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        {% set sc = r.sc %}
+        <tr>
+          <td>{{ r.user.full_name or r.user.email }}{% if not r.user.is_active %} <span class="sg-muted sg-sm">(деактив.)</span>{% endif %}</td>
+          <td>
+            <select class="sg-input" name="u{{ r.user.id }}_role">
+              <option value="manager" {{ 'selected' if (sc.cost_role if sc else r.default_role) == 'manager' }}>Менеджер</option>
+              <option value="rop" {{ 'selected' if (sc.cost_role if sc else r.default_role) == 'rop' }}>РОП</option>
+            </select>
+          </td>
+          <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_salary" style="width:110px" value="{{ (sc.salary_fixed|int) if sc and sc.salary_fixed else '' }}"></td>
+          <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_bonus" style="width:100px" value="{{ (sc.bonus_paid|int) if sc and sc.bonus_paid else '' }}"></td>
+          <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_tax" style="width:70px" value="{{ sc.payroll_tax_rate if sc else '0.302' }}"></td>
+          <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_overhead" style="width:100px" value="{{ (sc.overhead|int) if sc and sc.overhead else '' }}"></td>
+          <td><input class="sg-input sg-mono" name="u{{ r.user.id }}_lead" style="width:90px" value="{{ (sc.lead_cost|int) if sc and sc.lead_cost is not none else '' }}"></td>
+          <td class="sg-mono">{{ money(r.full_cost) }}</td>
+          <td><input class="sg-input" name="u{{ r.user.id }}_comment" style="width:140px" value="{{ sc.comment if sc and sc.comment else '' }}"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div class="sg-actions" style="margin-top:12px">
+      <button class="sg-btn sg-btn--primary" type="submit">Сохранить затраты</button>
+      <button class="sg-btn" type="submit" name="action" value="copy"
+              onclick="return confirm('Скопировать с прошлого месяца (бонус обнулится)?');">Скопировать с прошлого месяца</button>
+    </div>
+  </form>
+  <p class="sg-muted sg-sm">Полная стоимость = (оклад+бонус)×(1+взносы)+накладные+лиды. Затраты РОПа распределяются
+    между активными менеджерами пропорционально отработанным дням. Незаполненные строки в окупаемости — «нет данных».</p>
+</section>
+{% endblock %}

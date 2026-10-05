@@ -429,6 +429,174 @@ def board_conversions():
     )
 
 
+def _cost_users(mf):
+    """Пользователи для страницы затрат: менеджеры + админы (возможные РОПы),
+    активные ИЛИ деактивированные в выбранном месяце или позже."""
+    from calendar import monthrange
+    users = User.query.filter(User.role.in_(["manager", "admin"])).order_by(
+        User.role, User.full_name, User.email
+    ).all()
+    out = []
+    for u in users:
+        if u.is_active:
+            out.append(u)
+        elif u.deactivated_at and u.deactivated_at.date() >= mf:
+            out.append(u)
+    return out
+
+
+@ops_bp.route("/costs", methods=["GET"])
+@admin_required
+def costs():
+    from models import StaffCost
+    from ops.payback import own_cost
+    mf = _month_arg()
+    users = _cost_users(mf)
+    sc_map = {s.user_id: s for s in StaffCost.query.filter_by(month=mf).all()}
+    rows = []
+    for u in users:
+        sc = sc_map.get(u.id)
+        rows.append({
+            "user": u, "sc": sc,
+            "default_role": "rop" if u.role == "admin" else "manager",
+            "full_cost": own_cost(sc),
+        })
+    return render_template("ops/costs.html", rows=rows, month=mf,
+                           month_value=mf.strftime("%Y-%m"))
+
+
+@ops_bp.route("/costs", methods=["POST"])
+@admin_required
+def costs_save():
+    from datetime import datetime as _dt
+    from models import StaffCost
+    from ops.payback import recompute_allocations
+    from flask_login import current_user
+    mf = _month_arg()
+    action = request.form.get("action")
+
+    def _num(raw, default=0.0):
+        raw = (raw or "").strip().replace(" ", "").replace(",", ".")
+        if raw == "":
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            return default
+
+    if action == "copy":
+        prev = (mf.replace(day=1) - timedelta(days=1)).replace(day=1)
+        prev_map = {s.user_id: s for s in StaffCost.query.filter_by(month=prev).all()}
+        existing = {s.user_id: s for s in StaffCost.query.filter_by(month=mf).all()}
+        copied = 0
+        for u in _cost_users(mf):
+            src = prev_map.get(u.id)
+            if src is None:
+                continue
+            row = existing.get(u.id) or StaffCost(user_id=u.id, month=mf)
+            row.cost_role = src.cost_role
+            row.salary_fixed = src.salary_fixed
+            row.payroll_tax_rate = src.payroll_tax_rate
+            row.overhead = src.overhead
+            row.lead_cost = src.lead_cost
+            row.bonus_paid = 0  # бонус обнуляется
+            row.updated_by = current_user.id
+            db.session.add(row)
+            copied += 1
+        db.session.commit()
+        recompute_allocations(mf)
+        flash(f"Скопировано с {prev.strftime('%m.%Y')}: {copied}. Доли РОПа пересчитаны.", "success")
+        return redirect(url_for("ops.costs", month=mf.strftime("%Y-%m")))
+
+    existing = {s.user_id: s for s in StaffCost.query.filter_by(month=mf).all()}
+    for u in _cost_users(mf):
+        prefix = f"u{u.id}_"
+        salary = _num(request.form.get(prefix + "salary"))
+        bonus = _num(request.form.get(prefix + "bonus"))
+        tax = _num(request.form.get(prefix + "tax"), 0.302)
+        overhead = _num(request.form.get(prefix + "overhead"))
+        lead = request.form.get(prefix + "lead")
+        role = request.form.get(prefix + "role") or ("rop" if u.role == "admin" else "manager")
+        comment = (request.form.get(prefix + "comment") or "").strip()[:500]
+        filled = any(request.form.get(prefix + k) for k in ("salary", "bonus", "overhead", "lead"))
+        row = existing.get(u.id)
+        if not filled and row is None:
+            continue
+        if row is None:
+            row = StaffCost(user_id=u.id, month=mf)
+            db.session.add(row)
+        row.cost_role = "rop" if role == "rop" else "manager"
+        row.salary_fixed = salary
+        row.bonus_paid = bonus
+        row.payroll_tax_rate = tax
+        row.overhead = overhead
+        row.lead_cost = _num(lead, None) if (lead or "").strip() else None
+        row.comment = comment or None
+        row.updated_by = current_user.id
+    db.session.commit()
+    recompute_allocations(mf)
+    flash("Затраты сохранены, доли РОПа пересчитаны.", "success")
+    return redirect(url_for("ops.costs", month=mf.strftime("%Y-%m")))
+
+
+@ops_bp.route("/payback/recompute-first-revenue", methods=["POST"])
+@admin_required
+def payback_recompute_fr():
+    from ingest.amo_deals import recompute_first_revenue
+    _run_bg(recompute_first_revenue)
+    flash("Пересчёт первой выручки запущен в фоне.", "success")
+    return redirect(url_for("ops.payback"))
+
+
+@ops_bp.route("/payback")
+@admin_required
+def payback():
+    from ops.payback import payback_for, cumulative_net, factor_diagnosis, month_first
+    mf = _month_arg()
+    managers = _sales_managers()
+
+    # сводка: менеджер × последние 6 месяцев (payback_ratio)
+    months = []
+    cur = mf
+    for _ in range(6):
+        months.append(cur)
+        cur = (cur.replace(day=1) - timedelta(days=1)).replace(day=1)
+    months = list(reversed(months))
+
+    summary = []
+    for m in managers:
+        cells = [payback_for(m, mo) for mo in months]
+        summary.append({"manager": m, "cells": cells})
+
+    # выбранный менеджер — детальный разбор
+    sel_id = request.args.get("manager_id")
+    selected = None
+    if sel_id and sel_id.isdigit():
+        selected = db.session.get(User, int(sel_id))
+    if selected is None and managers:
+        selected = managers[0]
+
+    detail = None
+    if selected is not None:
+        base_mode = request.args.get("base", "prev")
+        try:
+            shift_days = int(request.args.get("shift", "0"))
+        except ValueError:
+            shift_days = 0
+        detail = {
+            "manager": selected,
+            "pb": payback_for(selected, mf),
+            "series": cumulative_net(selected, mf),
+            "diag": factor_diagnosis(selected.id, mf, base_mode, shift_days),
+            "base_mode": base_mode, "shift_days": shift_days,
+        }
+
+    return render_template(
+        "ops/payback.html", managers=managers, months=months, summary=summary,
+        detail=detail, month=mf, month_value=mf.strftime("%Y-%m"),
+    )
+
+
 @ops_bp.route("/validation")
 @admin_required
 def validation():

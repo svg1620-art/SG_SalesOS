@@ -163,6 +163,13 @@ def edit(user_id):
                                    departments=_departments()), 400
             user.set_password(password)
 
+        # момент деактивации «Учётка активна» (для окупаемости/распределения РОПа)
+        from datetime import datetime as _dt
+        if user.is_active and not is_active and user.deactivated_at is None:
+            user.deactivated_at = _dt.utcnow()
+        elif is_active and user.deactivated_at is not None:
+            user.deactivated_at = None
+
         user.full_name = full_name or None
         user.role = role
         user.is_active = is_active

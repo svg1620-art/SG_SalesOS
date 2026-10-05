@@ -88,6 +88,18 @@
     <p class="sg-muted sg-sm">Оплаты — по закрытым сделкам (первая выручка учитывается с Этапа 4).</p>
   </div>
 
+  {% if payback %}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Окупаемость</h3>
+    <p>
+      <span class="sg-dot sg-dot--{{ payback.status }}">●</span>
+      Коэффициент за месяц: <b class="sg-mono">{{ payback.ratio }}</b>
+      {% if payback.adaptation %}<span class="sg-muted">(период адаптации)</span>{% endif %}
+    </p>
+    <p class="sg-muted sg-sm">1.0 — окупаешь себя. Суммы и затраты видит только руководитель.</p>
+  </div>
+  {% endif %}
+
   <div class="sg-actions" style="margin-top:16px">
     <a class="sg-btn" href="{{ url_for('dashboard.manager_home') }}">Качество →</a>
   </div>
@@ -102,5 +114,8 @@
   .sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;
     border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}
   .sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+  .sg-dot{font-size:1.1rem}
+  .sg-dot--green{color:#17b26a}.sg-dot--yellow{color:#f5c542}.sg-dot--red{color:var(--sg-red,#e5484d)}
+  .sg-dot--no_data{color:#777}
 </style>
 {% endblock %}

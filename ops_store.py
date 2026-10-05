@@ -26,6 +26,7 @@ OPS_DEFAULTS = {
     "quality_gate_score": "60",
     "max_calls_per_contact_day": "3",
     "rampup_months": "3",
+    "rampup_factors": "0.3,0.6,0.9",
     "gross_margin_rate": "1.0",
     "payroll_tax_rate": "0.302",
     "overhead_default": "0",

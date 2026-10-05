@@ -46,6 +46,8 @@ class User(UserMixin, db.Model):
     daily_call_plan = db.Column(db.Integer, nullable=True)
     # дата найма (для адаптации/окупаемости); Ops-модуль
     hire_date = db.Column(db.Date, nullable=True)
+    # момент деактивации «Учётка активна» (для окупаемости/распределения РОПа)
+    deactivated_at = db.Column(db.DateTime, nullable=True)
     # последняя активность (для контроля использования платформы)
     last_seen_at = db.Column(db.DateTime, nullable=True, index=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
@@ -323,6 +325,10 @@ class Deal(db.Model):
     outcome = db.Column(db.String(10), index=True)  # won | lost
     won_at = db.Column(db.DateTime, index=True)  # дата закрытия (успех/провал)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Ops Этап 4: первая выручка клиента (единая база окупаемости/плана)
+    amo_company_id = db.Column(db.BigInteger, nullable=True, index=True)
+    client_key = db.Column(db.String(64), nullable=True, index=True)  # company:<id>|contact:<id>
+    is_first_revenue = db.Column(db.Boolean, nullable=False, default=False, index=True)
 
     manager = db.relationship("User")
 
@@ -566,3 +572,42 @@ class ManagerAbsence(db.Model):
     kind = db.Column(db.String(20), nullable=False, default="vacation")  # vacation|sick|other
 
     manager = db.relationship("User")
+
+
+# --- Ops Metrics Этап 4: затраты и окупаемость --------------------------------
+
+class StaffCost(db.Model):
+    """Затраты на сотрудника (менеджера/РОПа) за месяц — ввод вручную (§8.4)."""
+
+    __tablename__ = "staff_costs"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    month = db.Column(db.Date, primary_key=True)  # 1-е число месяца
+    cost_role = db.Column(db.String(10), nullable=False, default="manager")  # manager|rop
+    salary_fixed = db.Column(db.Numeric, nullable=False, default=0)
+    bonus_paid = db.Column(db.Numeric, nullable=False, default=0)
+    payroll_tax_rate = db.Column(db.Numeric, nullable=False, default=0.302)
+    overhead = db.Column(db.Numeric, nullable=False, default=0)
+    lead_cost = db.Column(db.Numeric, nullable=True)
+    comment = db.Column(db.String(500), nullable=True)
+    updated_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user = db.relationship("User", foreign_keys=[user_id])
+
+
+class RopCostAllocation(db.Model):
+    """Рассчитанная доля затрат РОПа на менеджера за месяц (пересчитывается)."""
+
+    __tablename__ = "rop_cost_allocations"
+
+    month = db.Column(db.Date, primary_key=True)
+    rop_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    weight = db.Column(db.Numeric, nullable=False, default=0)       # рабочие дни менеджера
+    allocated_cost = db.Column(db.Numeric, nullable=False, default=0)
+
+    rop = db.relationship("User", foreign_keys=[rop_user_id])
+    manager = db.relationship("User", foreign_keys=[manager_id])

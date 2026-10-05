@@ -78,6 +78,49 @@ def _main_contact_id(lead) -> int | None:
     return contacts[0].get("id")
 
 
+def _company_id(lead) -> int | None:
+    """ID компании сделки из _embedded.companies (если есть)."""
+    companies = ((lead.get("_embedded") or {}).get("companies")) or []
+    return companies[0].get("id") if companies else None
+
+
+def _client_key(lead):
+    """Ключ клиента для «первой выручки»: company:<id> или contact:<id> (§8.0)."""
+    cid = _company_id(lead)
+    if cid:
+        return f"company:{cid}", cid
+    contact = _main_contact_id(lead)
+    if contact:
+        return f"contact:{contact}", None
+    return None, None
+
+
+def recompute_first_revenue(app=None) -> dict:
+    """Пометить первую выручку клиента (§8.0): самая ранняя по won_at выигранная
+    сделка на client_key = первая выручка; остальные (повторные оплаты) — нет.
+
+    Считаем по всей таблице Deal (import_won тянет все выигранные). Идемпотентно.
+    """
+    app = app or current_app
+    deals = (
+        Deal.query.filter(Deal.outcome == "won")
+        .order_by(Deal.won_at.asc(), Deal.id.asc()).all()
+    )
+    seen_keys = set()
+    first_count = 0
+    for d in deals:
+        # сделка без company и без contact — считается первой выручкой (§8.0)
+        key = d.client_key or (f"deal:{d.amo_lead_id}")
+        is_first = key not in seen_keys
+        if is_first:
+            seen_keys.add(key)
+            first_count += 1
+        if d.is_first_revenue != is_first:
+            d.is_first_revenue = is_first
+    db.session.commit()
+    return {"ok": True, "won": len(deals), "first_revenue": first_count}
+
+
 def _fmt_money(rub: int) -> str:
     return f"{rub:,}".replace(",", " ")
 
@@ -466,6 +509,7 @@ def import_won(app=None, max_pages: int = _WON_MAX_PAGES) -> dict:
             price = int(lead.get("price") or 0)
             manager_id = mgr_by_amo.get(lead.get("responsible_user_id"))
             won_at = datetime.utcfromtimestamp(closed_ts)
+            ckey, company_id = _client_key(lead)
             existing = Deal.query.filter_by(amo_lead_id=lead_id).first()
             if existing is not None:
                 existing.outcome = "won"
@@ -473,6 +517,8 @@ def import_won(app=None, max_pages: int = _WON_MAX_PAGES) -> dict:
                 existing.pipeline_id = pid
                 existing.price = price
                 existing.won_at = won_at
+                existing.client_key = ckey
+                existing.amo_company_id = company_id
                 if manager_id:
                     existing.manager_id = manager_id
                 if existing.amo_contact_id is None:
@@ -483,6 +529,8 @@ def import_won(app=None, max_pages: int = _WON_MAX_PAGES) -> dict:
                     amo_lead_id=lead_id,
                     manager_id=manager_id,
                     amo_contact_id=_main_contact_id(lead),
+                    amo_company_id=company_id,
+                    client_key=ckey,
                     price=price,
                     name=(lead.get("name") or "")[:500],
                     pipeline_id=pid,
@@ -496,6 +544,13 @@ def import_won(app=None, max_pages: int = _WON_MAX_PAGES) -> dict:
         db.session.rollback()
         app.logger.warning("[deals] быстрый импорт выигранных упал: %s", exc)
         return {"ok": False, "error": str(exc)}
+
+    # пометить первую выручку клиента после импорта (§8.0)
+    try:
+        recompute_first_revenue(app)
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        app.logger.warning("[deals] пересчёт первой выручки пропущен: %s", exc)
 
     result = {
         "ok": True, "imported": imported, "updated": updated, "seen": seen,

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Окупаемость — SG SalesOS{% endblock %}
+
+{% macro money(v) %}{% if v is not none %}{{ '{:,.0f}'.format(v).replace(',', ' ') }} ₽{% else %}—{% endif %}{% endmacro %}
+{% macro ratio(v) %}{% if v is not none %}{{ '%.2f'|format(v) }}{% else %}—{% endif %}{% endmacro %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">Ops / Окупаемость</div>
+  <h1 class="sg-h1">Окупаемость</h1>
+
+  <div class="sg-sm" style="margin-bottom:10px">
+    <a class="sg-chip sg-chip--active" href="{{ url_for('ops.payback') }}">Окупаемость</a>
+    <a class="sg-chip" href="{{ url_for('ops.costs') }}">Затраты</a>
+    <a class="sg-chip" href="{{ url_for('ops.board') }}">Пульт</a>
+  </div>
+
+  <div class="sg-actions" style="align-items:flex-end">
+    <form method="get">
+      <label class="sg-field" style="max-width:200px"><span class="sg-field__label">Месяц</span>
+        <input class="sg-input sg-mono" type="month" name="month" value="{{ month_value }}"></label>
+    </form>
+    <form method="post" action="{{ url_for('ops.payback_recompute_fr') }}">
+      <button class="sg-btn" type="submit">↻ Пересчитать первую выручку</button>
+    </form>
+  </div>
+
+  {# --- сводная матрица --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:12px">
+    <h3 class="sg-h3">Сводка: окупаемость по месяцам</h3>
+    <div style="overflow-x:auto">
+    <table class="sg-table">
+      <thead><tr><th>Менеджер</th>{% for mo in months %}<th class="sg-mono sg-sm">{{ mo.strftime('%m.%y') }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in summary %}
+        <tr>
+          <td><a href="{{ url_for('ops.payback', month=month_value, manager_id=row.manager.id) }}">{{ row.manager.full_name or row.manager.email }}</a></td>
+          {% for cell in row.cells %}
+          <td class="sg-mono sg-dot--{{ cell.status }}" title="{{ cell.status }}">
+            {{ ratio(cell.ratio) }}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="sg-muted sg-sm">🟢 ≥1.0 окупил · 🟡 0.8–1.0 на грани · 🔴 &lt;0.8 не окупил · «—» нет данных по затратам. В адаптации пороги снижены.</p>
+  </div>
+
+  {% if detail %}
+  {% set pb = detail.pb %}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">{{ detail.manager.full_name or detail.manager.email }} — {{ month.strftime('%m.%Y') }}
+      {% if pb.adaptation %}<span class="sg-muted">· адаптация ×{{ pb.rampup_factor }}</span>{% endif %}
+    </h3>
+    {% if pb.status == 'no_data' %}
+      <p style="color:var(--sg-yellow)">Нет данных по затратам за месяц — заполните на странице «Затраты».</p>
+    {% else %}
+    <div class="sg-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
+      <div class="sg-card sg-card--pad"><div class="sg-muted sg-sm">Первая выручка</div><div class="sg-mono" style="font-size:1.3rem">{{ money(pb.rev_sum) }}</div><div class="sg-sm sg-muted">{{ pb.rev_cnt }} сделок</div></div>
+      <div class="sg-card sg-card--pad"><div class="sg-muted sg-sm">Полная стоимость</div><div class="sg-mono" style="font-size:1.3rem">{{ money(pb.full) }}</div><div class="sg-sm sg-muted">свои {{ money(pb.own) }} + РОП {{ money(pb.rop) }}</div></div>
+      <div class="sg-card sg-card--pad"><div class="sg-muted sg-sm">Окупаемость</div><div class="sg-mono" style="font-size:1.3rem"><span class="sg-dot--{{ pb.status }}">{{ ratio(pb.ratio) }}</span></div><div class="sg-sm sg-muted">без РОПа {{ ratio(pb.direct) }}</div></div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# --- накопительно --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Маржа vs стоимость и накопительный результат</h3>
+    <canvas id="cumChart" height="90"></canvas>
+    <table class="sg-table" style="margin-top:10px">
+      <thead><tr><th>Месяц</th><th>Маржа</th><th>Стоимость</th><th>Net</th><th>Накопительно</th></tr></thead>
+      <tbody>
+        {% for s in detail.series %}
+        <tr>
+          <td class="sg-mono sg-sm">{{ s.month.strftime('%m.%y') }}</td>
+          <td class="sg-mono">{{ money(s.margin) }}</td>
+          <td class="sg-mono">{{ money(s.full) if s.has_cost else '—' }}</td>
+          <td class="sg-mono">{{ money(s.net) }}</td>
+          <td class="sg-mono">{{ money(s.cumulative) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# --- факторная диагностика --- #}
+  {% set diag = detail.diag %}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Что произошло: факторная диагностика</h3>
+    <form method="get" class="sg-actions" style="align-items:flex-end">
+      <input type="hidden" name="month" value="{{ month_value }}">
+      <input type="hidden" name="manager_id" value="{{ detail.manager.id }}">
+      <label class="sg-field" style="max-width:220px"><span class="sg-field__label">База сравнения</span>
+        <select class="sg-input" name="base" onchange="this.form.submit()">
+          <option value="prev" {{ 'selected' if detail.base_mode=='prev' }}>Прошлый месяц</option>
+          <option value="own3m" {{ 'selected' if detail.base_mode=='own3m' }}>Своя медиана 3 мес</option>
+        </select></label>
+      <label class="sg-field" style="max-width:200px"><span class="sg-field__label">Сдвиг активности, дней</span>
+        <input class="sg-input sg-mono" type="number" name="shift" value="{{ detail.shift_days }}"></label>
+      <button class="sg-btn" type="submit">Применить</button>
+    </form>
+    <p class="sg-muted sg-sm">Выручка {{ money(diag.rev_m) }} vs база ({{ diag.base_label }}) {{ money(diag.rev_b) }} — Δ {{ money(diag.delta) }}.</p>
+    <table class="sg-table">
+      <thead><tr><th>Фактор</th><th>Текущий</th><th>База</th>{% if diag.decomposable %}<th>Вклад в Δ</th><th></th>{% endif %}</tr></thead>
+      <tbody>
+        {% set maxc = 1 %}
+        {% if diag.decomposable %}{% set maxc = (diag.rows | map(attribute='contribution') | map('abs') | max) or 1 %}{% endif %}
+        {% for r in diag.rows %}
+        <tr>
+          <td>{{ r.label }}</td>
+          <td class="sg-mono sg-sm">{{ '%.2f'|format(r.m) }}</td>
+          <td class="sg-mono sg-sm">{{ '%.2f'|format(r.b) }}</td>
+          {% if diag.decomposable %}
+          <td class="sg-mono sg-sm">{{ money(r.contribution) }}</td>
+          <td style="min-width:120px">
+            <div style="background:{{ 'rgba(23,178,106,.6)' if r.contribution >= 0 else 'rgba(229,72,77,.6)' }};
+                        height:10px;border-radius:3px;width:{{ (r.contribution|abs / maxc * 100)|round|int }}%"></div>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if not diag.decomposable %}
+    <p class="sg-muted sg-sm">Разложение недоступно (нулевая база/фактор или выручка не изменилась) — показаны только факторы.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function(){
+  var el=document.getElementById('cumChart');
+  if(!el) return;
+  var labels={{ detail.series | map(attribute='month') | map('string') | list | tojson }};
+  var margin={{ detail.series | map(attribute='margin') | list | tojson }};
+  var cost={{ detail.series | map(attribute='full') | list | tojson }};
+  var cum={{ detail.series | map(attribute='cumulative') | list | tojson }};
+  var lbl=labels.map(function(s){return s.slice(5,7)+'.'+s.slice(2,4);});
+  new Chart(el,{data:{labels:lbl,datasets:[
+    {type:'bar',label:'Маржа',data:margin,backgroundColor:'rgba(20,103,245,.6)'},
+    {type:'bar',label:'Стоимость',data:cost,backgroundColor:'rgba(229,72,77,.5)'},
+    {type:'line',label:'Накопительно',data:cum,borderColor:'#00BFDC',tension:.2,yAxisID:'y'}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'#aaa'}}},
+    scales:{x:{ticks:{color:'#888'}},y:{ticks:{color:'#888'}}}}});
+})();
+</script>
+<style>
+  .sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}
+  .sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+  .sg-dot--green{color:#17b26a}.sg-dot--yellow{color:#f5c542}.sg-dot--red{color:var(--sg-red,#e5484d)}.sg-dot--no_data{color:#777}
+</style>
+{% endblock %}

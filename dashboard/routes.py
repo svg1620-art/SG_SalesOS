@@ -610,8 +610,20 @@ def me_today():
         if stat and stat.first_action_at else None
     )
 
+    # окупаемость — менеджеру только коэффициент и статус, без сумм (§12)
+    payback = None
+    try:
+        from ops.payback import payback_for, month_first
+        pb = payback_for(target, month_first(today))
+        if pb.get("ratio") is not None:
+            payback = {"ratio": round(pb["ratio"], 2), "status": pb["status"],
+                       "adaptation": pb.get("adaptation")}
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+
     return render_template(
         "dashboard/me_today.html",
+        payback=payback,
         target=target, is_self=(target.id == current_user.id),
         today=today, stat=stat, cards=cards, connect_rate=connect_rate,
         first_action_label=first_action_label,
