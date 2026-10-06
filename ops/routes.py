@@ -638,6 +638,28 @@ def payback():
         "unattributed": int(unattr), "total": attr_total + int(unattr),
     }
 
+    # --- диагностика «почему пусто» за выбранный месяц ---
+    won_month = Deal.query.filter(
+        Deal.outcome == "won",
+        Deal.won_at >= _dt(mf.year, mf.month, mf.day),
+        Deal.won_at < _dt(_nxt.year, _nxt.month, _nxt.day),
+    )
+    won_count = won_month.count()
+    first_count = won_month.filter(Deal.is_first_revenue.is_(True)).count()
+    first_unattr_count = won_month.filter(
+        Deal.is_first_revenue.is_(True), Deal.manager_id.is_(None)
+    ).count()
+    # сколько из показанных месяцев имеют строки затрат (StaffCost)
+    from models import StaffCost as _SC
+    months_cost = db.session.query(_SC.month).filter(_SC.month.in_(months)).distinct().count()
+    empty_diag = {
+        "won_count": won_count, "first_count": first_count,
+        "first_attr_count": first_count - first_unattr_count,
+        "first_unattr_count": first_unattr_count,
+        "months_total": len(months), "months_cost": months_cost,
+        "no_revenue": attr_total == 0,
+    }
+
     # выбранный менеджер — детальный разбор
     sel_id = request.args.get("manager_id")
     selected = None
@@ -664,7 +686,7 @@ def payback():
     return render_template(
         "ops/payback.html", managers=managers, months=months, summary=summary,
         detail=detail, month=mf, month_value=mf.strftime("%Y-%m"),
-        attribution=attribution,
+        attribution=attribution, empty_diag=empty_diag,
     )
 
 
