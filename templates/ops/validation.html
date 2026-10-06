@@ -78,6 +78,28 @@
     </p>
   </div>
 
+  {# --- 2b. Доезжают ли недозвоны (неотвеченные звонки)? --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">2б. Недозвоны: логирует ли телефония неотвеченные звонки?</h3>
+    <p class="sg-muted sg-sm">
+      Исходящих за {{ call_diag.days }} дней: <b class="sg-mono">{{ call_diag.total }}</b>.
+      Из них не сняли трубку (длительность 0/пусто):
+      <b class="sg-mono">{{ call_diag.no_answer }}</b>{% if call_diag.na_share is not none %} ({{ call_diag.na_share }}%){% endif %};
+      сняли, но коротко (&lt;{{ call_diag.threshold }}с):
+      <b class="sg-mono">{{ call_diag.pickups_short }}</b>;
+      разговор ≥{{ call_diag.threshold }}с: <b class="sg-mono">{{ call_diag.talks }}</b>.
+    </p>
+    <div class="sg-flash {{ 'sg-flash--error' if call_diag.verdict in ('bad','no_data') else 'sg-flash--success' }}">
+      {{ call_diag.verdict_text }}
+    </div>
+    {% if call_diag.status_rows %}
+    <p class="sg-muted sg-sm" style="margin-top:8px">Распределение по call_status:
+      {% for s in call_diag.status_rows %}<span class="sg-mono">{{ s.code if s.code is not none else '—' }}: {{ s.count }}</span>{% if not loop.last %} · {% endif %}{% endfor %}
+    </p>
+    {% endif %}
+    <p class="sg-sm"><a href="{{ url_for('ops.calls') }}">→ Дашборд «Звонки»</a></p>
+  </div>
+
   {# --- 3. Сообщения по менеджерам за 14 дней --- #}
   <div class="sg-card sg-card--pad" style="margin-top:16px">
     <h3 class="sg-h3">3. Исходящие сообщения (чаты) за 14 дней</h3>

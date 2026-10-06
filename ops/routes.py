@@ -429,6 +429,38 @@ def board_conversions():
     )
 
 
+def _range_args(default_days=30):
+    """(from_d, to_d) из ?from=&to= (YYYY-MM-DD), по умолчанию последние N дней."""
+    from datetime import timedelta as _td
+    today = now_local().date()
+    try:
+        to_d = datetime.strptime(request.args.get("to", ""), "%Y-%m-%d").date()
+    except Exception:  # noqa: BLE001
+        to_d = today
+    try:
+        from_d = datetime.strptime(request.args.get("from", ""), "%Y-%m-%d").date()
+    except Exception:  # noqa: BLE001
+        from_d = today - _td(days=default_days)
+    if from_d > to_d:
+        from_d, to_d = to_d, from_d
+    return from_d, to_d
+
+
+@ops_bp.route("/calls")
+@admin_required
+def calls():
+    """Дашборд по дозвонам: попытки → трубку сняли → разговор, по менеджерам."""
+    from ops.calls import calls_overview
+    departments, dep_id, mgr_ids = _dept_filter()
+    from_d, to_d = _range_args(30)
+    data = calls_overview(from_d, to_d, manager_ids=mgr_ids)
+    return render_template(
+        "ops/calls.html",
+        departments=departments, department_id=dep_id,
+        from_d=from_d, to_d=to_d, data=data,
+    )
+
+
 def _cost_users(mf):
     """Пользователи для страницы затрат: менеджеры + админы (возможные РОПы),
     активные ИЛИ деактивированные в выбранном месяце или позже."""
@@ -721,12 +753,56 @@ def validation():
 
     recent_syncs = OpsSyncLog.query.order_by(OpsSyncLog.started_at.desc()).limit(10).all()
 
+    # 6) диагностика недозвонов: доезжают ли к нам неотвеченные звонки (30 дней)?
+    threshold = connect_min_sec()
+    diag_from = local_to_utc_naive(
+        now_local().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=30)
+    )
+    out_base = OpsActivityEvent.query.filter(
+        OpsActivityEvent.type == "call_out",
+        OpsActivityEvent.occurred_at >= diag_from,
+    )
+    out_total = out_base.count()
+    # недозвон = трубку не сняли: duration 0 или NULL
+    no_answer = out_base.filter(
+        db.or_(OpsActivityEvent.duration_sec.is_(None), OpsActivityEvent.duration_sec == 0)
+    ).count()
+    talks = out_base.filter(OpsActivityEvent.duration_sec >= threshold).count()
+    pickups_short = out_total - no_answer - talks  # сняли трубку, но < порога
+    # распределение по call_status (топ кодов)
+    status_rows = (
+        db.session.query(OpsActivityEvent.call_status, db.func.count(OpsActivityEvent.id))
+        .filter(OpsActivityEvent.type == "call_out",
+                OpsActivityEvent.occurred_at >= diag_from)
+        .group_by(OpsActivityEvent.call_status)
+        .order_by(db.func.count(OpsActivityEvent.id).desc()).all()
+    )
+    na_share = round(no_answer / out_total * 100) if out_total else None
+    # вердикт: если недозвонов почти нет — телефония их не логирует
+    if out_total == 0:
+        diag_verdict = ("no_data", "За 30 дней исходящих звонков нет — проверьте синхронизацию.")
+    elif na_share is not None and na_share < 3:
+        diag_verdict = ("bad", "Недозвонов почти нет (%s%%). Похоже, телефония "
+                        "НЕ пишет неотвеченные звонки в amoCRM — попытки «мимо» к нам "
+                        "не доезжают. Нужна доработка сбора (вебхук history Мегафона "
+                        "или журнал звонков)." % na_share)
+    else:
+        diag_verdict = ("ok", "Недозвоны фиксируются (%s%% попыток без снятия трубки) — "
+                        "данных для дашборда достаточно." % na_share)
+    call_diag = {
+        "days": 30, "threshold": threshold, "total": out_total,
+        "no_answer": no_answer, "pickups_short": pickups_short, "talks": talks,
+        "na_share": na_share,
+        "status_rows": [{"code": c, "count": n} for c, n in status_rows],
+        "verdict": diag_verdict[0], "verdict_text": diag_verdict[1],
+    }
+
     return render_template(
         "ops/validation.html",
         depth_rows=depth_rows, funnel_min=funnel_min, funnel_count=funnel_count,
         calls_quality=calls_quality, msg_rows=msg_rows, sverka_rows=sverka_rows,
         unmapped=unmapped, pipelines_error=pl_err, recent_syncs=recent_syncs,
-        connect_min_sec=connect_min_sec(),
+        connect_min_sec=connect_min_sec(), call_diag=call_diag,
     )
 
 

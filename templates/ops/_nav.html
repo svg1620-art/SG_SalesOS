@@ -4,6 +4,7 @@
 <div class="sg-sm sg-opsnav" style="margin:-4px 0 12px">
   <a class="sg-chip {{ 'sg-chip--active' if active=='board' }}" href="{{ url_for('ops.board') }}">🛰 Пульт</a>
   <a class="sg-chip {{ 'sg-chip--active' if active=='conversions' }}" href="{{ url_for('ops.board_conversions') }}">Воронка / конверсии</a>
+  <a class="sg-chip {{ 'sg-chip--active' if active=='calls' }}" href="{{ url_for('ops.calls') }}">📞 Звонки</a>
   <a class="sg-chip {{ 'sg-chip--active' if active=='payback' }}" href="{{ url_for('ops.payback') }}">Окупаемость</a>
   <a class="sg-chip {{ 'sg-chip--active' if active=='costs' }}" href="{{ url_for('ops.costs') }}">Затраты</a>
   <a class="sg-chip {{ 'sg-chip--active' if active=='plans' }}" href="{{ url_for('ops.plans') }}">Планы</a>

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Звонки — SG SalesOS{% endblock %}
+
+{% macro rate(v) %}{% if v is not none %}{{ v }}%{% else %}<span class="sg-muted">—</span>{% endif %}{% endmacro %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">Ops / Звонки</div>
+  <h1 class="sg-h1">📞 Звонки и дозвоны</h1>
+  {{ ops_nav('calls') }}
+
+  <p class="sg-muted sg-sm" style="max-width:720px">
+    Три уровня: <b>Попытка</b> — набрали номер (усилие менеджера) ·
+    <b>Дозвон</b> — клиент снял трубку (любая длительность&nbsp;&gt;&nbsp;0) ·
+    <b>Разговор</b> — состоялся разговор ≥ {{ data.threshold }} сек.
+    % дозвона = дозвоны / попытки; % разговора = разговоры / дозвоны.
+  </p>
+
+  <form method="get" action="{{ url_for('ops.calls') }}" class="sg-actions" style="align-items:flex-end">
+    <label class="sg-field" style="max-width:160px"><span class="sg-field__label">С</span>
+      <input class="sg-input sg-mono" type="date" name="from" value="{{ from_d.isoformat() }}"></label>
+    <label class="sg-field" style="max-width:160px"><span class="sg-field__label">По</span>
+      <input class="sg-input sg-mono" type="date" name="to" value="{{ to_d.isoformat() }}"></label>
+    <label class="sg-field" style="max-width:220px"><span class="sg-field__label">Отдел</span>
+      <select class="sg-input" name="department_id">
+        <option value="">Все</option>
+        {% for d in departments %}<option value="{{ d.id }}" {{ 'selected' if department_id == d.id }}>{{ d.name }}</option>{% endfor %}
+      </select></label>
+    <button class="sg-btn" type="submit">Показать</button>
+  </form>
+
+  {# KPI команды #}
+  <div class="sg-cards-grid" style="margin-top:14px">
+    <div class="sg-card sg-card--pad"><div class="sg-muted sg-sm">Попыток</div>
+      <div class="sg-kpi sg-mono">{{ data.total.attempts }}</div></div>
+    <div class="sg-card sg-card--pad"><div class="sg-muted sg-sm">Дозвонов (трубку сняли)</div>
+      <div class="sg-kpi sg-mono">{{ data.total.pickups }}</div>
+      <div class="sg-sm sg-muted">{{ rate(data.total.connect_rate) }} от попыток</div></div>
+    <div class="sg-card sg-card--pad"><div class="sg-muted sg-sm">Разговоров ≥{{ data.threshold }}с</div>
+      <div class="sg-kpi sg-mono">{{ data.total.talks }}</div>
+      <div class="sg-sm sg-muted">{{ rate(data.total.talk_rate) }} от дозвонов</div></div>
+    <div class="sg-card sg-card--pad"><div class="sg-muted sg-sm">Ср. длительность</div>
+      <div class="sg-kpi sg-mono">{{ data.total.avg_talk }}<span class="sg-sm"> сек</span></div>
+      <div class="sg-sm sg-muted">входящих принято: {{ data.total.in_answered }}</div></div>
+  </div>
+
+  {# график по дням #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">По дням</h3>
+    <canvas id="callsChart" height="90"></canvas>
+  </div>
+
+  {# таблица по менеджерам #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">По менеджерам</h3>
+    <div style="overflow-x:auto">
+    <table class="sg-table">
+      <thead><tr>
+        <th>Менеджер</th>
+        <th class="sg-num">Попытки</th>
+        <th class="sg-num">Дозвоны</th>
+        <th class="sg-num">% дозвона</th>
+        <th class="sg-num">Разговоры</th>
+        <th class="sg-num">% разговора</th>
+        <th class="sg-num">Ср. сек</th>
+        <th class="sg-num">Вход. принято</th>
+      </tr></thead>
+      <tbody>
+        {% for r in data.mgr_rows %}
+        <tr>
+          <td>{{ r.name }}{% if r.no_amo %}<span class="sg-badge sg-badge--excluded" title="Нет привязки amo_user_id — звонки не подтягиваются">нет amo</span>{% endif %}</td>
+          <td class="sg-num sg-mono">{{ r.attempts }}</td>
+          <td class="sg-num sg-mono">{{ r.pickups }}</td>
+          <td class="sg-num sg-mono {{ 'sg-warn' if r.connect_rate is not none and r.connect_rate < 20 }}">{{ rate(r.connect_rate) }}</td>
+          <td class="sg-num sg-mono">{{ r.talks }}</td>
+          <td class="sg-num sg-mono">{{ rate(r.talk_rate) }}</td>
+          <td class="sg-num sg-mono sg-muted">{{ r.avg_talk }}</td>
+          <td class="sg-num sg-mono sg-muted">{{ r.in_answered }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="sg-muted">За период звонков нет.</td></tr>
+        {% endfor %}
+        {% if data.unattributed and data.unattributed.attempts %}
+        <tr class="sg-muted">
+          <td title="Исходящие от пользователей без привязки amo_user_id">⚠️ Без привязки к менеджеру</td>
+          <td class="sg-num sg-mono">{{ data.unattributed.attempts }}</td>
+          <td class="sg-num sg-mono">{{ data.unattributed.pickups }}</td>
+          <td class="sg-num sg-mono">{{ rate(data.unattributed.connect_rate) }}</td>
+          <td class="sg-num sg-mono">{{ data.unattributed.talks }}</td>
+          <td class="sg-num sg-mono">{{ rate(data.unattributed.talk_rate) }}</td>
+          <td class="sg-num sg-mono">{{ data.unattributed.avg_talk }}</td>
+          <td class="sg-num sg-mono">—</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+    <p class="sg-muted sg-sm" style="margin-top:8px">
+      Красным выделен низкий % дозвона (&lt;20%): это сигнал про базу/время обзвона,
+      а не обязательно про лень — сверьте с попытками. Если у кого-то «нет amo» —
+      зайдите в «Настройки» → «Синхронизировать пользователей».
+    </p>
+  </div>
+</section>
+
+<script>
+(function(){
+  var el=document.getElementById('callsChart');
+  if(!el || !window.Chart) return;
+  var labels={{ data.days | map(attribute='date') | map('string') | list | tojson }};
+  var attempts={{ data.days | map(attribute='attempts') | list | tojson }};
+  var pickups={{ data.days | map(attribute='pickups') | list | tojson }};
+  var talks={{ data.days | map(attribute='talks') | list | tojson }};
+  var lbl=labels.map(function(s){return s.slice(8,10)+'.'+s.slice(5,7);});
+  new Chart(el,{type:'bar',data:{labels:lbl,datasets:[
+    {label:'Попытки',data:attempts,backgroundColor:'rgba(255,255,255,.12)'},
+    {label:'Дозвоны',data:pickups,backgroundColor:'rgba(20,103,245,.65)'},
+    {label:'Разговоры',data:talks,backgroundColor:'rgba(0,191,220,.75)'}
+  ]},options:{responsive:true,plugins:{legend:{labels:{color:'#aaa'}}},
+    scales:{x:{stacked:false,ticks:{color:'#888'}},y:{beginAtZero:true,ticks:{color:'#888'}}}}});
+})();
+</script>
+<style>
+  .sg-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+  .sg-kpi{font-size:1.8rem;font-weight:700;line-height:1.1;margin:2px 0}
+  .sg-num{text-align:right}
+  .sg-warn{color:var(--sg-red,#e5484d);font-weight:700}
+  .sg-badge--excluded{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;
+    font-size:.72rem;background:rgba(229,72,77,.15);color:#e5484d}
+</style>
+{% endblock %}
