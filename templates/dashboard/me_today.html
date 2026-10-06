@@ -14,6 +14,68 @@
     {% if first_action_label %}· старт {{ first_action_label }}{% endif %}
   </p>
 
+  {# --- Миссия дня (геймификация, Этап 5) --- #}
+  {% if mission %}
+  <div class="sg-card sg-card--pad sg-mission" style="margin-top:14px">
+    <div class="sg-mission__head">
+      <div>
+        <h3 class="sg-h3" style="margin:0">🎯 Миссия дня
+          <span class="sg-badge sg-badge--lvl">Ур. {{ mission.level }} · {{ mission.level_name }}</span>
+        </h3>
+        <div class="sg-sm sg-muted">Сегодняшний тир:
+          <b class="sg-tier sg-tier--{{ mission.tier }}">
+            {% if mission.tier == 'gold' %}🥇 Золото{% elif mission.tier == 'silver' %}🥈 Серебро{% elif mission.tier == 'bronze' %}🥉 Бронза{% else %}— ещё не взят{% endif %}
+          </b>
+        </div>
+      </div>
+      {% if progress %}
+      <div class="sg-mission__prog sg-sm">
+        <span title="Серия дней подряд ≥ бронзы">🔥 {{ progress.streak }}<span class="sg-muted"> (рекорд {{ progress.streak_best }})</span></span>
+        <span title="Заморозки серии">❄️ {{ progress.freezes }}</span>
+        <span title="XP за 7 дней">⚡ {{ progress.xp_week }}<span class="sg-muted"> / {{ progress.xp_total }} всего</span></span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="sg-rings">
+      {% for r in mission.rings %}
+      <div class="sg-ring sg-ring--{{ r.tier }}">
+        <div class="sg-ring__dial" style="--pct:{{ r.pct }}">
+          <div class="sg-ring__inner">
+            <div class="sg-ring__val sg-mono">{{ r.value }}</div>
+            <div class="sg-ring__goal sg-mono sg-muted">/ {{ r.silver }}</div>
+          </div>
+        </div>
+        <div class="sg-ring__label sg-sm">{{ r.label }}</div>
+        <div class="sg-ring__tiers sg-sm sg-muted">🥉{{ r.bronze }} · 🥈{{ r.silver }} · 🥇{{ r.gold }}</div>
+        {% if r.next_label and r.next_need > 0 %}
+        <div class="sg-ring__hint sg-sm">ещё <b>{{ r.next_need }}</b> до {{ r.next_label }}</div>
+        {% elif not r.next_label %}
+        <div class="sg-ring__hint sg-sm sg-ok">✓ золото</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if quest and quest.active %}
+    <div class="sg-quest" style="margin-top:14px">
+      <div class="sg-sm"><b>Командный квест недели:</b> {{ quest.label }}
+        — <span class="sg-mono">{{ quest.current }}</span> / <span class="sg-mono">{{ quest.target }}</span>
+        {% if quest.done %}<span class="sg-ok">✓ выполнен!</span>{% endif %}
+      </div>
+      <div class="sg-quest__bar"><div class="sg-quest__fill" style="width:{{ quest.pct }}%"></div></div>
+    </div>
+    {% endif %}
+
+    {% if progress and progress.records %}
+    {% set rec_labels = {'calls_connected':'дозвоны','touches':'касания','qualified':'квалиф.','meetings_held':'встречи','invoices':'счета'} %}
+    <div class="sg-sm sg-muted" style="margin-top:10px">🏅 Личные рекорды:
+      {% for mk, rec in progress.records.items() %}<span class="sg-rec">{{ rec_labels.get(mk, mk) }} <b>{{ rec.value }}</b></span>{% if not loop.last %} · {% endif %}{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# --- Сегодня в цифрах --- #}
   <div class="sg-cards-grid">
     {% for c in cards %}
@@ -117,5 +179,32 @@
   .sg-dot{font-size:1.1rem}
   .sg-dot--green{color:#17b26a}.sg-dot--yellow{color:#f5c542}.sg-dot--red{color:var(--sg-red,#e5484d)}
   .sg-dot--no_data{color:#777}
+
+  /* --- Миссия дня --- */
+  .sg-mission{border:1px solid rgba(20,103,245,.25)}
+  .sg-mission__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .sg-badge--lvl{background:rgba(0,191,220,.15);color:#00BFDC;padding:2px 8px;border-radius:999px;font-size:.78rem;margin-left:6px}
+  .sg-mission__prog{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .sg-tier--gold{color:#f5c542}.sg-tier--silver{color:#cfd6e4}.sg-tier--bronze{color:#cd7f4e}.sg-tier--none{color:#888}
+  .sg-rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;margin-top:14px}
+  .sg-ring{text-align:center}
+  .sg-ring__dial{--pct:0;--ring:#1467F5;width:92px;height:92px;margin:0 auto;border-radius:50%;
+    background:conic-gradient(var(--ring) calc(var(--pct)*1%),rgba(255,255,255,.08) 0);
+    display:flex;align-items:center;justify-content:center;transition:background .6s ease}
+  .sg-ring--bronze .sg-ring__dial{--ring:#cd7f4e}
+  .sg-ring--silver .sg-ring__dial{--ring:#cfd6e4}
+  .sg-ring--gold .sg-ring__dial{--ring:#f5c542;box-shadow:0 0 14px rgba(245,197,66,.4);animation:sg-pulse 1.8s ease-in-out infinite}
+  @keyframes sg-pulse{0%,100%{box-shadow:0 0 10px rgba(245,197,66,.3)}50%{box-shadow:0 0 20px rgba(245,197,66,.6)}}
+  .sg-ring__inner{width:70px;height:70px;border-radius:50%;background:var(--sg-bg,#0A0A0D);
+    display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .sg-ring__val{font-size:1.3rem;font-weight:700;line-height:1}
+  .sg-ring__goal{font-size:.72rem}
+  .sg-ring__label{margin-top:6px;font-weight:600}
+  .sg-ring__tiers{font-size:.72rem}
+  .sg-ring__hint{margin-top:2px}
+  .sg-quest__bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);margin-top:6px;overflow:hidden}
+  .sg-quest__fill{height:100%;background:linear-gradient(90deg,#1467F5,#00BFDC);transition:width .6s ease}
+  .sg-rec{white-space:nowrap}
+  .sg-ok{color:#17b26a}
 </style>
 {% endblock %}

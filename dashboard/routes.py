@@ -621,6 +621,69 @@ def me_today():
     except Exception:  # noqa: BLE001
         db.session.rollback()
 
+    # миссия дня + прогресс геймификации (Этап 5)
+    mission = None
+    progress = None
+    quest = None
+    try:
+        from ops.missions import (
+            generate_mission, evaluate_mission, _progress, team_quest,
+            LEVEL_METRICS, LEVEL_NAMES, METRIC_LABELS, RANK, xp_total, xp_since,
+        )
+        from ops.metrics import _is_working_day
+        if _is_working_day(today):
+            generate_mission(target, today)
+            m = evaluate_mission(target, today, finalize=False)
+            prog = _progress(target.id)
+            metrics = LEVEL_METRICS.get(m.level, LEVEL_METRICS[1])
+            targets = m.targets or {}
+            results = m.results or {}
+            rings = []
+            for mk in metrics:
+                t = targets.get(mk, {})
+                val = int(results.get(mk, 0))
+                gold = int(t.get("gold", 0))
+                silver = int(t.get("silver", 0))
+                bronze = int(t.get("bronze", 0))
+                ceil_v = gold or silver or 1
+                rings.append({
+                    "metric": mk, "label": METRIC_LABELS.get(mk, mk),
+                    "value": val, "bronze": bronze, "silver": silver, "gold": gold,
+                    "pct": min(100, round(val / ceil_v * 100)) if ceil_v else 0,
+                    "tier": (
+                        "gold" if gold and val >= gold else
+                        "silver" if silver and val >= silver else
+                        "bronze" if bronze and val >= bronze else "none"
+                    ),
+                    # сколько осталось до следующего тира (подсказка «до финиша»)
+                    "next_label": (
+                        None if gold and val >= gold else
+                        ("золота" if silver and val >= silver else
+                         "серебра" if bronze and val >= bronze else "бронзы")
+                    ),
+                    "next_need": (
+                        0 if gold and val >= gold else
+                        max(0, gold - val) if (silver and val >= silver) else
+                        max(0, silver - val) if (bronze and val >= bronze) else
+                        max(0, bronze - val)
+                    ),
+                })
+            mission = {
+                "level": m.level, "level_name": LEVEL_NAMES.get(m.level, ""),
+                "tier": m.tier_reached or "none", "rings": rings,
+            }
+            progress = {
+                "level": prog.level, "streak": prog.streak_days or 0,
+                "streak_best": prog.streak_best or 0,
+                "freezes": prog.freezes_available or 0,
+                "records": prog.records or {},
+                "xp_total": xp_total(target.id),
+                "xp_week": xp_since(target.id, datetime.utcnow() - _td(days=7)),
+            }
+            quest = team_quest()
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+
     return render_template(
         "dashboard/me_today.html",
         payback=payback,
@@ -629,6 +692,7 @@ def me_today():
         first_action_label=first_action_label,
         heatmap=heatmap, hours=hours, metric=metric, heatmap_metrics=_HEATMAP_METRICS,
         month=month,
+        mission=mission, progress=progress, quest=quest,
     )
 
 

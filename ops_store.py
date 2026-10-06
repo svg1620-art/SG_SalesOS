@@ -44,7 +44,36 @@ OPS_DEFAULTS = {
     "board_afternoon_hour": "15",     # час, с которого применяется правило дозвонов
     "heatmap_window_days": "30",      # окно командной тепловой карты
     "forecast_baseline_days": "20",   # раб. дней для run-rate прогноза
+    # --- Этап 5: миссии и геймификация ---
+    "xp_step_rub": "50000", "xp_per_step": "50",
+    "xp_day_bronze": "10", "xp_day_silver": "20", "xp_day_gold": "35",
+    "xp_qualified": "5", "xp_meeting_set": "10", "xp_meeting_held": "20",
+    "xp_invoice": "25", "xp_record": "15", "xp_level_up": "100",
+    "xp_streak_5": "20", "xp_streak_10": "40", "xp_streak_20": "80", "xp_streak_40": "150",
+    "xp_team_quest": "50",
+    "gold_ratio": "1.25", "bronze_ratio": "0.8",
+    "floor_silver_json": ('{"calls_connected":20,"touches":10,"messages_out":15,'
+                          '"qualified":2,"meetings_set":1,"meetings_held":1,"invoices":1}'),
+    "level_promote_need": "8", "level_window": "10", "level_demote_need": "6",
+    "streak_freeze_every": "10", "streak_freeze_max": "2",
+    "quality_gate_min_calls": "3",
+    "max_messages_per_contact_day": "10",
+    "team_quest_metric": "meetings_held",  # метрика квеста недели
+    "team_quest_target": "0",              # 0 — квест выключен
+    "team_quest_label": "",
 }
+
+
+def ops_json(key: str, default=None):
+    """Значение-настройка в виде JSON (dict/list)."""
+    import json
+    raw = get_ops_setting(key)
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except Exception:  # noqa: BLE001
+        return default
 
 
 def get_ops_setting(key: str):

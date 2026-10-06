@@ -14,8 +14,31 @@
     </form>
   </div>
 
+  <div class="sg-sm" style="margin-bottom:10px">
+    <a class="sg-chip {{ 'sg-chip--active' if tab != 'xp' }}" href="{{ url_for('leaderboard.index', month=month_value) }}">Выручка</a>
+    <a class="sg-chip {{ 'sg-chip--active' if tab == 'xp' }}" href="{{ url_for('leaderboard.index', month=month_value, tab='xp') }}">XP за неделю</a>
+  </div>
+  <style>.sg-chip{display:inline-block;padding:3px 12px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}.sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}</style>
+
+  {% if tab == 'xp' %}
+  <p class="sg-muted sg-sm">Рейтинг по заработанному XP за последние 7 дней (процесс важнее результата —
+    отстающий по выручке может быть первым за счёт ритма).</p>
+  <table class="sg-table">
+    <thead><tr><th>#</th><th>Менеджер</th><th>XP за неделю</th><th>XP всего</th></tr></thead>
+    <tbody>
+      {% for r in xp_rows %}
+      <tr><td>{{ r.rank }}</td><td>{{ r.name }}</td>
+          <td class="sg-mono"><b>{{ r.xp_week }}</b></td>
+          <td class="sg-mono sg-muted">{{ r.xp_total }}</td></tr>
+      {% else %}
+      <tr><td colspan="4" class="sg-muted">Пока нет начислений XP.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+
   <p class="sg-muted sg-sm">
-    Рейтинг менеджеров отдела продаж по выручке за месяц.
+    Рейтинг менеджеров отдела продаж по <b>первой выручке</b> за месяц.
     За каждые {{ '{:,}'.format(xp_step).replace(',', ' ') }} руб — <b>+{{ xp_per_step }} XP</b>.
     Всего выручки за месяц: <b class="sg-mono">{{ total_revenue_fmt }} ₽</b>.
     <span class="sg-muted sg-sm">Сделок за месяц: {{ deals_this_month }}, всего в базе: {{ total_deals }}.</span>
@@ -99,6 +122,7 @@
         {% endfor %}
       </tbody>
     </table>
+  {% endif %}
   {% endif %}
 </section>
 {% endblock %}

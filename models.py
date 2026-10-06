@@ -611,3 +611,56 @@ class RopCostAllocation(db.Model):
 
     rop = db.relationship("User", foreign_keys=[rop_user_id])
     manager = db.relationship("User", foreign_keys=[manager_id])
+
+
+# --- Ops Metrics Этап 5: миссии и геймификация --------------------------------
+
+class DailyMission(db.Model):
+    """Дневная миссия менеджера: цели (тиры) и результат."""
+
+    __tablename__ = "daily_missions"
+
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    date = db.Column(db.Date, primary_key=True)
+    level = db.Column(db.Integer, nullable=False, default=1)
+    targets = db.Column(db.JSON)   # {metric: {bronze, silver, gold}}
+    results = db.Column(db.JSON)    # {metric: value}
+    tier_reached = db.Column(db.String(10), nullable=False, default="none")  # none|bronze|silver|gold
+    xp_awarded = db.Column(db.Integer, nullable=False, default=0)
+    finalized = db.Column(db.Boolean, nullable=False, default=False)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class ManagerProgress(db.Model):
+    """Прогресс геймификации менеджера: уровень, серия, заморозки, рекорды."""
+
+    __tablename__ = "manager_progress"
+
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    level = db.Column(db.Integer, nullable=False, default=1)
+    streak_days = db.Column(db.Integer, nullable=False, default=0)
+    streak_best = db.Column(db.Integer, nullable=False, default=0)
+    freezes_available = db.Column(db.Integer, nullable=False, default=0)
+    records = db.Column(db.JSON)   # {metric: {value, date}}
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class XpLedger(db.Model):
+    """Единый журнал XP (идемпотентно по source+ref)."""
+
+    __tablename__ = "xp_ledger"
+
+    id = db.Column(db.Integer, primary_key=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    occurred_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    source = db.Column(db.String(30), nullable=False)
+    amount = db.Column(db.Integer, nullable=False, default=0)
+    ref = db.Column(db.String(80), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("source", "ref", name="uq_xp_ledger_source_ref"),
+    )

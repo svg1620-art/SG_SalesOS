@@ -260,11 +260,14 @@ def poll_deals(app=None, congratulate=None) -> dict:
                 if responsible else None
             )
             won_at = datetime.utcfromtimestamp(closed_ts)  # дата закрытия
+            ckey, company_id = _client_key(lead) if outcome == "won" else (None, None)
 
             deal = Deal(
                 amo_lead_id=lead_id,
                 manager_id=manager.id if manager else None,
                 amo_contact_id=_main_contact_id(lead),
+                amo_company_id=company_id,
+                client_key=ckey,
                 price=price,
                 name=(lead.get("name") or "")[:500],
                 pipeline_id=lead.get("pipeline_id"),
@@ -276,13 +279,22 @@ def poll_deals(app=None, congratulate=None) -> dict:
             db.session.commit()
             new_count += 1
 
-            # XP и поздравление — только за свежие ВЫИГРАННЫЕ сделки
+            # первая ли это выручка клиента (для поздравления только за первую, §9.4)
+            is_first = True
+            if outcome == "won" and ckey:
+                earlier = Deal.query.filter(
+                    Deal.client_key == ckey, Deal.outcome == "won",
+                    Deal.won_at < won_at, Deal.amo_lead_id != lead_id,
+                ).first()
+                is_first = earlier is None
+
+            # XP и поздравление — только за свежие ВЫИГРАННЫЕ ПЕРВЫЕ сделки
             eligible = (
                 outcome == "won"
                 and congratulate and manager and price > 0
                 and won_at >= congrats_after
                 and congrats_sent < _MAX_CONGRATS_PER_RUN
-                and in_target  # поздравляем только за воронку лидерборда
+                and in_target and is_first  # первая выручка, воронка лидерборда
             )
             if eligible:
                 total_after = manager_revenue_in_month(
@@ -299,6 +311,14 @@ def poll_deals(app=None, congratulate=None) -> dict:
 
     if max_updated:
         set_setting("amo_deals_last_sync", max_updated)
+    # первая выручка + XP-леджер (§8.0/§9.4)
+    try:
+        recompute_first_revenue(app)
+        from ops.missions import backfill_first_revenue_xp
+        backfill_first_revenue_xp(app)
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        app.logger.warning("[deals] пересчёт первой выручки/XP пропущен: %s", exc)
     app.logger.info(
         "[deals] опрос завершён: получено %s, закрытых %s, в воронке %s, "
         "новых %s, удалено %s (backfill=%s)",
@@ -545,12 +565,14 @@ def import_won(app=None, max_pages: int = _WON_MAX_PAGES) -> dict:
         app.logger.warning("[deals] быстрый импорт выигранных упал: %s", exc)
         return {"ok": False, "error": str(exc)}
 
-    # пометить первую выручку клиента после импорта (§8.0)
+    # пометить первую выручку клиента после импорта (§8.0) + XP-леджер (§9.4)
     try:
         recompute_first_revenue(app)
+        from ops.missions import backfill_first_revenue_xp
+        backfill_first_revenue_xp(app)
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
-        app.logger.warning("[deals] пересчёт первой выручки пропущен: %s", exc)
+        app.logger.warning("[deals] пересчёт первой выручки/XP пропущен: %s", exc)
 
     result = {
         "ok": True, "imported": imported, "updated": updated, "seen": seen,

@@ -41,6 +41,26 @@ def _fmt_money(rub: int) -> str:
     return f"{int(rub or 0):,}".replace(",", " ")
 
 
+def _xp_total(manager_id: int) -> int:
+    from ops.missions import xp_total
+    return xp_total(manager_id)
+
+
+def _xp_week_rows(managers):
+    """Рейтинг по XP за последние 7 дней (из xp_ledger)."""
+    from datetime import timedelta
+    from ops.missions import xp_since, xp_total
+    since = datetime.utcnow() - timedelta(days=7)
+    rows = [{
+        "manager": m, "name": m.full_name or m.email,
+        "xp_week": xp_since(m.id, since), "xp_total": xp_total(m.id),
+    } for m in managers]
+    rows.sort(key=lambda r: (-r["xp_week"], -r["xp_total"], r["name"].lower()))
+    for i, r in enumerate(rows, start=1):
+        r["rank"] = i
+    return rows
+
+
 @leaderboard_bp.route("/leaderboard")
 @login_required
 def index():
@@ -72,8 +92,10 @@ def index():
     # выручка за месяц по менеджеру (только сделки выбранной воронки, если задана)
     from settings_store import leaderboard_pipeline_id
     pid = leaderboard_pipeline_id()
+    # §9.4: лидерборд по ВЫРУЧКЕ считается по первой выручке клиента
     deals_q = Deal.query.filter(
-        Deal.outcome == "won", Deal.won_at >= start, Deal.won_at < end
+        Deal.outcome == "won", Deal.is_first_revenue.is_(True),
+        Deal.won_at >= start, Deal.won_at < end,
     )
     if pid is not None:
         deals_q = deals_q.filter(Deal.pipeline_id == pid)
@@ -109,7 +131,7 @@ def index():
             "revenue": revenue,
             "revenue_fmt": _fmt_money(revenue),
             "deals": deals_by_mgr.get(m.id, 0),
-            "xp": xp_for_revenue(revenue),
+            "xp": _xp_total(m.id),
             "in_sales": in_sales,
         })
 
@@ -121,8 +143,8 @@ def index():
 
     total_revenue = sum(r["revenue"] for r in rows)
 
-    # диагностика: сколько всего ВЫИГРАННЫХ сделок и в каких месяцах есть данные
-    won_q = Deal.query.filter(Deal.outcome == "won")
+    # диагностика: сколько всего ВЫИГРАННЫХ (первых) сделок и в каких месяцах
+    won_q = Deal.query.filter(Deal.outcome == "won", Deal.is_first_revenue.is_(True))
     if pid is not None:
         won_q = won_q.filter(Deal.pipeline_id == pid)
     total_deals = won_q.count()
@@ -140,9 +162,13 @@ def index():
             for (y, mo), cnt in sorted(seen.items(), reverse=True)
         ]
 
+    tab = request.args.get("tab", "revenue")
+    xp_rows = _xp_week_rows(all_managers if all_managers else managers) if tab == "xp" else []
+
     return render_template(
         "leaderboard/index.html",
         rows=rows,
+        tab=tab, xp_rows=xp_rows,
         month_label=f"{_RU_MONTHS[m_num]} {m_year}",
         month_value=f"{m_year:04d}-{m_num:02d}",
         total_revenue_fmt=_fmt_money(total_revenue),

@@ -265,14 +265,36 @@ def _add_schedule_jobs(app: Flask) -> None:
                 recompute_today(app)
             except Exception as exc:  # noqa: BLE001
                 app.logger.warning("[ops_metrics] пересчёт за сегодня пропущен: %s", exc)
+            # оценка миссий за сегодня (без финализации) — обновить кольца/XP
+            try:
+                from ops.missions import evaluate_all
+                evaluate_all(app, finalize=False)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[missions] оценка за сегодня пропущена: %s", exc)
 
     def _run_ops_recompute_yesterday():
         with app.app_context():
+            from datetime import timedelta as _td
+            from utils import now_local
             try:
                 from ops.metrics import recompute_yesterday
                 recompute_yesterday(app)
             except Exception as exc:  # noqa: BLE001
                 app.logger.warning("[ops_metrics] пересчёт за вчера пропущен: %s", exc)
+            # финализация миссий за вчера (серии/уровни/бейджи)
+            try:
+                from ops.missions import evaluate_all
+                evaluate_all(app, day=now_local().date() - _td(days=1), finalize=True)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[missions] финализация за вчера пропущена: %s", exc)
+
+    def _run_ops_generate_missions():
+        with app.app_context():
+            try:
+                from ops.missions import generate_all
+                generate_all(app)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[missions] генерация пропущена: %s", exc)
 
     tz = app.config.get("TZ") or "UTC"
     t_hour, d_hour = telegram_hour(app), digest_hour(app)
@@ -302,6 +324,10 @@ def _add_schedule_jobs(app: Flask) -> None:
     scheduler.add_job(
         _run_ops_recompute_yesterday, CronTrigger(hour=0, minute=30, timezone=tz),
         id="ops_recompute_yesterday", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _run_ops_generate_missions, CronTrigger(hour=6, minute=0, timezone=tz),
+        id="ops_generate_missions", replace_existing=True, max_instances=1, coalesce=True,
     )
     app.logger.info(
         "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",
