@@ -48,7 +48,7 @@
   {# график по дням #}
   <div class="sg-card sg-card--pad" style="margin-top:16px">
     <h3 class="sg-h3">По дням</h3>
-    <canvas id="callsChart" height="90"></canvas>
+    <div style="position:relative;height:260px"><canvas id="callsChart"></canvas></div>
   </div>
 
   {# таблица по менеджерам #}
@@ -106,19 +106,25 @@
 
 <script>
 (function(){
-  var el=document.getElementById('callsChart');
-  if(!el || !window.Chart) return;
-  var labels={{ data.days | map(attribute='date') | map('string') | list | tojson }};
-  var attempts={{ data.days | map(attribute='attempts') | list | tojson }};
-  var pickups={{ data.days | map(attribute='pickups') | list | tojson }};
-  var talks={{ data.days | map(attribute='talks') | list | tojson }};
-  var lbl=labels.map(function(s){return s.slice(8,10)+'.'+s.slice(5,7);});
-  new Chart(el,{type:'bar',data:{labels:lbl,datasets:[
-    {label:'Попытки',data:attempts,backgroundColor:'rgba(255,255,255,.12)'},
-    {label:'Дозвоны',data:pickups,backgroundColor:'rgba(20,103,245,.65)'},
-    {label:'Разговоры',data:talks,backgroundColor:'rgba(0,191,220,.75)'}
-  ]},options:{responsive:true,plugins:{legend:{labels:{color:'#aaa'}}},
-    scales:{x:{stacked:false,ticks:{color:'#888'}},y:{beginAtZero:true,ticks:{color:'#888'}}}}});
+  function draw(){
+    var el=document.getElementById('callsChart');
+    if(!el) return;
+    if(!window.Chart){ setTimeout(draw, 120); return; }  // ждём defer-загрузку Chart.js
+    var labels={{ data.days | map(attribute='date') | map('string') | list | tojson }};
+    var attempts={{ data.days | map(attribute='attempts') | list | tojson }};
+    var pickups={{ data.days | map(attribute='pickups') | list | tojson }};
+    var talks={{ data.days | map(attribute='talks') | list | tojson }};
+    var lbl=labels.map(function(s){return s.slice(8,10)+'.'+s.slice(5,7);});
+    new Chart(el,{type:'bar',data:{labels:lbl,datasets:[
+      {label:'Попытки',data:attempts,backgroundColor:'rgba(255,255,255,.12)'},
+      {label:'Дозвоны',data:pickups,backgroundColor:'rgba(20,103,245,.65)'},
+      {label:'Разговоры',data:talks,backgroundColor:'rgba(0,191,220,.75)'}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#aaa'}}},
+      scales:{x:{stacked:false,ticks:{color:'#888'}},y:{beginAtZero:true,ticks:{color:'#888'}}}}});
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', draw);
+  } else { draw(); }
 })();
 </script>
 <style>
