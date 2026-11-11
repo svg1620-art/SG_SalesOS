@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "ops/_engagement.html" import eng_styles, eng_panel %}
 {% block title %}Мой день — SG SalesOS{% endblock %}
 
 {% block content %}
@@ -129,6 +130,16 @@
       </table>
     </div>
   </div>
+
+  {# --- Вовлечённость --- #}
+  {% if eng %}
+  {{ eng_styles() }}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Вовлечённость</h3>
+    <p class="sg-muted sg-sm" style="margin-top:-2px">Все касания (действия) по часам: когда ты реально в работе.</p>
+    {{ eng_panel(eng, eng_metric_chips) }}
+  </div>
+  {% endif %}
 
   {# --- Месяц --- #}
   <div class="sg-card sg-card--pad" style="margin-top:16px">

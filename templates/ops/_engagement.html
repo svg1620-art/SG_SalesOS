@@ -1,0 +1,157 @@
+{# Блок «Вовлечённость»: тепловая карта активности по часам.
+   Использование:
+     {% from "ops/_engagement.html" import eng_styles, eng_panel, eng_team %}
+     {{ eng_styles() }}
+     {{ eng_panel(eng, metric_chips) }}
+     {{ eng_team(team, mgr_chips) }}   {# только РОП #}
+#}
+
+{% macro eng_styles() %}
+<style>
+  .eng{--eng-muted:#8A8A96;--eng-faint:#5c5c66}
+  .eng .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .eng .kpi{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:12px 13px}
+  .eng .kpi .k{font-size:.72rem;color:var(--eng-muted);text-transform:uppercase;letter-spacing:.04em}
+  .eng .kpi .v{font-size:1.5rem;font-weight:800;line-height:1.1;margin-top:5px}
+  .eng .kpi .v small{font-size:.78rem;font-weight:600;color:var(--eng-muted)}
+  .eng .kpi .meta{font-size:.76rem;color:var(--eng-muted);margin-top:2px}
+  .eng .chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+  .eng .echip{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:var(--eng-muted);
+    border-radius:999px;padding:5px 12px;font-size:.82rem;font-weight:600;text-decoration:none;
+    display:inline-flex;align-items:center;gap:7px}
+  .eng .echip--on{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+  .eng .echip .d{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .eng .hmwrap,.eng .cowrap{overflow-x:auto}
+  .eng table.hm{border-collapse:separate;border-spacing:4px;min-width:560px}
+  .eng table.hm th{font-family:var(--sg-mono,monospace);font-size:.72rem;color:var(--eng-muted);font-weight:500;padding:1px}
+  .eng table.hm td.day{font-family:var(--sg-mono,monospace);font-size:.74rem;color:var(--eng-muted);white-space:nowrap;text-align:right;padding-right:4px}
+  .eng .cell{width:42px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--sg-mono,monospace);font-size:.76rem;font-weight:700;border:1px solid rgba(255,255,255,.04)}
+  .eng .legend{display:flex;align-items:center;gap:7px;font-size:.76rem;color:var(--eng-muted)}
+  .eng .legbar{display:flex;gap:3px}
+  .eng .legbar i{width:20px;height:11px;border-radius:3px;display:block}
+  .eng .compose{display:grid;gap:7px;align-items:end;height:160px}
+  .eng .bar{display:flex;flex-direction:column-reverse;height:100%;gap:2px}
+  .eng .seg{border-radius:3px}
+  .eng .barlabels{display:grid;gap:7px;margin-top:5px}
+  .eng .barlabels span{font-family:var(--sg-mono,monospace);font-size:.7rem;color:var(--eng-muted);text-align:center}
+  .eng .tleg{display:flex;gap:13px;flex-wrap:wrap;font-size:.8rem}
+  .eng .tleg span{display:inline-flex;align-items:center;gap:6px;color:var(--eng-muted)}
+  .eng .tleg i{width:11px;height:11px;border-radius:3px}
+  .eng table.team{border-collapse:separate;border-spacing:4px;min-width:600px}
+  .eng table.team th{font-family:var(--sg-mono,monospace);font-size:.7rem;color:var(--eng-muted);font-weight:500}
+  .eng table.team td.tname{white-space:nowrap;padding-right:8px;font-size:.86rem;font-weight:600}
+  .eng table.team td.tname a{color:inherit;text-decoration:none}
+  .eng table.team td.tname .mn{color:var(--eng-muted);font-weight:500;font-size:.76rem}
+  .eng .tcell{width:38px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.04)}
+  .eng .engnote{color:var(--eng-muted);font-size:.8rem;margin-top:10px}
+  @media(max-width:720px){.eng .kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
+{% endmacro %}
+
+{% macro _legbar() %}<span class="legbar">
+  <i style="background:rgba(20,103,245,.12)"></i><i style="background:rgba(20,103,245,.3)"></i>
+  <i style="background:rgba(20,103,245,.5)"></i><i style="background:rgba(20,103,245,.72)"></i>
+  <i style="background:rgba(20,103,245,.95)"></i></span>{% endmacro %}
+
+{% macro eng_panel(eng, metric_chips) %}
+<div class="eng">
+  <div class="kpis">
+    <div class="kpi"><div class="k">Активных часов</div>
+      <div class="v"><span class="sg-mono">{{ eng.kpi.active_hours }}</span> <small>/ {{ eng.kpi.work_hours }}</small></div>
+      <div class="meta">часы с действиями</div></div>
+    <div class="kpi"><div class="k">Первое действие</div>
+      <div class="v"><span class="sg-mono">{{ '%02d:00'|format(eng.kpi.first_h) if eng.kpi.first_h is not none else '—' }}</span></div>
+      <div class="meta">старт дня</div></div>
+    <div class="kpi"><div class="k">Последнее</div>
+      <div class="v"><span class="sg-mono">{{ '%02d:00'|format(eng.kpi.last_h) if eng.kpi.last_h is not none else '—' }}</span></div>
+      <div class="meta">конец активности</div></div>
+    <div class="kpi"><div class="k">Всего касаний</div>
+      <div class="v"><span class="sg-mono">{{ eng.kpi.total_today }}</span></div>
+      <div class="meta">за сегодня</div></div>
+    <div class="kpi"><div class="k">Тихое окно</div>
+      <div class="v"><span class="sg-mono">{{ eng.kpi.quiet_gap }}</span> <small>ч</small></div>
+      <div class="meta">макс. пауза в смене</div></div>
+  </div>
+
+  {% if metric_chips %}
+  <div class="chips">
+    {% for c in metric_chips %}
+    <a class="echip {{ 'echip--on' if c.active }}" href="{{ c.url }}">
+      <span class="d" style="background:{{ c.color }}"></span>{{ c.label }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="chead" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 8px">
+    <div class="sg-muted sg-sm">Ритм: часы × последние {{ eng.days|length }} рабочих дней</div>
+    <div class="legend">меньше {{ _legbar() }} больше</div>
+  </div>
+  <div class="hmwrap">
+    <table class="hm">
+      <tr><th></th>{% for h in eng.hours %}<th>{{ h }}</th>{% endfor %}</tr>
+      {% for row in eng.grid %}
+      {% set d = loop.index0 %}
+      <tr>
+        <td class="day">{{ eng.days[d].label }}{{ ' · сег' if eng.days[d].is_today }}</td>
+        {% for cell in row %}
+        <td><div class="cell" style="background:{{ cell.bg }};color:{{ cell.fg }}"
+                 title="{{ eng.days[d].label }}, {{ eng.hours[loop.index0] }}:00 — {{ cell.v }} касаний">{{ cell.v or '' }}</div></td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="chead" style="margin:16px 0 6px"><div class="sg-muted sg-sm">Из чего складывается активность сегодня</div></div>
+  <div class="tleg" style="margin-bottom:8px">
+    {% for t in eng.types %}<span><i style="background:{{ t.color }}"></i>{{ t.label }}</span>{% endfor %}
+  </div>
+  <div class="cowrap">
+    <div class="compose" style="grid-template-columns:repeat({{ eng.hours|length }},minmax(32px,1fr));min-width:{{ eng.hours|length * 40 }}px">
+      {% for col in eng.composition %}
+      <div class="bar" title="{{ col.hour }}:00 — {{ col.total }} касаний">
+        {% for s in col.segs %}<div class="seg" style="height:{{ s.pct }}%;background:{{ s.color }};{{ 'display:none' if not s.val }}"></div>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="barlabels" style="grid-template-columns:repeat({{ eng.hours|length }},minmax(32px,1fr));min-width:{{ eng.hours|length * 40 }}px">
+      {% for col in eng.composition %}<span>{{ col.hour }}</span>{% endfor %}
+    </div>
+  </div>
+
+  {% if not eng.crm_tasks_present %}
+  <p class="engnote">«CRM-записи» и «Задачи» пока не собираются из amoCRM — появятся после расширения сбора событий. Сейчас в касаниях — звонки и сообщения.</p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro eng_team(team, mgr_chips) %}
+<div class="eng">
+  {% if mgr_chips %}
+  <div class="chips">
+    <span class="sg-muted sg-sm" style="align-self:center;margin-right:4px">Разбор по менеджеру:</span>
+    {% for c in mgr_chips %}<a class="echip {{ 'echip--on' if c.active }}" href="{{ c.url }}">{{ c.name }}</a>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="chead" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 8px">
+    <div class="sg-muted sg-sm">Команда сегодня: суммарные касания по часам</div>
+    <div class="legend">меньше {{ _legbar() }} больше</div>
+  </div>
+  <div class="hmwrap">
+    <table class="team">
+      <tr><th></th>{% for h in team.hours %}<th>{{ h }}</th>{% endfor %}</tr>
+      {% for r in team.rows %}
+      <tr>
+        <td class="tname"><a href="{{ url_for('dashboard.index', eng_manager=r.manager_id) }}">{{ r.name }}</a> <span class="mn sg-mono">{{ r.total }}</span></td>
+        {% for cell in r.cells %}
+        <td><div class="tcell" style="background:{{ cell.bg }}" title="{{ r.name }}, {{ team.hours[loop.index0] }}:00 — {{ cell.v }}"></div></td>
+        {% endfor %}
+      </tr>
+      {% else %}
+      <tr><td class="sg-muted" style="padding:8px">Сегодня активности нет.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endmacro %}

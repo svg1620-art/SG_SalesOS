@@ -338,6 +338,44 @@ def index():
         m_year, m_num = now_l.year, now_l.month
     bars = _build_month_bars(m_year, m_num, dept_manager_ids)
 
+    # --- вовлечённость: команда сегодня + разбор по выбранному менеджеру ---
+    from ops.engagement import manager_engagement, team_engagement, TOUCH_TYPES
+    eng_metric = request.args.get("eng_metric", "all")
+    if eng_metric not in {"all", "calls", "msgs", "crm", "tasks"}:
+        eng_metric = "all"
+    eng_sel = request.args.get("eng_manager")
+    eng_sel_id = int(eng_sel) if eng_sel and eng_sel.isdigit() else (
+        managers[0].id if managers else None
+    )
+    try:
+        eng_team_data = team_engagement(dept_manager_ids)
+        eng = manager_engagement(eng_sel_id, eng_metric) if eng_sel_id else None
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        eng_team_data, eng = None, None
+
+    def _eng_url(**kw):
+        p = {"department_id": department_id, "eng_manager": eng_sel_id, "eng_metric": eng_metric}
+        p.update(kw)
+        return url_for("dashboard.index", **p)
+
+    eng_metric_chips = [{
+        "key": "all", "label": "Все", "color": "var(--sg-blue,#1467F5)",
+        "active": eng_metric == "all", "url": _eng_url(eng_metric="all"),
+    }]
+    for _k, _t, _c, _lb in TOUCH_TYPES:
+        eng_metric_chips.append({
+            "key": _k, "label": _lb, "color": _c,
+            "active": eng_metric == _k, "url": _eng_url(eng_metric=_k),
+        })
+    eng_mgr_chips = [{
+        "name": m.full_name or m.email, "active": m.id == eng_sel_id,
+        "url": _eng_url(eng_manager=m.id),
+    } for m in managers]
+    eng_selected_name = next(
+        (m.full_name or m.email for m in managers if m.id == eng_sel_id), None
+    )
+
     return render_template(
         "dashboard/index.html",
         kpi=kpi,
@@ -348,6 +386,9 @@ def index():
         next_step_calls=next_step_calls,
         departments=departments,
         bars=bars,
+        eng=eng, eng_team_data=eng_team_data,
+        eng_metric_chips=eng_metric_chips, eng_mgr_chips=eng_mgr_chips,
+        eng_selected_name=eng_selected_name,
         filters={
             "from": df_naive.strftime("%Y-%m-%d"),
             "to": dt_naive.strftime("%Y-%m-%d"),
@@ -684,6 +725,36 @@ def me_today():
     except Exception:  # noqa: BLE001
         db.session.rollback()
 
+    # --- вовлечённость менеджера (личный блок) ---
+    eng = None
+    eng_metric_chips = []
+    try:
+        from ops.engagement import manager_engagement, TOUCH_TYPES
+        eng_metric = request.args.get("eng_metric", "all")
+        if eng_metric not in {"all", "calls", "msgs", "crm", "tasks"}:
+            eng_metric = "all"
+        eng = manager_engagement(target.id, eng_metric, up_to=today)
+        is_self_flag = (target.id == current_user.id)
+
+        def _eng_url2(key):
+            p = {"eng_metric": key, "metric": metric}
+            if not is_self_flag:
+                p["manager_id"] = target.id
+            return url_for("dashboard.me_today", **p)
+
+        eng_metric_chips = [{
+            "key": "all", "label": "Все", "color": "var(--sg-blue,#1467F5)",
+            "active": eng_metric == "all", "url": _eng_url2("all"),
+        }]
+        for _k, _t, _c, _lb in TOUCH_TYPES:
+            eng_metric_chips.append({
+                "key": _k, "label": _lb, "color": _c,
+                "active": eng_metric == _k, "url": _eng_url2(_k),
+            })
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        eng, eng_metric_chips = None, []
+
     return render_template(
         "dashboard/me_today.html",
         payback=payback,
@@ -693,6 +764,7 @@ def me_today():
         heatmap=heatmap, hours=hours, metric=metric, heatmap_metrics=_HEATMAP_METRICS,
         month=month,
         mission=mission, progress=progress, quest=quest,
+        eng=eng, eng_metric_chips=eng_metric_chips,
     )
 
 
