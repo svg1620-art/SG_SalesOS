@@ -123,6 +123,93 @@ def _sync_calls(client, from_dt, to_dt, mgr_map, existing_ids, counters) -> None
             counters.setdefault("errors", []).append(f"calls/{entity}: {exc}")
 
 
+def _sync_notes(client, from_dt, to_dt, mgr_map, existing_ids, counters) -> None:
+    """Примечания (common) контактов и сделок → события type='note' (касания)."""
+    from_ts = int(from_dt.timestamp())
+    for entity in ("contacts", "leads"):
+        try:
+            for note in client.iter_notes(entity, ["common"], since_ts=from_ts, max_pages=100):
+                occurred_ts = int(note.get("created_at") or 0)
+                if not occurred_ts:
+                    continue
+                occurred = datetime.utcfromtimestamp(occurred_ts)
+                if occurred < from_dt or occurred > to_dt:
+                    continue
+                note_id = note.get("id")
+                if note_id is None:
+                    continue
+                amo_event_id = f"note:{note_id}"
+                if amo_event_id in existing_ids:
+                    continue
+                created_by = note.get("created_by") or 0
+                ent_id = note.get("entity_id")
+                db.session.add(OpsActivityEvent(
+                    amo_event_id=amo_event_id,
+                    manager_id=mgr_map.get(created_by),
+                    amo_user_id=created_by or None,
+                    type="note",
+                    contact_id=ent_id if entity == "contacts" else None,
+                    lead_id=ent_id if entity == "leads" else None,
+                    occurred_at=occurred,
+                    is_connected=False,
+                    raw=note,
+                ))
+                existing_ids.add(amo_event_id)
+                counters["notes"] = counters.get("notes", 0) + 1
+                if counters["notes"] % 500 == 0:
+                    db.session.commit()
+            db.session.commit()
+        except AmoError as exc:
+            db.session.rollback()
+            counters.setdefault("errors", []).append(f"notes/{entity}: {exc}")
+
+
+def _sync_tasks(client, from_dt, to_dt, mgr_map, existing_ids, counters) -> None:
+    """Выполненные задачи → события type='task_done' (касания).
+
+    Момент касания — updated_at (когда задачу отметили выполненной).
+    """
+    from_ts = int(from_dt.timestamp())
+    try:
+        for task in client.iter_tasks(since_ts=from_ts, max_pages=100):
+            if not task.get("is_completed"):
+                continue
+            occurred_ts = int(task.get("updated_at") or task.get("complete_till") or 0)
+            if not occurred_ts:
+                continue
+            occurred = datetime.utcfromtimestamp(occurred_ts)
+            if occurred < from_dt or occurred > to_dt:
+                continue
+            task_id = task.get("id")
+            if task_id is None:
+                continue
+            amo_event_id = f"task:{task_id}"
+            if amo_event_id in existing_ids:
+                continue
+            uid = task.get("responsible_user_id") or task.get("created_by") or 0
+            ent_type = task.get("entity_type")
+            ent_id = task.get("entity_id")
+            db.session.add(OpsActivityEvent(
+                amo_event_id=amo_event_id,
+                manager_id=mgr_map.get(uid),
+                amo_user_id=uid or None,
+                type="task_done",
+                contact_id=ent_id if ent_type == "contacts" else None,
+                lead_id=ent_id if ent_type == "leads" else None,
+                occurred_at=occurred,
+                is_connected=False,
+                raw=task,
+            ))
+            existing_ids.add(amo_event_id)
+            counters["tasks"] = counters.get("tasks", 0) + 1
+            if counters["tasks"] % 500 == 0:
+                db.session.commit()
+        db.session.commit()
+    except AmoError as exc:
+        db.session.rollback()
+        counters.setdefault("errors", []).append(f"tasks: {exc}")
+
+
 def _status_from_event(ev) -> tuple:
     """(pipeline_id, status_id) из value_after события смены этапа, иначе (None,None)."""
     for item in (ev.get("value_after") or []):
@@ -231,6 +318,8 @@ def _run(app, kind: str, from_dt: datetime, to_dt: datetime,
         existing_funnel = _load_existing_funnel()
 
         _sync_calls(client := _client(), from_dt, to_dt, mgr_map, existing_ids, counters)
+        _sync_notes(client, from_dt, to_dt, mgr_map, existing_ids, counters)
+        _sync_tasks(client, from_dt, to_dt, mgr_map, existing_ids, counters)
 
         if kind == "backfill":
             # события — пакетами по дням (прогресс/изоляция)

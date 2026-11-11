@@ -66,6 +66,62 @@ class AmoClient:
                 return
             page += 1
 
+    def iter_notes(self, entity: str, note_types=None, since_ts: int | None = None,
+                   max_pages: int = 50):
+        """Итератор по примечаниям сущности заданных типов (по умолчанию common).
+
+        entity: 'contacts' | 'leads'. since_ts — фильтр по updated_at (unix).
+        """
+        note_types = note_types or ["common"]
+        page = 1
+        while page <= max_pages:
+            params = [("filter[note_type][]", t) for t in note_types]
+            params += [("order[updated_at]", "asc"), ("page", page), ("limit", 250)]
+            if since_ts:
+                params.append(("filter[updated_at][from]", int(since_ts)))
+            r = httpx.get(
+                f"{self.base}/api/v4/{entity}/notes",
+                headers=self._headers(), params=params, timeout=30,
+            )
+            if r.status_code == 204:
+                return
+            if r.status_code != 200:
+                raise AmoError(f"notes HTTP {r.status_code}: {r.text[:200]}")
+            data = r.json()
+            notes = (data.get("_embedded") or {}).get("notes") or []
+            if not notes:
+                return
+            for note in notes:
+                yield note
+            if not (data.get("_links") or {}).get("next"):
+                return
+            page += 1
+
+    def iter_tasks(self, since_ts: int | None = None, max_pages: int = 50):
+        """Итератор по задачам amoCRM (все сущности). since_ts — по updated_at (unix)."""
+        page = 1
+        while page <= max_pages:
+            params = [("order[updated_at]", "asc"), ("page", page), ("limit", 250)]
+            if since_ts:
+                params.append(("filter[updated_at][from]", int(since_ts)))
+            r = httpx.get(
+                f"{self.base}/api/v4/tasks",
+                headers=self._headers(), params=params, timeout=30,
+            )
+            if r.status_code == 204:
+                return
+            if r.status_code != 200:
+                raise AmoError(f"tasks HTTP {r.status_code}: {r.text[:200]}")
+            data = r.json()
+            tasks = (data.get("_embedded") or {}).get("tasks") or []
+            if not tasks:
+                return
+            for task in tasks:
+                yield task
+            if not (data.get("_links") or {}).get("next"):
+                return
+            page += 1
+
     def get_users(self, max_pages: int = 20) -> list[dict]:
         """Все пользователи amoCRM: [{id, name, email}]."""
         users, page = [], 1
