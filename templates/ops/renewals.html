@@ -101,7 +101,105 @@
     <p class="sg-muted sg-sm" style="margin-top:10px">Фокус — <b style="color:var(--sg-cyan,#00BFDC)">рабочее окно</b> и <b style="color:#F5A524">горит</b>. Красное — клиенты, которых уже должны вести, но давно не трогали.</p>
   </div>
 
-  <p class="sg-muted sg-sm" style="margin-top:14px">Следующие этапы: рабочий список на сегодня, тепловая карта касаний, карточка клиента с историей и разбором звонков.</p>
+  {% set zp = {'green':['#39d98a','🟢 на треке'],'yellow':['#f5c542','🟡 риск'],'red':['#ff6b6e','🔴 критично'],'paid':['#39d98a','🟢 продлил'],'churn':['#8A8A96','⚫ отвал']} %}
+  <style>
+    .rring{--p:0;width:84px;height:84px;border-radius:50%;flex:none;background:conic-gradient(var(--sg-cyan,#00BFDC) calc(var(--p)*1%),rgba(255,255,255,.08) 0);display:flex;align-items:center;justify-content:center}
+    .rring .in{width:66px;height:66px;border-radius:50%;background:var(--sg-panel,#141419);display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .rring .in b{font-size:1.3rem;font-family:var(--sg-mono,monospace)} .rring .in span{font-size:.7rem;color:var(--sg-muted,#8A8A96)}
+    .rpill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.76rem;font-weight:700;white-space:nowrap}
+    .rhm{border-collapse:separate;border-spacing:4px;min-width:540px}
+    .rhm th{font-family:var(--sg-mono,monospace);font-size:.72rem;color:var(--sg-muted,#8A8A96);font-weight:500;padding:1px}
+    .rhm td.day{font-family:var(--sg-mono,monospace);font-size:.72rem;color:var(--sg-muted,#8A8A96);text-align:right;padding-right:4px;white-space:nowrap}
+    .rhm .c{width:40px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--sg-mono,monospace);font-size:.72rem;font-weight:700;border:1px solid rgba(255,255,255,.04)}
+    .bdot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  </style>
+
+  {# --- Рабочий список на сегодня --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+      <div><h3 class="sg-h3">Рабочий список на сегодня</h3>
+        <div class="sg-muted sg-sm">Приоритет: ближе к продлению и дольше без касания.</div></div>
+      {% if plan %}
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="rring" style="--p:{{ plan.pct }}"><div class="in"><b>{{ plan.fact }}</b><span>из {{ plan.plan }}</span></div></div>
+        <div class="sg-muted sg-sm" style="max-width:120px">Дневной план касаний менеджера</div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="sg-sm" style="margin:12px 0">
+      {% for key, lbl in [('all','Все'),('work','Рабочее окно'),('hot','Горит'),('crit','Критично'),('untouched','Без касания '~data.kpi.sla~'д+')] %}
+        <a class="sg-chip {{ 'sg-chip--active' if wband==key }}" href="{{ url_for('ops.renewals', period=period, department_id=department_id, wband=key, rm=sel_rm) }}">{{ lbl }}</a>
+      {% endfor %}
+    </div>
+    <div style="overflow-x:auto">
+      <table class="sg-table">
+        <thead><tr><th>Клиент</th><th>Окончание</th><th>Осталось</th><th>Срок</th><th>Без касания</th><th>Статус</th><th>Последняя договорённость</th></tr></thead>
+        <tbody>
+          {% for w in worklist %}
+          <tr>
+            <td><b>{{ w.name }}</b>{% if w.contact and w.contact != w.name %}<div class="sg-muted sg-sm">{{ w.contact }}</div>{% endif %}</td>
+            <td class="sg-mono">{{ w.end.strftime('%d.%m.%Y') if w.end else '—' }}</td>
+            <td class="sg-mono {{ 'rwarn' if w.days_left is not none and w.days_left < 0 }}">{% if w.days_left is none %}—{% elif w.days_left < 0 %}просроч. {{ -w.days_left }}д{% else %}{{ w.days_left }} дн{% endif %}</td>
+            <td><span class="bdot" style="background:{{ w.band_color }}"></span> {{ w.band_label }}</td>
+            <td class="sg-mono {{ 'rwarn' if w.untouched }}">{% if w.last_touch is none %}нет{% else %}{{ w.last_touch }} дн{% endif %}</td>
+            <td><span class="rpill" style="background:rgba(255,255,255,.06);color:{{ zp[w.zone][0] }}">{{ zp[w.zone][1] }}</span></td>
+            <td class="sg-muted sg-sm">{{ w.agreement|truncate(60) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="sg-muted">Нет сделок под фильтр.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# --- Тепловая карта касаний --- #}
+  {% if heat %}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h3 class="sg-h3">Тепловая карта касаний</h3>
+        <div class="sg-muted sg-sm">Ритм менеджера продлений: часы × последние {{ heat.days|length }} рабочих дней.</div></div>
+      {% if rm_list and rm_list|length > 1 %}
+      <div class="sg-sm">{% for m in rm_list %}<a class="sg-chip {{ 'sg-chip--active' if sel_rm==m.id }}" href="{{ url_for('ops.renewals', period=period, department_id=department_id, wband=wband, rm=m.id) }}">{{ m.name }}</a>{% endfor %}</div>
+      {% endif %}
+    </div>
+    <div style="overflow-x:auto;margin-top:10px">
+      <table class="rhm">
+        <tr><th></th>{% for h in heat.hours %}<th>{{ h }}</th>{% endfor %}</tr>
+        {% for row in heat.grid %}{% set d = loop.index0 %}
+        <tr><td class="day">{{ heat.days[d].label }}{{ ' · сег' if heat.days[d].is_today }}</td>
+          {% for cell in row %}<td><div class="c" style="background:{{ cell.bg }};color:{{ cell.fg }}">{{ cell.v or '' }}</div></td>{% endfor %}
+        </tr>{% endfor %}
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# --- Касания сегодня --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Касания сегодня → клиент → продление</h3>
+    <div class="sg-muted sg-sm">С кем конкретно менеджер работал сегодня.</div>
+    <div style="overflow-x:auto;margin-top:10px">
+      <table class="sg-table">
+        <thead><tr><th>Время</th><th>Клиент</th><th>Тип</th><th>Осталось</th><th>Статус</th></tr></thead>
+        <tbody>
+          {% for t in touches %}
+          <tr>
+            <td class="sg-mono sg-muted">{{ t.time }}</td>
+            <td><b>{{ t.name }}</b>{% if t.contact and t.contact != t.name %} <span class="sg-muted sg-sm">{{ t.contact }}</span>{% endif %}</td>
+            <td>{{ t.type }}</td>
+            <td class="sg-mono">{% if t.days_left is none %}—{% elif t.days_left < 0 %}просроч.{% else %}{{ t.days_left }} дн{% endif %}</td>
+            <td><span class="rpill" style="background:rgba(255,255,255,.06);color:{{ zp[t.zone][0] }}">{{ zp[t.zone][1] }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="sg-muted">Сегодня касаний по клиентам продлений ещё нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="sg-muted sg-sm" style="margin-top:14px">Следующий этап: карточка клиента с полной историей взаимодействий и разбором звонков (транскрибация + выводы нейронки).</p>
   {% endif %}
 </section>
 {% endblock %}

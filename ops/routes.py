@@ -476,6 +476,35 @@ def renewals():
     date_field = get_ops_setting("renewals_date_field")
     configured = bool(pid) and Renewal.query.count() > 0
     data = board(period=period, manager_ids=mgr_ids) if pid else None
+
+    # --- Этап B: рабочий список, план, тепловая карта, касания сегодня ---
+    worklist = plan = touches = heat = rm_list = None
+    sel_rm = None
+    wband = request.args.get("wband", "all")
+    if wband not in ("all", "work", "hot", "crit", "early", "nodate", "untouched"):
+        wband = "all"
+    if data is not None:
+        from ops.renewals import (
+            worklist as _worklist, touch_plan, today_touches, renewal_managers,
+        )
+        rm_list = renewal_managers()
+        if mgr_ids is not None:
+            rm_list = [m for m in rm_list if m["id"] in mgr_ids]
+        rm_ids = [m["id"] for m in rm_list]
+        worklist = _worklist(manager_ids=mgr_ids, band_filter=wband)
+        plan = touch_plan(rm_ids)
+        touches = today_touches(rm_ids)
+        # тепловая карта касаний выбранного менеджера продлений
+        sel = request.args.get("rm")
+        sel_rm = int(sel) if sel and sel.isdigit() and int(sel) in rm_ids else (
+            rm_ids[0] if rm_ids else None)
+        if sel_rm is not None:
+            try:
+                from ops.engagement import manager_engagement
+                heat = manager_engagement(sel_rm, "all")
+            except Exception:  # noqa: BLE001
+                db.session.rollback()
+
     pipelines, pl_err = _pipelines()
     last_sync = None
     try:
@@ -488,6 +517,8 @@ def renewals():
         data=data, pipelines=pipelines, pipelines_error=pl_err,
         pipeline_id=pid, date_field=date_field, configured=configured,
         total_renewals=Renewal.query.count() if pid else 0, last_sync=last_sync,
+        worklist=worklist, plan=plan, touches=touches, heat=heat,
+        rm_list=rm_list, sel_rm=sel_rm, wband=wband,
     )
 
 

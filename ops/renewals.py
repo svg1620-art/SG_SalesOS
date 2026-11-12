@@ -151,3 +151,151 @@ def board(period="month", manager_ids=None, today=None):
         "from": w_from, "to": w_to,
     }
     return {"bands": bands, "kpi": kpi, "money": money, "period": period, "cfg": cfg}
+
+
+# ================= Этап B: рабочий список, план, касания =================
+
+BAND_SHORT = {"work": "Рабочее окно", "hot": "Горит", "crit": "Критично",
+              "early": "Рано", "nodate": "Без даты"}
+BAND_COLOR = {k: c for k, _l, c in [(m[0], m[1], m[2]) for m in BAND_META]}
+_PRIORITY = {"crit": 0, "hot": 1, "work": 2, "early": 3, "nodate": 4}
+
+
+def renewal_managers():
+    """Менеджеры, у кого есть открытые сделки продлений (по убыванию числа)."""
+    rows = (
+        db.session.query(Renewal.manager_id, db.func.count(Renewal.amo_lead_id))
+        .filter(Renewal.is_open.is_(True), Renewal.manager_id.isnot(None))
+        .group_by(Renewal.manager_id).all()
+    )
+    from models import User
+    ids_by_cnt = sorted(rows, key=lambda r: -r[1])
+    out = []
+    for mid, cnt in ids_by_cnt:
+        u = db.session.get(User, mid)
+        if u is not None:
+            out.append({"id": u.id, "name": u.full_name or u.email, "count": cnt})
+    return out
+
+
+def _last_notes(renewals):
+    """{amo_lead_id: текст последнего примечания} по contact_id/lead_id."""
+    lead_ids = {r.amo_lead_id for r in renewals}
+    contact_ids = {r.amo_contact_id for r in renewals if r.amo_contact_id}
+    ev = OpsActivityEvent.query.filter(
+        OpsActivityEvent.type == "note",
+        db.or_(OpsActivityEvent.lead_id.in_(lead_ids),
+               OpsActivityEvent.contact_id.in_(contact_ids)),
+    ).order_by(OpsActivityEvent.occurred_at.desc()).limit(4000).all()
+    by_lead, by_contact = {}, {}
+    for e in ev:
+        txt = ""
+        try:
+            txt = (e.raw or {}).get("params", {}).get("text") or (e.raw or {}).get("text") or ""
+        except Exception:  # noqa: BLE001
+            txt = ""
+        if not txt:
+            continue
+        if e.lead_id is not None and e.lead_id not in by_lead:
+            by_lead[e.lead_id] = txt
+        if e.contact_id is not None and e.contact_id not in by_contact:
+            by_contact[e.contact_id] = txt
+    out = {}
+    for r in renewals:
+        out[r.amo_lead_id] = by_lead.get(r.amo_lead_id) or (
+            by_contact.get(r.amo_contact_id) if r.amo_contact_id else None)
+    return out
+
+
+def _display_name(r):
+    return r.company or r.name or f"Сделка {r.amo_lead_id}"
+
+
+def worklist(manager_ids=None, band_filter="all", limit=20, today=None):
+    today = today or date.today()
+    cfg = _cfg()
+    q = Renewal.query.filter(Renewal.is_open.is_(True))
+    if manager_ids is not None:
+        q = q.filter(Renewal.manager_id.in_(list(manager_ids)))
+    rows = q.all()
+    for r in rows:
+        r._band = band_of(r.renewal_end, today, cfg)
+    touch = _last_touch_days(rows)
+    notes = _last_notes(rows)
+    rows.sort(key=lambda r: (_PRIORITY.get(r._band, 9),
+                             -(touch.get(r.amo_lead_id) or 999)))
+    out = []
+    for r in rows:
+        if band_filter == "untouched":
+            d = touch.get(r.amo_lead_id)
+            if not (d is None or d >= cfg["sla"]):
+                continue
+        elif band_filter != "all" and r._band != band_filter:
+            continue
+        d = touch.get(r.amo_lead_id)
+        dl = (r.renewal_end - today).days if r.renewal_end else None
+        out.append({
+            "lead_id": r.amo_lead_id, "name": _display_name(r), "contact": r.name,
+            "end": r.renewal_end, "days_left": dl, "band": r._band,
+            "band_label": BAND_SHORT.get(r._band, ""), "band_color": BAND_COLOR.get(r._band),
+            "last_touch": d, "untouched": (d is None or d >= cfg["sla"]),
+            "zone": r.zone, "agreement": notes.get(r.amo_lead_id) or r.status_name or "—",
+            "amo_lead_id": r.amo_lead_id,
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def touch_plan(manager_ids, today=None):
+    """Дневной план касаний менеджера(ов) продлений: факт сегодня / план."""
+    from ops.metrics import _utc_bounds
+    today = today or date.today()
+    cfg = _cfg()
+    if not manager_ids:
+        return {"fact": 0, "plan": cfg["plan"], "pct": 0}
+    uf, ut = _utc_bounds(today)
+    fact = OpsActivityEvent.query.filter(
+        OpsActivityEvent.manager_id.in_(list(manager_ids)),
+        OpsActivityEvent.occurred_at >= uf, OpsActivityEvent.occurred_at < ut,
+    ).count()
+    plan = cfg["plan"] or 1
+    return {"fact": fact, "plan": cfg["plan"], "pct": min(100, round(fact / plan * 100))}
+
+
+def today_touches(manager_ids, today=None, limit=40):
+    """Касания сегодня менеджеров продлений, связанные с клиентом-сделкой."""
+    from ops.metrics import _utc_bounds
+    from utils import to_local
+    today = today or date.today()
+    if not manager_ids:
+        return []
+    uf, ut = _utc_bounds(today)
+    ev = OpsActivityEvent.query.filter(
+        OpsActivityEvent.manager_id.in_(list(manager_ids)),
+        OpsActivityEvent.occurred_at >= uf, OpsActivityEvent.occurred_at < ut,
+    ).order_by(OpsActivityEvent.occurred_at.desc()).limit(300).all()
+    # карты сделок
+    opens = Renewal.query.all()
+    by_lead = {r.amo_lead_id: r for r in opens}
+    by_contact = {r.amo_contact_id: r for r in opens if r.amo_contact_id}
+    cfg = _cfg()
+    TYPE_LABEL = {"call_out": "Звонок", "call_in": "Входящий", "msg_out": "Сообщение",
+                  "msg_in": "Входящее", "note": "Примечание", "task_done": "Задача"}
+    out = []
+    for e in ev:
+        r = (by_lead.get(e.lead_id) if e.lead_id else None) or \
+            (by_contact.get(e.contact_id) if e.contact_id else None)
+        if r is None:
+            continue
+        dl = (r.renewal_end - today).days if r.renewal_end else None
+        out.append({
+            "time": to_local(e.occurred_at).strftime("%H:%M"),
+            "name": _display_name(r), "contact": r.name,
+            "type": TYPE_LABEL.get(e.type, e.type),
+            "days_left": dl, "zone": r.zone, "amo_lead_id": r.amo_lead_id,
+            "band": band_of(r.renewal_end, today, cfg),
+        })
+        if len(out) >= limit:
+            break
+    return out
