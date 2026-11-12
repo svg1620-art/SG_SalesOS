@@ -461,6 +461,55 @@ def calls():
     )
 
 
+@ops_bp.route("/renewals")
+@admin_required
+def renewals():
+    """Пульт продлений (Этап A): покрытие по бэндам + деньги."""
+    from ops.renewals import board
+    from ops_store import get_ops_setting
+    from models import Renewal
+    departments, dep_id, mgr_ids = _dept_filter()
+    period = request.args.get("period", "month")
+    if period not in ("month", "quarter", "year"):
+        period = "month"
+    pid = get_ops_setting("renewals_pipeline_id")
+    date_field = get_ops_setting("renewals_date_field")
+    configured = bool(pid) and Renewal.query.count() > 0
+    data = board(period=period, manager_ids=mgr_ids) if pid else None
+    pipelines, pl_err = _pipelines()
+    last_sync = None
+    try:
+        last_sync = db.session.query(db.func.max(Renewal.synced_at)).scalar()
+    except Exception:  # noqa: BLE001
+        pass
+    return render_template(
+        "ops/renewals.html",
+        departments=departments, department_id=dep_id, period=period,
+        data=data, pipelines=pipelines, pipelines_error=pl_err,
+        pipeline_id=pid, date_field=date_field, configured=configured,
+        total_renewals=Renewal.query.count() if pid else 0, last_sync=last_sync,
+    )
+
+
+@ops_bp.route("/renewals/config", methods=["POST"])
+@admin_required
+def renewals_config():
+    from ops_store import set_ops_setting
+    set_ops_setting("renewals_pipeline_id", (request.form.get("pipeline_id") or "").strip())
+    set_ops_setting("renewals_date_field", (request.form.get("date_field") or "").strip())
+    flash("Настройки воронки продлений сохранены. Запустите синхронизацию.", "success")
+    return redirect(url_for("ops.renewals"))
+
+
+@ops_bp.route("/renewals/sync", methods=["POST"])
+@admin_required
+def renewals_sync_now():
+    from ingest.renewals_sync import sync_renewals
+    _run_bg(sync_renewals)
+    flash("Синхронизация продлений запущена в фоне. Обновите страницу через несколько секунд.", "success")
+    return redirect(url_for("ops.renewals"))
+
+
 def _cost_users(mf):
     """Пользователи для страницы затрат: менеджеры + админы (возможные РОПы),
     активные ИЛИ деактивированные в выбранном месяце или позже."""

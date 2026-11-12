@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "ops/_nav.html" import ops_nav %}
+{% block title %}Продления — SG SalesOS{% endblock %}
+
+{% macro money(n) %}{% if n >= 1000000 %}{{ '%.2f'|format(n/1000000) }} млн{% else %}{{ (n/1000)|round|int }}к{% endif %}{% endmacro %}
+
+{% block content %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm">Ops / Продления</div>
+  <h1 class="sg-h1">📅 Пульт продлений</h1>
+  {{ ops_nav('renewals') }}
+
+  {# --- конфигурация воронки --- #}
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Источник: воронка «Аккаунтинг»</h3>
+    <form method="post" action="{{ url_for('ops.renewals_config') }}" class="sg-actions" style="align-items:flex-end;flex-wrap:wrap">
+      <label class="sg-field" style="max-width:280px"><span class="sg-field__label">Воронка продлений</span>
+        <select class="sg-input" name="pipeline_id">
+          <option value="">— выбрать —</option>
+          {% for p in pipelines %}<option value="{{ p.id }}" {{ 'selected' if pipeline_id and pipeline_id|string == p.id|string }}>{{ p.name }}</option>{% endfor %}
+        </select></label>
+      <label class="sg-field" style="max-width:320px"><span class="sg-field__label">Поле «дата окончания подписки» (id или имя)</span>
+        <input class="sg-input sg-mono" name="date_field" value="{{ date_field or '' }}" placeholder="напр. 1234567 или Дата окончания подписки"></label>
+      <button class="sg-btn" type="submit">Сохранить</button>
+    </form>
+    <form method="post" action="{{ url_for('ops.renewals_sync_now') }}" style="margin-top:10px">
+      <button class="sg-btn sg-btn--primary" type="submit">↻ Синхронизировать продления</button>
+      <span class="sg-muted sg-sm" style="margin-left:10px">
+        {% if total_renewals %}В базе: <b>{{ total_renewals }}</b> сделок{% if last_sync %} · обновлено {{ last_sync.strftime('%d.%m %H:%M') }} UTC{% endif %}{% else %}Сделки ещё не загружены{% endif %}
+      </span>
+    </form>
+    {% if pipelines_error %}<p class="sg-sm" style="color:var(--sg-yellow)">amoCRM: {{ pipelines_error }}</p>{% endif %}
+  </div>
+
+  {% if not pipeline_id %}
+    <div class="sg-flash sg-flash--warning" style="margin-top:14px">Выберите воронку продлений и укажите поле даты окончания подписки, затем запустите синхронизацию.</div>
+  {% elif not data or data.kpi.open == 0 and total_renewals == 0 %}
+    <div class="sg-flash sg-flash--warning" style="margin-top:14px">Воронка выбрана, но сделки не загружены. Нажмите «Синхронизировать продления».</div>
+  {% else %}
+
+  {# --- период --- #}
+  <div class="sg-sm" style="margin:14px 0 2px">
+    {% for key, lbl in [('month','Этот месяц'),('quarter','Квартал'),('year','Год')] %}
+      <a class="sg-chip {{ 'sg-chip--active' if period==key }}" href="{{ url_for('ops.renewals', period=key, department_id=department_id) }}">{{ lbl }}</a>
+    {% endfor %}
+  </div>
+  <style>.sg-chip{display:inline-block;padding:4px 13px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}.sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+    .rmoney{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}
+    .rmoney .mt{background:var(--sg-panel,#141419);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px 14px}
+    .rmoney .k{font-size:.7rem;color:var(--sg-muted,#8A8A96);text-transform:uppercase;letter-spacing:.04em}
+    .rmoney .v{font-size:1.4rem;font-weight:800;margin-top:6px} .rmoney .s{font-size:.75rem;color:var(--sg-muted,#8A8A96);margin-top:2px}
+    .rmoney .green .v{color:#39d98a}.rmoney .amber .v{color:#F5A524}.rmoney .red .v{color:#ff6b6e}
+    .rk{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:10px}
+    .rk .kpi{background:var(--sg-panel,#141419);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 13px}
+    .rk .k{font-size:.7rem;color:var(--sg-muted,#8A8A96);text-transform:uppercase} .rk .v{font-size:1.35rem;font-weight:800;margin-top:6px}
+    .rk .v small{font-size:.72rem;color:var(--sg-muted,#8A8A96);font-weight:600} .rk .alarm .v{color:#ff6b6e}
+    .rwarn{color:#ff6b6e;font-weight:700}
+    @media(max-width:820px){.rmoney,.rk{grid-template-columns:repeat(2,1fr)}}
+  </style>
+
+  {# --- деньги --- #}
+  <div class="rmoney">
+    <div class="mt"><div class="k">План сборов</div><div class="v sg-mono">{{ money(data.money.plan_sum) }} ₽</div><div class="s">{{ data.money.scope_cnt }} должны продлиться</div></div>
+    <div class="mt green"><div class="k">Подтверждено</div><div class="v sg-mono">{{ money(data.money.paid_sum) }} ₽</div><div class="s">{{ data.money.paid_cnt }} продлили · {{ data.money.collected_pct }}%</div></div>
+    <div class="mt amber"><div class="k">Под риском</div><div class="v sg-mono">{{ money(data.money.risk_sum) }} ₽</div><div class="s">горят, не 🟢</div></div>
+    <div class="mt red"><div class="k">Отвал</div><div class="v sg-mono">{{ money(data.money.churn_sum) }} ₽</div><div class="s">{{ data.money.churn_cnt }} отказались</div></div>
+    <div class="mt red"><div class="k">Churn по деньгам</div><div class="v sg-mono">{{ data.money.churn_pct }}%</div><div class="s">отвал ₽ / план ₽</div></div>
+  </div>
+  <p class="sg-muted sg-sm" style="margin-top:8px">Период по дате окончания: {{ data.money['from'].strftime('%d.%m.%Y') }} — {{ data.money.to.strftime('%d.%m.%Y') }}. Осталось собрать <b class="sg-mono">{{ money(data.money.remaining) }} ₽</b>.</p>
+
+  {# --- операционные KPI (весь портфель) --- #}
+  <div class="rk">
+    <div class="kpi"><div class="k">В работе</div><div class="v sg-mono">{{ data.kpi.open }} <small>клиентов</small></div></div>
+    <div class="kpi"><div class="k">Рабочее окно</div><div class="v sg-mono">{{ data.kpi.in_work }} <small>пора начать</small></div></div>
+    <div class="kpi"><div class="k">Горит ≤3м</div><div class="v sg-mono">{{ data.kpi.in_hot }} <small>добивать</small></div></div>
+    <div class="kpi {{ 'alarm' if data.kpi.untouched }}"><div class="k">Не тронуты {{ data.kpi.sla }}д+</div><div class="v sg-mono">{{ data.kpi.untouched }} <small>протухли</small></div></div>
+    <div class="kpi {{ 'alarm' if data.kpi.nodate }}"><div class="k">Без даты окончания</div><div class="v sg-mono">{{ data.kpi.nodate }} <small>завести</small></div></div>
+  </div>
+
+  {# --- доска по бэндам --- #}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <h3 class="sg-h3">Покрытие по срокам до продления</h3>
+    <div class="sg-muted sg-sm">Бэнды — от даты окончания подписки.</div>
+    <div style="overflow-x:auto;margin-top:10px">
+      <table class="sg-table">
+        <thead><tr><th>Срок до продления</th><th>Клиентов</th><th>Сумма ₽</th><th>Не тронут {{ data.kpi.sla }}д+</th><th>🟡</th><th>🔴</th></tr></thead>
+        <tbody>
+          {% for b in data.bands %}
+          <tr style="{{ 'background:rgba(0,191,220,.05)' if b.focus }}">
+            <td><span style="display:inline-flex;align-items:center;gap:7px;font-weight:700"><span style="width:10px;height:10px;border-radius:3px;background:{{ b.color }}"></span>{{ b.label }}</span></td>
+            <td class="sg-mono">{{ b.count }}</td>
+            <td class="sg-mono sg-muted">{{ money(b.sum) }}</td>
+            <td class="sg-mono {{ 'rwarn' if b.untouched }}">{{ b.untouched or '—' }}</td>
+            <td class="sg-mono">{{ b.yellow or '—' }}</td>
+            <td class="sg-mono {{ 'rwarn' if b.red }}">{{ b.red or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="sg-muted sg-sm" style="margin-top:10px">Фокус — <b style="color:var(--sg-cyan,#00BFDC)">рабочее окно</b> и <b style="color:#F5A524">горит</b>. Красное — клиенты, которых уже должны вести, но давно не трогали.</p>
+  </div>
+
+  <p class="sg-muted sg-sm" style="margin-top:14px">Следующие этапы: рабочий список на сегодня, тепловая карта касаний, карточка клиента с историей и разбором звонков.</p>
+  {% endif %}
+</section>
+{% endblock %}

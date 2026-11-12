@@ -61,6 +61,17 @@ OPS_DEFAULTS = {
     "team_quest_metric": "meetings_held",  # метрика квеста недели
     "team_quest_target": "0",              # 0 — квест выключен
     "team_quest_label": "",
+    # --- Продления (Этап A) ---
+    "renewals_pipeline_id": "",            # id воронки «Аккаунтинг» (обязательно)
+    "renewals_date_field": "",             # id или имя поля «дата окончания подписки»
+    "renewal_band_early_months": "6",      # > N мес — «рано»
+    "renewal_band_work_months": "4",       # [work..early) — «рабочее окно»
+    "renewal_band_hot_months": "1",        # [hot..work) — «горит», ниже — «критично»
+    "renewal_sla_days": "4",               # без касания N дней → «протух»
+    "renewal_touch_plan": "20",            # дневной план касаний менеджера продлений
+    # ключевые слова этапов → зона (строчные, по вхождению в имя статуса)
+    "renewal_zone_red": "не выходит на связь,не запускается,ловит много проблем",
+    "renewal_zone_yellow": "снизилась активность,смотрит конкурентов,сменился ответственный,только курсы",
 }
 
 

@@ -296,6 +296,17 @@ def _add_schedule_jobs(app: Flask) -> None:
             except Exception as exc:  # noqa: BLE001
                 app.logger.warning("[missions] генерация пропущена: %s", exc)
 
+    def _run_renewals_sync():
+        with app.app_context():
+            from settings_store import amo_configured
+            if not amo_configured(app):
+                return
+            try:
+                from ingest.renewals_sync import sync_renewals
+                sync_renewals(app)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[renewals] синк пропущен: %s", exc)
+
     tz = app.config.get("TZ") or "UTC"
     t_hour, d_hour = telegram_hour(app), digest_hour(app)
     poll_min = max(1, int(app.config.get("POLL_INTERVAL_MIN") or 15))
@@ -328,6 +339,10 @@ def _add_schedule_jobs(app: Flask) -> None:
     scheduler.add_job(
         _run_ops_generate_missions, CronTrigger(hour=6, minute=0, timezone=tz),
         id="ops_generate_missions", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _run_renewals_sync, IntervalTrigger(hours=1),
+        id="renewals_sync", replace_existing=True, max_instances=1, coalesce=True,
     )
     app.logger.info(
         "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",

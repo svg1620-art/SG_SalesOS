@@ -664,3 +664,34 @@ class XpLedger(db.Model):
     __table_args__ = (
         db.UniqueConstraint("source", "ref", name="uq_xp_ledger_source_ref"),
     )
+
+
+class Renewal(db.Model):
+    """Сделка воронки продлений («Аккаунтинг»). Якорь — дата окончания подписки.
+
+    Отдельно от Deal (та — закрытые сделки/выручка). Здесь ведём ОТКРЫТЫЕ и
+    терминальные сделки продлений с датой окончания и статусом-зоной.
+    """
+
+    __tablename__ = "renewals"
+
+    amo_lead_id = db.Column(db.BigInteger, primary_key=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    amo_responsible_id = db.Column(db.BigInteger, nullable=True, index=True)
+    name = db.Column(db.String(500))
+    company = db.Column(db.String(500))
+    amo_contact_id = db.Column(db.BigInteger, nullable=True, index=True)
+    amo_company_id = db.Column(db.BigInteger, nullable=True, index=True)
+    price = db.Column(db.Integer, default=0)
+    pipeline_id = db.Column(db.BigInteger, index=True)
+    status_id = db.Column(db.Integer)
+    status_name = db.Column(db.String(160))
+    # green | yellow | red | paid | churn
+    zone = db.Column(db.String(10), nullable=False, default="green", index=True)
+    is_open = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    renewal_end = db.Column(db.Date, nullable=True, index=True)  # дата окончания подписки
+    amo_updated_at = db.Column(db.DateTime, nullable=True)
+    synced_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<Renewal {self.amo_lead_id} {self.zone} {self.renewal_end}>"
