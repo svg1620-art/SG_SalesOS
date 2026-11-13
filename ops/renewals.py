@@ -314,12 +314,47 @@ def client_card(lead_id, today=None):
     )
     now = datetime.utcnow()
     last_touch = min(((now - e.occurred_at).days for e in ev), default=None)
-    history = [{
-        "when": to_local(e.occurred_at), "type": e.type,
-        "icon": _HIST_META.get(e.type, ("•", e.type))[0],
-        "label": _HIST_META.get(e.type, ("•", e.type))[1],
-        "text": _event_text(e),
-    } for e in ev]
+
+    # разбор звонков из ОКК: связка касание-звонок с Call по amo_note_id
+    def _note_id(e):
+        aid = e.amo_event_id or ""
+        if aid.startswith("note:"):
+            try:
+                return int(aid.split(":", 1)[1])
+            except ValueError:
+                return None
+        return None
+
+    from models import Call, Recommendation
+    note_ids = [n for n in (_note_id(e) for e in ev
+                if e.type in ("call_out", "call_in")) if n is not None]
+    call_by_note, rec_by_call = {}, {}
+    if note_ids:
+        calls = Call.query.filter(Call.amo_note_id.in_(note_ids)).all()
+        call_by_note = {c.amo_note_id: c for c in calls}
+        done_ids = [c.id for c in calls if c.status == "done" and c.overall_score is not None]
+        if done_ids:
+            for rc in Recommendation.query.filter(Recommendation.call_id.in_(done_ids)).all():
+                rec_by_call.setdefault(rc.call_id, []).append(rc)
+
+    history = []
+    for e in ev:
+        item = {
+            "when": to_local(e.occurred_at), "type": e.type,
+            "icon": _HIST_META.get(e.type, ("•", e.type))[0],
+            "label": _HIST_META.get(e.type, ("•", e.type))[1],
+            "text": _event_text(e), "analysis": None,
+        }
+        if e.type in ("call_out", "call_in"):
+            c = call_by_note.get(_note_id(e))
+            if c is not None and c.status == "done" and c.overall_score is not None:
+                item["analysis"] = {
+                    "call_id": c.id, "score": c.overall_score, "zone": c.zone,
+                    "summary": c.summary,
+                    "recs": [r.text for r in rec_by_call.get(c.id, [])[:3] if r.text],
+                    "manager_comment": c.manager_comment,
+                }
+        history.append(item)
     untouched = last_touch is None or last_touch >= cfg["sla"]
     notes = _last_notes([r])
     return {

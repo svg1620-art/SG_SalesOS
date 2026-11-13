@@ -27,6 +27,10 @@
     .tl .body{flex:1;min-width:0}
     .tl .dt{font-family:var(--sg-mono,monospace);font-size:.76rem;color:var(--sg-muted,#8A8A96)}
     .rwarn{color:var(--sg-red,#e5484d);font-weight:700}
+    details.anbox{margin-top:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:7px 11px}
+    details.anbox summary{cursor:pointer;font-size:.82rem;font-weight:600;list-style:none}
+    details.anbox summary::-webkit-details-marker{display:none}
+    details.anbox ul{font-size:.84rem}
   </style>
 
   <div class="rstats">
@@ -50,11 +54,21 @@
     {% if card.history %}
     <ul class="tl">
       {% for h in card.history %}
+      {% set az = {'green':['#39d98a','🟢 Зелёная'],'yellow':['#f5c542','🟡 Жёлтая'],'red':['#ff6b6e','🔴 Красная']} %}
       <li>
         <span class="ic">{{ h.icon }}</span>
         <div class="body">
           <div class="dt">{{ h.when.strftime('%d.%m.%Y %H:%M') }} · {{ h.label }}</div>
           {% if h.text %}<div class="sg-sm" style="white-space:pre-wrap">{{ h.text }}</div>{% endif %}
+          {% if h.analysis %}{% set a = h.analysis %}
+          <details class="anbox">
+            <summary>🧠 Разбор звонка · <b style="color:{{ az.get(a.zone, ['#8A8A96','—'])[0] }}">{{ az.get(a.zone, ['','—'])[1] }}</b> · <span class="sg-mono">{{ a.score }}/100</span></summary>
+            {% if a.summary %}<div class="sg-sm" style="margin-top:8px"><b>Саммери:</b> {{ a.summary }}</div>{% endif %}
+            {% if a.recs %}<div class="sg-sm" style="margin-top:6px"><b>Рекомендации:</b><ul style="margin:4px 0 0;padding-left:18px">{% for rtext in a.recs %}<li>{{ rtext }}</li>{% endfor %}</ul></div>{% endif %}
+            {% if a.manager_comment %}<div class="sg-sm" style="margin-top:6px"><b>Разбор менеджера:</b> {{ a.manager_comment }}</div>{% endif %}
+            <a class="sg-sm" href="{{ url_for('calls.detail', call_id=a.call_id) }}" style="display:inline-block;margin-top:8px">Открыть карточку звонка →</a>
+          </details>
+          {% endif %}
         </div>
       </li>
       {% endfor %}
