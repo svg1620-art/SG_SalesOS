@@ -82,16 +82,27 @@ def _parse_date_field(lead, field_cfg):
 
 
 def _to_date(raw):
-    """Значение поля даты amoCRM → date. Поддержка unix-ts (int/str) и строк."""
+    """Значение поля даты amoCRM → date. Безопасно к мусору и большим числам.
+
+    Поддержка unix-ts в секундах/миллисекундах (int/str) и строковых дат.
+    Значения вне диапазона ~1973..2100 датой не считаются (это id/суммы и т.п.).
+    """
     if raw is None or raw == "":
         return None
-    # unix timestamp (секунды) — основной формат date-полей amoCRM
+    ts = None
     try:
         ts = int(raw)
-        if ts > 10 ** 8:  # похоже на unix-время, а не на «12»
-            return datetime.utcfromtimestamp(ts).date()
     except (TypeError, ValueError):
-        pass
+        ts = None
+    if ts is not None:
+        if ts > 10 ** 12:          # миллисекунды → секунды
+            ts //= 1000
+        if 10 ** 8 < ts < 4102444800:  # ~1973 .. 2100
+            try:
+                return datetime.utcfromtimestamp(ts).date()
+            except (OverflowError, OSError, ValueError):
+                return None
+        return None                 # слишком большое/маленькое — не дата
     s = str(raw).strip()[:10]
     for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%Y.%m.%d"):
         try:
