@@ -43,6 +43,12 @@ BAND_META = [
 ]
 
 
+def _month_window(month):
+    """[первое, последнее] число конкретного месяца (month — 1-е число)."""
+    end = month.replace(day=monthrange(month.year, month.month)[1])
+    return month, end
+
+
 def _period_window(period, today):
     start = today.replace(day=1)
     if period == "month":
@@ -87,7 +93,7 @@ def _last_touch_days(renewals):
     return out
 
 
-def board(period="month", manager_ids=None, today=None):
+def board(period="month", manager_ids=None, today=None, month=None):
     today = today or date.today()
     cfg = _cfg()
     q = Renewal.query
@@ -130,20 +136,47 @@ def board(period="month", manager_ids=None, today=None):
         "sla": cfg["sla"], "plan": cfg["plan"],
     }
 
-    # --- деньги (по периоду, окно по renewal_end) ---
-    w_from, w_to = _period_window(period, today)
-    scope = [r for r in allr if r.renewal_end and w_from <= r.renewal_end <= w_to]
-    plan_sum = sum(int(r.price or 0) for r in scope)
-    paid = [r for r in scope if r.zone == "paid"]
-    churn = [r for r in scope if r.zone == "churn"]
-    paid_sum = sum(int(r.price or 0) for r in paid)
-    churn_sum = sum(int(r.price or 0) for r in churn)
-    risk_sum = sum(int(r.price or 0) for r in scope
-                   if r.is_open and r._band in ("hot", "crit") and untouched(r))
+    # --- деньги (по периоду/месяцу, окно по дате окончания цикла) ---
+    # Источник исходов: журнал циклов (история) + текущие сделки, объединённо по
+    # сделке. Журнал нужен, т.к. дата окончания съезжает вперёд при продлении.
+    from models import RenewalCycle
+    if month is not None:
+        w_from, w_to = _month_window(month)
+    else:
+        w_from, w_to = _period_window(period, today)
+    cyc_q = RenewalCycle.query.filter(
+        RenewalCycle.cycle_end >= w_from, RenewalCycle.cycle_end <= w_to)
+    if manager_ids is not None:
+        cyc_q = cyc_q.filter(RenewalCycle.manager_id.in_(list(manager_ids)))
+    cyc_by_lead = {}
+    for c in cyc_q.all():
+        cyc_by_lead[c.amo_lead_id] = c  # один цикл на сделку в окне
+    cur_by_lead = {r.amo_lead_id: r for r in allr
+                   if r.renewal_end and w_from <= r.renewal_end <= w_to}
+    leads = set(cyc_by_lead) | set(cur_by_lead)
+    plan_sum = paid_sum = churn_sum = risk_sum = 0
+    paid_cnt = churn_cnt = 0
+    for lid in leads:
+        c = cyc_by_lead.get(lid)
+        r = cur_by_lead.get(lid)
+        price = int((c.price if c else (r.price if r else 0)) or 0)
+        plan_sum += price
+        if c is not None:  # исход зафиксирован в журнале
+            if c.outcome == "renewed":
+                paid_sum += price; paid_cnt += 1
+            else:
+                churn_sum += price; churn_cnt += 1
+        elif r is not None:
+            if r.zone == "paid":
+                paid_sum += price; paid_cnt += 1
+            elif r.zone == "churn":
+                churn_sum += price; churn_cnt += 1
+            elif r.is_open and r._band in ("hot", "crit") and untouched(r):
+                risk_sum += price
     money = {
-        "plan_sum": plan_sum, "scope_cnt": len(scope),
-        "paid_sum": paid_sum, "paid_cnt": len(paid),
-        "churn_sum": churn_sum, "churn_cnt": len(churn),
+        "plan_sum": plan_sum, "scope_cnt": len(leads),
+        "paid_sum": paid_sum, "paid_cnt": paid_cnt,
+        "churn_sum": churn_sum, "churn_cnt": churn_cnt,
         "risk_sum": risk_sum,
         "churn_pct": round(churn_sum / plan_sum * 100) if plan_sum else 0,
         "collected_pct": round(paid_sum / plan_sum * 100) if plan_sum else 0,

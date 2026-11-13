@@ -698,3 +698,29 @@ class Renewal(db.Model):
 
     def __repr__(self) -> str:
         return f"<Renewal {self.amo_lead_id} {self.zone} {self.renewal_end}>"
+
+
+class RenewalCycle(db.Model):
+    """Журнал исходов циклов продления (история — дата сделки съезжает вперёд).
+
+    Фиксируется при синке: продлил (дата уехала вперёд / этап «оплатил») или
+    отвалился. cycle_end — дата окончания того цикла (месяц, к которому относим).
+    Позволяет ретроспективно смотреть «кого продляли в <месяц>».
+    """
+
+    __tablename__ = "renewal_cycles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    amo_lead_id = db.Column(db.BigInteger, nullable=False, index=True)
+    cycle_end = db.Column(db.Date, nullable=False, index=True)  # дата окончания цикла
+    outcome = db.Column(db.String(10), nullable=False)          # renewed | churned
+    price = db.Column(db.Integer, default=0)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    resolved_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("amo_lead_id", "cycle_end", name="uq_renewal_cycle_lead_end"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<RenewalCycle {self.amo_lead_id} {self.cycle_end} {self.outcome}>"

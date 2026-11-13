@@ -472,10 +472,19 @@ def renewals():
     period = request.args.get("period", "month")
     if period not in ("month", "quarter", "year"):
         period = "month"
+    from datetime import date as _date
+    month_raw = (request.args.get("month") or "").strip()
+    sel_month = None
+    if month_raw:
+        try:
+            _y, _m = map(int, month_raw.split("-"))
+            sel_month = _date(_y, _m, 1)
+        except Exception:  # noqa: BLE001
+            sel_month = None
     pid = get_ops_setting("renewals_pipeline_id")
     date_field = get_ops_setting("renewals_date_field")
     configured = bool(pid) and Renewal.query.count() > 0
-    data = board(period=period, manager_ids=mgr_ids) if pid else None
+    data = board(period=period, manager_ids=mgr_ids, month=sel_month) if pid else None
 
     # --- Этап B: рабочий список, план, тепловая карта, касания сегодня ---
     worklist = plan = touches = heat = rm_list = None
@@ -525,6 +534,7 @@ def renewals():
         total_renewals=Renewal.query.count() if pid else 0, last_sync=last_sync,
         worklist=worklist, plan=plan, touches=touches, heat=heat,
         rm_list=rm_list, sel_rm=sel_rm, wband=wband, field_diag=field_diag,
+        sel_month=(month_raw if sel_month else ""),
     )
 
 

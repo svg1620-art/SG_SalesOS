@@ -9,7 +9,7 @@ from datetime import datetime, date
 from flask import current_app
 
 from extensions import db
-from models import Renewal, User
+from models import Renewal, RenewalCycle, User
 from settings_store import amo_base_domain, amo_access_token, amo_configured
 from ops_store import get_ops_setting, ops_int
 
@@ -127,6 +127,29 @@ def _main_contact_id(lead):
     return cts[0].get("id")
 
 
+def _record_cycle(lead_id, prev_end, prev_zone, new_zone, new_end, price, manager_id):
+    """Зафиксировать исход цикла продления (идемпотентно по lead+cycle_end).
+
+    renewed — этап «оплатил» ИЛИ дата окончания уехала вперёд (≥25 дней);
+    churned — переход в «отказался». cycle_end — дата окончания того цикла.
+    """
+    outcome, cyc_end = None, None
+    if new_zone == "churn" and prev_zone != "churn":
+        outcome, cyc_end = "churned", (prev_end or new_end)
+    elif new_zone == "paid" and prev_zone != "paid":
+        outcome, cyc_end = "renewed", (prev_end or new_end)
+    elif prev_end and new_end and (new_end - prev_end).days >= 25:
+        outcome, cyc_end = "renewed", prev_end
+    if not (outcome and cyc_end):
+        return
+    exists = RenewalCycle.query.filter_by(amo_lead_id=lead_id, cycle_end=cyc_end).first()
+    if exists is None:
+        db.session.add(RenewalCycle(
+            amo_lead_id=lead_id, cycle_end=cyc_end, outcome=outcome,
+            price=int(price or 0), manager_id=manager_id, resolved_at=datetime.utcnow(),
+        ))
+
+
 def sample_custom_fields(app=None, limit_leads=10) -> dict:
     """Диагностика: какие доп-поля есть у сделок воронки и их значения.
 
@@ -199,8 +222,15 @@ def sync_renewals(app=None) -> dict:
                 no_date += 1
             resp = lead.get("responsible_user_id") or None
             upd = lead.get("updated_at")
-            row = db.session.get(Renewal, int(lead_id)) or Renewal(amo_lead_id=int(lead_id))
-            row.manager_id = mgr_map.get(int(resp)) if resp else None
+            existing = db.session.get(Renewal, int(lead_id))
+            prev_end = existing.renewal_end if existing else None
+            prev_zone = existing.zone if existing else None
+            mgr_id = mgr_map.get(int(resp)) if resp else None
+            # зафиксировать исход цикла (продлил/отвалился) для ретроспективы
+            _record_cycle(int(lead_id), prev_end, prev_zone, zone, rend,
+                          int(lead.get("price") or 0), mgr_id)
+            row = existing or Renewal(amo_lead_id=int(lead_id))
+            row.manager_id = mgr_id
             row.amo_responsible_id = int(resp) if resp else None
             row.name = (lead.get("name") or "")[:500]
             row.company = (_company_name(lead) or "")[:500] or None

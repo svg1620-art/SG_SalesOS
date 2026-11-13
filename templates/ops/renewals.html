@@ -65,11 +65,18 @@
   {% else %}
 
   {# --- период --- #}
-  <div class="sg-sm" style="margin:14px 0 2px">
+  <div class="sg-sm" style="margin:14px 0 2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
     {% for key, lbl in [('month','Этот месяц'),('quarter','Квартал'),('year','Год')] %}
-      <a class="sg-chip {{ 'sg-chip--active' if period==key }}" href="{{ url_for('ops.renewals', period=key, department_id=department_id) }}">{{ lbl }}</a>
+      <a class="sg-chip {{ 'sg-chip--active' if period==key and not sel_month }}" href="{{ url_for('ops.renewals', period=key, department_id=department_id) }}">{{ lbl }}</a>
     {% endfor %}
+    <form method="get" action="{{ url_for('ops.renewals') }}" style="display:inline-flex;align-items:center;gap:6px;margin-left:6px">
+      {% if department_id %}<input type="hidden" name="department_id" value="{{ department_id }}">{% endif %}
+      <span class="sg-muted">или месяц:</span>
+      <input class="sg-input sg-input--sm sg-mono" type="month" name="month" value="{{ sel_month }}" onchange="this.form.submit()" style="max-width:150px">
+      {% if sel_month %}<a class="sg-chip" href="{{ url_for('ops.renewals', department_id=department_id) }}">✕</a>{% endif %}
+    </form>
   </div>
+  {% if sel_month %}<p class="sg-muted sg-sm" style="margin:2px 0">Ретроспектива по месяцу окончания подписки. «Продлили/отвал» берутся из журнала циклов (накапливается с момента внедрения).</p>{% endif %}
   <style>.sg-chip{display:inline-block;padding:4px 13px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}.sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
     .rmoney{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}
     .rmoney .mt{background:var(--sg-panel,#141419);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px 14px}
