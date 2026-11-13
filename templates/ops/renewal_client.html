@@ -4,7 +4,7 @@
 {% macro money(n) %}{% if n and n >= 1000000 %}{{ '%.2f'|format(n/1000000) }} млн{% elif n %}{{ (n/1000)|round|int }}к{% else %}—{% endif %}{% endmacro %}
 
 {% block content %}
-{% set zp = {'green':['#39d98a','🟢 на треке'],'yellow':['#f5c542','🟡 риск'],'red':['#ff6b6e','🔴 критично'],'paid':['#39d98a','🟢 продлил'],'churn':['#8A8A96','⚫ отвал']} %}
+{% set zp = {'green':['#39d98a','🟢 договорились'],'yellow':['#f5c542','🟡 думает / риск'],'red':['#ff6b6e','🔴 возражение / уходит'],'paid':['#39d98a','🟢 продлил'],'churn':['#8A8A96','⚫ отвал'],'unknown':['#8A8A96','— не оценён']} %}
 <section class="sg-page">
   <div class="sg-breadcrumbs sg-sm"><a href="{{ url_for('ops.renewals') }}">Продления</a> / Клиент</div>
   <div class="sg-page__head">
@@ -47,6 +47,50 @@
     <div class="sg-muted sg-sm">Последняя договорённость (из примечания)</div>
     <p style="margin:4px 0 0;white-space:pre-wrap">{{ card.agreement }}</p>
   </div>
+  {% endif %}
+
+  {% if not card.terminal %}
+  <div class="sg-card sg-card--pad" style="margin-top:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <h3 class="sg-h3" style="margin:0">Статус коммуникации</h3>
+        <p class="sg-muted sg-sm" style="margin:4px 0 0">Светофор по переговорам с клиентом — не по сроку. Выставляет РОП вручную или НейроGuru по последнему звонку.</p>
+      </div>
+      <span class="rpill" style="background:rgba(255,255,255,.06);color:{{ zp[card.status][0] }};padding:4px 13px;border-radius:999px;font-weight:700;font-size:1rem">{{ zp[card.status][1] }}</span>
+    </div>
+
+    <div class="sg-sm sg-muted" style="margin-top:10px">
+      {% if card.comm_source == 'ai' %}🧠 Оценка НейроGuru{% elif card.comm_source == 'manual' %}✍️ Поставил менеджер{% else %}Ещё не оценён{% endif %}
+      {% if card.comm_updated_at %} · {{ card.comm_updated_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+    </div>
+    {% if card.comm_note %}<p class="sg-sm" style="margin:6px 0 0;white-space:pre-wrap"><b>Причина:</b> {{ card.comm_note }}</p>{% endif %}
+
+    <form method="post" action="{{ url_for('ops.renewal_set_status', lead_id=card.r.amo_lead_id) }}" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label class="statbtn" style="--c:#39d98a"><input type="radio" name="status" value="green" {{ 'checked' if card.status == 'green' }}> 🟢 Договорились</label>
+        <label class="statbtn" style="--c:#f5c542"><input type="radio" name="status" value="yellow" {{ 'checked' if card.status == 'yellow' }}> 🟡 Думает / риск</label>
+        <label class="statbtn" style="--c:#ff6b6e"><input type="radio" name="status" value="red" {{ 'checked' if card.status == 'red' }}> 🔴 Возражение / уходит</label>
+      </div>
+      <input class="sg-input" type="text" name="note" maxlength="500" placeholder="Комментарий / договорённость (необязательно)" value="{{ card.comm_note or '' }}">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="sg-btn sg-btn--primary sg-btn--sm" type="submit">Сохранить статус</button>
+      </div>
+    </form>
+
+    {% if card.has_call %}
+    <form method="post" action="{{ url_for('ops.renewal_classify', lead_id=card.r.amo_lead_id) }}" style="margin-top:8px">
+      <button class="sg-btn sg-btn--sm" type="submit">🧠 Оценить по звонку (ИИ)</button>
+      <span class="sg-muted sg-sm" style="margin-left:6px">НейроGuru разберёт последний звонок и выставит статус.</span>
+    </form>
+    {% else %}
+    <p class="sg-muted sg-sm" style="margin-top:8px">🧠 Оценка по звонку станет доступна, когда по клиенту появится разобранный звонок из ОКК.</p>
+    {% endif %}
+  </div>
+  <style>
+    .statbtn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid rgba(255,255,255,.12);border-radius:10px;cursor:pointer;font-size:.86rem;font-weight:600}
+    .statbtn:has(input:checked){border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent)}
+    .statbtn input{accent-color:var(--c)}
+  </style>
   {% endif %}
 
   <div class="sg-card sg-card--pad" style="margin-top:14px">

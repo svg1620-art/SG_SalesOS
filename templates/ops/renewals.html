@@ -134,7 +134,7 @@
     <p class="sg-muted sg-sm" style="margin-top:10px">Фокус — <b style="color:var(--sg-cyan,#00BFDC)">рабочее окно</b> и <b style="color:#F5A524">горит</b>. Красное — клиенты, которых уже должны вести, но давно не трогали.</p>
   </div>
 
-  {% set zp = {'green':['#39d98a','🟢 на треке'],'yellow':['#f5c542','🟡 риск'],'red':['#ff6b6e','🔴 критично'],'paid':['#39d98a','🟢 продлил'],'churn':['#8A8A96','⚫ отвал']} %}
+  {% set zp = {'green':['#39d98a','🟢 договорились'],'yellow':['#f5c542','🟡 думает'],'red':['#ff6b6e','🔴 возражение'],'paid':['#39d98a','🟢 продлил'],'churn':['#8A8A96','⚫ отвал'],'unknown':['#8A8A96','— не оценён']} %}
   <style>
     .rring{--p:0;width:84px;height:84px;border-radius:50%;flex:none;background:conic-gradient(var(--sg-cyan,#00BFDC) calc(var(--p)*1%),rgba(255,255,255,.08) 0);display:flex;align-items:center;justify-content:center}
     .rring .in{width:66px;height:66px;border-radius:50%;background:var(--sg-panel,#141419);display:flex;flex-direction:column;align-items:center;justify-content:center}

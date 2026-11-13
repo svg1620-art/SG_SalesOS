@@ -549,6 +549,39 @@ def renewal_client(lead_id):
     return render_template("ops/renewal_client.html", card=card)
 
 
+@ops_bp.route("/renewals/<int:lead_id>/status", methods=["POST"])
+@admin_required
+def renewal_set_status(lead_id):
+    """Ручной статус коммуникации клиента (переопределяет ИИ)."""
+    from ops.renewals import set_comm_manual
+    from models import Renewal
+    from flask_login import current_user
+    r = db.session.get(Renewal, lead_id)
+    if r is None:
+        abort(404)
+    status = (request.form.get("status") or "").strip()
+    set_comm_manual(r, status, request.form.get("note"), current_user.id)
+    flash("Статус коммуникации обновлён.", "success")
+    return redirect(url_for("ops.renewal_client", lead_id=lead_id))
+
+
+@ops_bp.route("/renewals/<int:lead_id>/classify", methods=["POST"])
+@admin_required
+def renewal_classify(lead_id):
+    """Оценить статус коммуникации нейронкой по последнему звонку."""
+    from ops.renewals import ai_refresh_one
+    from models import Renewal
+    r = db.session.get(Renewal, lead_id)
+    if r is None:
+        abort(404)
+    res = ai_refresh_one(current_app._get_current_object(), r, force=True)
+    if res.get("ok"):
+        flash("Нейронка оценила переговоры по последнему звонку.", "success")
+    else:
+        flash("Не удалось оценить: " + (res.get("error") or "нет данных"), "error")
+    return redirect(url_for("ops.renewal_client", lead_id=lead_id))
+
+
 @ops_bp.route("/renewals/config", methods=["POST"])
 @admin_required
 def renewals_config():

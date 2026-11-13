@@ -307,6 +307,16 @@ def _add_schedule_jobs(app: Flask) -> None:
             except Exception as exc:  # noqa: BLE001
                 app.logger.warning("[renewals] синк пропущен: %s", exc)
 
+    def _run_renewals_classify():
+        with app.app_context():
+            try:
+                from ops.renewals import ai_refresh_all
+                res = ai_refresh_all(app)
+                app.logger.info("[renewals] НейроGuru оценила переговоров: %s",
+                                res.get("classified"))
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[renewals] оценка переговоров пропущена: %s", exc)
+
     tz = app.config.get("TZ") or "UTC"
     t_hour, d_hour = telegram_hour(app), digest_hour(app)
     poll_min = max(1, int(app.config.get("POLL_INTERVAL_MIN") or 15))
@@ -343,6 +353,10 @@ def _add_schedule_jobs(app: Flask) -> None:
     scheduler.add_job(
         _run_renewals_sync, IntervalTrigger(hours=1),
         id="renewals_sync", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _run_renewals_classify, CronTrigger(hour=5, minute=30, timezone=tz),
+        id="renewals_classify", replace_existing=True, max_instances=1, coalesce=True,
     )
     app.logger.info(
         "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",

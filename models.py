@@ -689,10 +689,17 @@ class Renewal(db.Model):
     pipeline_id = db.Column(db.BigInteger, index=True)
     status_id = db.Column(db.Integer)
     status_name = db.Column(db.String(160))
-    # green | yellow | red | paid | churn
-    zone = db.Column(db.String(10), nullable=False, default="green", index=True)
+    # терминальный исход по сделке: open | paid | churn (этапы «оплатил»/«отказался»)
+    zone = db.Column(db.String(10), nullable=False, default="open", index=True)
     is_open = db.Column(db.Boolean, nullable=False, default=True, index=True)
     renewal_end = db.Column(db.Date, nullable=True, index=True)  # дата окончания подписки
+    # --- статус коммуникации (светофор по переговорам, гибрид ИИ+ручной) ---
+    comm_status = db.Column(db.String(10), nullable=True)   # green|yellow|red|None(=не оценён)
+    comm_source = db.Column(db.String(10), nullable=True)   # ai | manual
+    comm_note = db.Column(db.String(500), nullable=True)
+    comm_updated_at = db.Column(db.DateTime, nullable=True)
+    comm_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    comm_call_id = db.Column(db.Integer, nullable=True)     # звонок, по которому выставил ИИ
     amo_updated_at = db.Column(db.DateTime, nullable=True)
     synced_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 

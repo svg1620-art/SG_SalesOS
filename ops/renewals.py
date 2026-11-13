@@ -121,8 +121,8 @@ def board(period="month", manager_ids=None, today=None, month=None):
             "key": key, "label": label, "color": color,
             "count": len(s), "sum": sum(int(r.price or 0) for r in s),
             "untouched": sum(1 for r in s if untouched(r)),
-            "yellow": sum(1 for r in s if _health(r._band, untouched(r)) == "yellow"),
-            "red": sum(1 for r in s if _health(r._band, untouched(r)) == "red"),
+            "yellow": sum(1 for r in s if comm_status_of(r) == "yellow"),
+            "red": sum(1 for r in s if comm_status_of(r) == "red"),
             "focus": key in ("work", "hot"),
         })
 
@@ -171,7 +171,7 @@ def board(period="month", manager_ids=None, today=None, month=None):
                 paid_sum += price; paid_cnt += 1
             elif r.zone == "churn":
                 churn_sum += price; churn_cnt += 1
-            elif r.is_open and r._band in ("hot", "crit") and untouched(r):
+            elif r.is_open and comm_status_of(r) in ("red", "yellow"):
                 risk_sum += price
     money = {
         "plan_sum": plan_sum, "scope_cnt": len(leads),
@@ -208,10 +208,108 @@ def _health(band, untouched):
 
 
 def status_of(zone, band, untouched):
-    """Итоговый статус: терминальный исход (paid/churn) или health открытой."""
+    """Операционный health (резерв): терминальный исход или по сроку+касанию."""
     if zone in ("paid", "churn"):
         return zone
     return _health(band, untouched)
+
+
+def comm_status_of(r):
+    """Светофор продления = статус КОММУНИКАЦИИ (переговоров), не срок.
+
+    Терминальные paid/churn приоритетны; иначе статус из переговоров
+    (нейронка/ручной), либо 'unknown', если ещё не оценивали.
+    """
+    if r.zone == "paid":
+        return "paid"
+    if r.zone == "churn":
+        return "churn"
+    return r.comm_status or "unknown"
+
+
+def latest_analyzed_call(renewal):
+    """Самый свежий разобранный ОКК звонок клиента (по amo_note_id)."""
+    conds = [OpsActivityEvent.lead_id == renewal.amo_lead_id]
+    if renewal.amo_contact_id:
+        conds.append(OpsActivityEvent.contact_id == renewal.amo_contact_id)
+    ev = OpsActivityEvent.query.filter(
+        db.or_(*conds), OpsActivityEvent.type.in_(["call_out", "call_in"])
+    ).all()
+    note_ids = []
+    for e in ev:
+        aid = e.amo_event_id or ""
+        if aid.startswith("note:"):
+            try:
+                note_ids.append(int(aid.split(":", 1)[1]))
+            except ValueError:
+                pass
+    if not note_ids:
+        return None
+    from models import Call
+    calls = Call.query.filter(
+        Call.amo_note_id.in_(note_ids), Call.status == "done",
+        Call.overall_score.isnot(None),
+    ).all()
+    calls = [c for c in calls if c.transcript_json]
+    if not calls:
+        return None
+    return max(calls, key=lambda c: c.started_at or c.created_at)
+
+
+def set_comm_manual(renewal, status, note, user_id):
+    """Ручной статус коммуникации (переопределяет ИИ)."""
+    renewal.comm_status = status if status in ("green", "yellow", "red") else None
+    renewal.comm_source = "manual"
+    renewal.comm_note = (note or "").strip()[:500] or None
+    renewal.comm_updated_at = datetime.utcnow()
+    renewal.comm_by = user_id
+    db.session.commit()
+
+
+def ai_refresh_one(app, renewal, force=False):
+    """Выставить статус коммуникации нейронкой по последнему звонку."""
+    if renewal.comm_source == "manual" and not force:
+        return {"ok": False, "skip": "manual"}
+    call = latest_analyzed_call(renewal)
+    if call is None:
+        return {"ok": False, "error": "Нет разобранного звонка для оценки."}
+    if not force and renewal.comm_call_id == call.id:
+        return {"ok": False, "skip": "same_call"}
+    from processing.renewal_classify import classify_renewal
+    res = classify_renewal(app, call)
+    if not res.get("ok"):
+        return res
+    renewal.comm_status = res["status"]
+    renewal.comm_source = "ai"
+    renewal.comm_note = res.get("reason") or None
+    renewal.comm_updated_at = datetime.utcnow()
+    renewal.comm_call_id = call.id
+    renewal.comm_by = None
+    db.session.commit()
+    return {"ok": True, "status": res["status"]}
+
+
+def ai_refresh_all(app=None, limit=40):
+    """Фоновый проход: оценить нейронкой продления с новым разобранным звонком."""
+    from flask import current_app
+    app = app or current_app
+    rs = Renewal.query.filter(
+        Renewal.is_open.is_(True),
+        db.or_(Renewal.comm_source.is_(None), Renewal.comm_source != "manual"),
+    ).all()
+    n = 0
+    for r in rs:
+        try:
+            res = ai_refresh_one(app, r)
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            app.logger.warning("[renewal-classify] %s: %s", r.amo_lead_id, exc)
+            continue
+        if res.get("ok"):
+            n += 1
+        if n >= limit:
+            break
+    return {"classified": n}
 
 
 def renewal_managers():
@@ -292,8 +390,8 @@ def worklist(manager_ids=None, band_filter="all", limit=20, today=None):
             "end": r.renewal_end, "days_left": dl, "band": r._band,
             "band_label": BAND_SHORT.get(r._band, ""), "band_color": BAND_COLOR.get(r._band),
             "last_touch": d, "untouched": (d is None or d >= cfg["sla"]),
-            "zone": status_of(r.zone, r._band, d is None or d >= cfg["sla"]),
-            "agreement": notes.get(r.amo_lead_id) or "—",
+            "zone": comm_status_of(r),
+            "agreement": r.comm_note or notes.get(r.amo_lead_id) or "—",
             "amo_lead_id": r.amo_lead_id,
         })
         if len(out) >= limit:
@@ -393,7 +491,11 @@ def client_card(lead_id, today=None):
     return {
         "r": r, "name": _display_name(r), "band": band,
         "band_label": BAND_SHORT.get(band, ""), "band_color": BAND_COLOR.get(band),
-        "status": status_of(r.zone, band, untouched),
+        "status": comm_status_of(r),
+        "terminal": r.zone in ("paid", "churn"),
+        "comm_source": r.comm_source, "comm_note": r.comm_note,
+        "comm_updated_at": r.comm_updated_at,
+        "has_call": latest_analyzed_call(r) is not None,
         "days_left": (r.renewal_end - today).days if r.renewal_end else None,
         "touch_count": len(ev), "last_touch": last_touch,
         "agreement": notes.get(r.amo_lead_id),
@@ -454,7 +556,7 @@ def today_touches(manager_ids, today=None, limit=40):
             "name": _display_name(r), "contact": r.name,
             "type": TYPE_LABEL.get(e.type, e.type),
             "days_left": dl, "band": b, "amo_lead_id": r.amo_lead_id,
-            "zone": status_of(r.zone, b, d is None or d >= cfg["sla"]),
+            "zone": comm_status_of(r),
         })
         if len(out) >= limit:
             break
