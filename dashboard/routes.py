@@ -772,9 +772,20 @@ def me_today():
         db.session.rollback()
         eng, eng_metric_chips = None, []
 
+    # «Фокус недели» (Этап 6): менеджеру — только action_for_manager (§12)
+    focus = None
+    try:
+        from ops.diagnosis import latest_diagnosis
+        d = latest_diagnosis(target.id)
+        if d is not None and d.action_for_manager and not d.error:
+            focus = {"action": d.action_for_manager, "week": d.week_start,
+                     "risk": d.risk_level}
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+
     return render_template(
         "dashboard/me_today.html",
-        payback=payback,
+        payback=payback, focus=focus,
         target=target, is_self=(target.id == current_user.id),
         today=today, stat=stat, cards=cards, connect_rate=connect_rate,
         first_action_label=first_action_label,

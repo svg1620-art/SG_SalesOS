@@ -50,6 +50,10 @@ class User(UserMixin, db.Model):
     deactivated_at = db.Column(db.DateTime, nullable=True)
     # последняя активность (для контроля использования платформы)
     last_seen_at = db.Column(db.DateTime, nullable=True, index=True)
+    # Telegram-привязка (Этап 6): chat_id после /start с одноразовым кодом
+    telegram_chat_id = db.Column(db.String(40), nullable=True, index=True)
+    telegram_code = db.Column(db.String(16), nullable=True)   # одноразовый код привязки
+    notify_enabled = db.Column(db.Boolean, nullable=False, default=True)  # личные уведомления
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
@@ -731,3 +735,70 @@ class RenewalCycle(db.Model):
 
     def __repr__(self) -> str:
         return f"<RenewalCycle {self.amo_lead_id} {self.cycle_end} {self.outcome}>"
+
+
+# --- Ops Metrics Этап 6: алерты и AI-диагностика -----------------------------
+
+class OpsAlert(db.Model):
+    """Системный алерт пульта (§10.3). Один активный алерт на (тип, менеджер).
+
+    Пересчёт идемпотентный: повторное срабатывание обновляет существующий
+    активный алерт, исчезновение причины — закрывает его (resolved_at, is_active).
+    """
+
+    __tablename__ = "ops_alerts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    # тип: plan_unrealistic|show_rate_drop|activity_drop|quality_drop|payback_risk|crm_hygiene
+    atype = db.Column(db.String(30), nullable=False, index=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    severity = db.Column(db.String(10), nullable=False, default="warn")  # info|warn|crit
+    title = db.Column(db.String(200), nullable=False)
+    detail = db.Column(db.String(500))
+    data_json = db.Column(db.JSON)          # числа, по которым сработал алерт
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    resolved_at = db.Column(db.DateTime, nullable=True)
+
+    manager = db.relationship("User")
+
+    __table_args__ = (
+        db.Index("ix_ops_alerts_active", "is_active", "atype", "manager_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<OpsAlert {self.atype} m={self.manager_id} active={self.is_active}>"
+
+
+class ManagerDiagnosis(db.Model):
+    """Еженедельная AI-диагностика менеджера (§11). Один разбор на неделю.
+
+    Источник — слой выбора LLM-провайдера SalesOS (DeepSeek/Claude). Строгий
+    JSON {main_cause, evidence[], action_for_manager, question_for_rop, risk_level}.
+    """
+
+    __tablename__ = "manager_diagnosis"
+
+    id = db.Column(db.Integer, primary_key=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    week_start = db.Column(db.Date, nullable=False, index=True)  # понедельник недели
+    main_cause = db.Column(db.String(600))
+    evidence_json = db.Column(db.JSON)             # список коротких фактов
+    action_for_manager = db.Column(db.String(600))
+    question_for_rop = db.Column(db.String(600))
+    risk_level = db.Column(db.String(10))          # low|medium|high
+    provider = db.Column(db.String(20))            # anthropic|deepseek (чем считали)
+    error = db.Column(db.String(500))              # если разбор не удался
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    manager = db.relationship("User")
+
+    __table_args__ = (
+        db.UniqueConstraint("manager_id", "week_start", name="uq_diagnosis_manager_week"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ManagerDiagnosis m={self.manager_id} {self.week_start} {self.risk_level}>"

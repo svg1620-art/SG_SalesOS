@@ -29,10 +29,36 @@
       <input type="hidden" name="department_id" value="{{ department_id or '' }}">
       <button class="sg-btn" type="submit">↻ Пересчитать сейчас</button>
     </form>
+    <form method="post" action="{{ url_for('ops.alerts_recompute') }}">
+      <input type="hidden" name="department_id" value="{{ department_id or '' }}">
+      <button class="sg-btn" type="submit">⚠️ Пересчитать алерты</button>
+    </form>
+    <form method="post" action="{{ url_for('ops.diagnosis_run') }}">
+      <input type="hidden" name="department_id" value="{{ department_id or '' }}">
+      <button class="sg-btn" type="submit" title="Еженедельный AI-разбор по каждому менеджеру (НейроGuru)">🧠 Разбор недели (ИИ)</button>
+    </form>
     <div class="sg-muted sg-sm">
       🟢 {{ summary.green }} · 🟡 {{ summary.yellow }} · 🔴 {{ summary.red }}
     </div>
   </div>
+
+  {% if alerts %}
+  <div class="sg-card sg-card--pad alerts-box">
+    <h3 class="sg-h3" style="margin:0 0 8px">⚠️ Системные алерты <span class="sg-muted sg-sm">({{ alerts|length }})</span></h3>
+    <div class="alerts-grid">
+      {% for a in alerts %}
+      <div class="alert alert--{{ a.severity }}">
+        <div class="alert__top">
+          <span class="alert__emoji">{{ a.emoji }}</span>
+          <b>{{ a.title }}</b>
+          {% if a.manager_id %}<a class="alert__mgr" href="{{ url_for('dashboard.me_today', manager_id=a.manager_id) }}">{{ a.manager }}</a>{% else %}<span class="alert__mgr">{{ a.manager }}</span>{% endif %}
+        </div>
+        {% if a.detail %}<div class="sg-sm sg-muted">{{ a.detail }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   <table class="sg-table">
     <thead>
@@ -73,6 +99,29 @@
         </td>
         <td class="sg-mono">{{ r.avg_call_score if r.avg_call_score is not none else '—' }}</td>
       </tr>
+      {% set dg = diag_rows.get(r.manager.id) %}
+      {% if dg and not dg.error and dg.main_cause %}
+      {% set rr = {'high':['#e5484d','высокий'],'medium':['#f5c542','средний'],'low':['#17b26a','низкий']} %}
+      <tr class="diag-row">
+        <td colspan="11">
+          <details class="diag">
+            <summary>
+              <span class="diag__risk" style="background:{{ rr.get(dg.risk,['#8A8A96','—'])[0] }}"></span>
+              🧠 Разбор недели · риск {{ rr.get(dg.risk, ['','—'])[1] }}
+              <span class="sg-muted sg-sm">({{ dg.week.strftime('%d.%m') }})</span>
+              — {{ dg.main_cause }}
+            </summary>
+            <div class="diag__body">
+              {% if dg.evidence %}<div class="sg-sm"><b>На чём основано:</b><ul style="margin:4px 0 0;padding-left:18px">{% for e in dg.evidence %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+              {% if dg.action %}<div class="sg-sm" style="margin-top:6px"><b>Действие менеджеру:</b> {{ dg.action }}</div>{% endif %}
+              {% if dg.question %}<div class="sg-sm" style="margin-top:6px"><b>Вопрос на 1:1:</b> {{ dg.question }}</div>{% endif %}
+            </div>
+          </details>
+        </td>
+      </tr>
+      {% elif dg and dg.error %}
+      <tr class="diag-row"><td colspan="11" class="sg-muted sg-sm">🧠 {{ r.name }}: разбор не удался — {{ dg.error }}</td></tr>
+      {% endif %}
       {% else %}
       <tr><td colspan="11" class="sg-muted">Нет активных менеджеров / данных за сегодня.</td></tr>
       {% endfor %}
@@ -90,5 +139,17 @@
   .sg-bar__fill{height:100%;background:var(--sg-blue,#1467F5);border-radius:3px}
   .sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}
   .sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+  .alerts-box{margin:0 0 14px}
+  .alerts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:9px}
+  .alert{border:1px solid rgba(255,255,255,.1);border-left-width:3px;border-radius:9px;padding:9px 11px;background:rgba(255,255,255,.03)}
+  .alert--crit{border-left-color:#e5484d}.alert--warn{border-left-color:#f5c542}.alert--info{border-left-color:#1467F5}
+  .alert__top{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .alert__mgr{margin-left:auto;font-size:.8rem;color:var(--sg-cyan,#00BFDC);text-decoration:none}
+  .diag-row>td{padding-top:0!important;border-top:none!important}
+  details.diag{margin:0 0 4px}
+  details.diag summary{cursor:pointer;list-style:none;font-size:.86rem;padding:6px 8px;background:rgba(20,103,245,.07);border-radius:8px}
+  details.diag summary::-webkit-details-marker{display:none}
+  .diag__risk{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle;margin-right:4px}
+  .diag__body{padding:8px 10px 4px}
 </style>
 {% endblock %}

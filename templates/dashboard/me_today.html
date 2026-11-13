@@ -15,6 +15,18 @@
     {% if first_action_label %}· старт {{ first_action_label }}{% endif %}
   </p>
 
+  {# --- Фокус недели (AI-диагностика, Этап 6) --- #}
+  {% if focus %}
+  <div class="sg-card sg-card--pad sg-focus" style="margin-top:14px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:1.3rem">🎯</span>
+      <h3 class="sg-h3" style="margin:0">Фокус недели</h3>
+      <span class="sg-muted sg-sm" style="margin-left:auto">неделя с {{ focus.week.strftime('%d.%m') }}</span>
+    </div>
+    <p style="margin:8px 0 0;font-size:1.02rem">{{ focus.action }}</p>
+  </div>
+  {% endif %}
+
   {# --- Миссия дня (геймификация, Этап 5) --- #}
   {% if mission %}
   <div class="sg-card sg-card--pad sg-mission" style="margin-top:14px">
@@ -191,6 +203,8 @@
   .sg-dot--green{color:#17b26a}.sg-dot--yellow{color:#f5c542}.sg-dot--red{color:var(--sg-red,#e5484d)}
   .sg-dot--no_data{color:#777}
 
+  /* --- Фокус недели --- */
+  .sg-focus{border:1px solid rgba(0,191,220,.3);background:linear-gradient(135deg,rgba(0,191,220,.08),transparent)}
   /* --- Миссия дня --- */
   .sg-mission{border:1px solid rgba(20,103,245,.25)}
   .sg-mission__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}

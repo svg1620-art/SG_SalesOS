@@ -344,10 +344,25 @@ def board():
     for r in rows:
         summary[r["status"]] = summary.get(r["status"], 0) + 1
 
+    # системные алерты (Этап 6) + AI-диагностика по менеджерам
+    from ops.alerts import active_alerts
+    from ops.diagnosis import diagnosis_map
+    row_ids = [r["manager"].id for r in rows if r.get("manager")]
+    alerts = active_alerts(manager_ids=(mgr_ids if mgr_ids is not None else None))
+    diags = diagnosis_map(row_ids)
+    diag_rows = {}
+    for mid, d in diags.items():
+        diag_rows[mid] = {
+            "main_cause": d.main_cause, "evidence": d.evidence_json or [],
+            "action": d.action_for_manager, "question": d.question_for_rop,
+            "risk": d.risk_level, "week": d.week_start, "error": d.error,
+        }
+
     return render_template(
         "ops/board.html", rows=rows, summary=summary, sort=sort,
         departments=departments, department_id=dep_id,
         now_label=now_local().strftime("%H:%M"),
+        alerts=alerts, diag_rows=diag_rows,
     )
 
 
@@ -357,6 +372,25 @@ def board_refresh():
     from ops.metrics import recompute_today
     _run_bg(recompute_today)
     flash("Пересчёт метрик за сегодня запущен. Обновите страницу через несколько секунд.", "success")
+    return redirect(url_for("ops.board", department_id=request.form.get("department_id") or None))
+
+
+@ops_bp.route("/alerts/recompute", methods=["POST"])
+@admin_required
+def alerts_recompute():
+    from ops.alerts import recompute_alerts
+    _run_bg(lambda app: recompute_alerts(app))
+    flash("Пересчёт алертов запущен. Обновите страницу через несколько секунд.", "success")
+    return redirect(url_for("ops.board", department_id=request.form.get("department_id") or None))
+
+
+@ops_bp.route("/diagnosis/run", methods=["POST"])
+@admin_required
+def diagnosis_run():
+    from ops.diagnosis import diagnose_all
+    force = request.form.get("force") == "1"
+    _run_bg(lambda app: diagnose_all(app, force=force))
+    flash("AI-диагностика недели запущена (НейроGuru). Результат появится через минуту.", "success")
     return redirect(url_for("ops.board", department_id=request.form.get("department_id") or None))
 
 

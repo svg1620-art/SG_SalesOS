@@ -296,6 +296,24 @@ def _add_schedule_jobs(app: Flask) -> None:
             except Exception as exc:  # noqa: BLE001
                 app.logger.warning("[missions] генерация пропущена: %s", exc)
 
+    def _run_ops_alerts():
+        with app.app_context():
+            try:
+                from ops.alerts import recompute_alerts
+                res = recompute_alerts(app)
+                app.logger.info("[alerts] активных сработало: %s", res.get("fired"))
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[alerts] пересчёт пропущен: %s", exc)
+
+    def _run_ops_diagnosis():
+        with app.app_context():
+            try:
+                from ops.diagnosis import diagnose_all
+                res = diagnose_all(app)
+                app.logger.info("[diagnosis] разбор недели: %s", res)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[diagnosis] разбор недели пропущен: %s", exc)
+
     def _run_renewals_sync():
         with app.app_context():
             from settings_store import amo_configured
@@ -357,6 +375,15 @@ def _add_schedule_jobs(app: Flask) -> None:
     scheduler.add_job(
         _run_renewals_classify, CronTrigger(hour=5, minute=30, timezone=tz),
         id="renewals_classify", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    # Этап 6: системные алерты (несколько раз в день) + AI-диагностика (пн 08:00)
+    scheduler.add_job(
+        _run_ops_alerts, CronTrigger(hour="8,12,16", minute=50, timezone=tz),
+        id="ops_alerts", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _run_ops_diagnosis, CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=tz),
+        id="ops_diagnosis", replace_existing=True, max_instances=1, coalesce=True,
     )
     app.logger.info(
         "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",
