@@ -376,8 +376,18 @@ def index():
         (m.full_name or m.email for m in managers if m.id == eng_sel_id), None
     )
 
+    # --- разбор звонков: дисциплина самоконтроля по менеджерам ---
+    import review as _review
+    review_rows = []
+    for m in managers:
+        st = _review.manager_stats(m.id, date_from, date_to)
+        if st["total"]:
+            review_rows.append({"name": m.full_name or m.email, **st})
+    review_rows.sort(key=lambda r: (r["pct"] if r["pct"] is not None else 101, -r["overdue"]))
+
     return render_template(
         "dashboard/index.html",
+        review_rows=review_rows,
         kpi=kpi,
         leaderboard=leaderboard,
         manager_cards=manager_cards,
@@ -513,6 +523,11 @@ def manager_home():
         .all()
     )
 
+    # --- на разбор: неразобранные оценённые звонки ---
+    import review as _review
+    review_pending = _review.pending_for_manager(current_user.id)
+    review_overdue = sum(1 for c in review_pending if _review.state(c) == "overdue")
+
     return render_template(
         "dashboard/manager.html",
         avg_score=avg_score,
@@ -524,6 +539,8 @@ def manager_home():
         missed=missed,
         recent_calls=recent_calls,
         next_step_calls=next_step_calls,
+        review_pending=review_pending[:20], review_pending_count=len(review_pending),
+        review_overdue=review_overdue,
     )
 
 

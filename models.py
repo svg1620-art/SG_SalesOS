@@ -209,6 +209,9 @@ class Call(db.Model):
     diarization = db.Column(db.String(10))  # stereo|heuristic
     # нецелевой звонок: исключён из рейтинга/метрик, но остаётся в списке
     excluded = db.Column(db.Boolean, default=False)
+    # самоконтроль: разбор звонка менеджером (комментарий обязателен)
+    manager_comment = db.Column(db.Text, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True, index=True)
     # какой канал стерео = менеджер (0=левый, 1=правый); None → дефолт по направлению
     manager_channel = db.Column(db.Integer, nullable=True)
     # для дедупликации ручной загрузки: SHA256(имя+длительность+дата)

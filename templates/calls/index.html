@@ -62,6 +62,14 @@
         <option value="lost" {{ 'selected' if filters.outcome == 'lost' }}>❌ Закрыто и не реализовано</option>
       </select>
     </label>
+    <label class="sg-field sg-field--inline">
+      <span class="sg-field__label">Разбор</span>
+      <select class="sg-input sg-input--sm" name="review">
+        <option value="">Все</option>
+        <option value="pending" {{ 'selected' if filters.review == 'pending' }}>⚠️ Не разобраны</option>
+        <option value="overdue" {{ 'selected' if filters.review == 'overdue' }}>⏰ Просрочены</option>
+      </select>
+    </label>
     <button class="sg-btn sg-btn--primary sg-btn--sm" type="submit">Применить</button>
     <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.index') }}">Сброс</a>
     {% if current_user.is_admin %}
@@ -89,6 +97,7 @@
           <th>Баланс 🗣/👂</th>
           <th>Исход</th>
           <th>Зона</th>
+          <th>Разбор</th>
         </tr>
       </thead>
       <tbody>
@@ -124,6 +133,13 @@
             {% else %}<span class="sg-muted">—</span>{% endif %}
           </td>
           <td>{{ zone_badge(c.zone) }}</td>
+          <td>
+            {% set rs = review_states.get(c.id) %}
+            {% if rs == 'reviewed' %}<span class="sg-badge sg-badge--active">✅ разобран</span>
+            {% elif rs == 'overdue' %}<span class="sg-badge sg-badge--lost">⏰ просрочен</span>
+            {% elif rs == 'pending' %}<span class="sg-badge" style="color:var(--sg-yellow)">⚠️ не разобран</span>
+            {% else %}<span class="sg-muted">—</span>{% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

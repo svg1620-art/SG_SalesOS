@@ -71,6 +71,41 @@
     </div>
     {% endif %}
 
+    {# --- Мой разбор (обязательный самоконтроль менеджера) --- #}
+    {% if review and review.required %}
+    <div class="sg-card sg-card--pad" id="review"
+         style="border:1px solid {{ 'rgba(23,178,106,.35)' if review.state=='reviewed' else ('rgba(229,72,77,.4)' if review.state=='overdue' else 'rgba(245,197,66,.35)') }}">
+      <h3 class="sg-h3">📝 Мой разбор
+        {% if review.state == 'reviewed' %}<span class="sg-badge sg-badge--active">разобран</span>
+        {% elif review.state == 'overdue' %}<span class="sg-badge sg-badge--lost">просрочен</span>
+        {% else %}<span class="sg-badge">не разобран</span>{% endif %}
+      </h3>
+      {% if review.state == 'reviewed' %}
+        <p class="sg-muted sg-sm">Разобрано {{ review.reviewed_at.strftime('%d.%m.%Y %H:%M') }} UTC.</p>
+        <p style="white-space:pre-wrap">{{ review.comment }}</p>
+        {% if review.is_owner %}
+        <details style="margin-top:8px"><summary class="sg-sm sg-muted" style="cursor:pointer">Изменить разбор</summary>
+          <form method="post" action="{{ url_for('calls.review', call_id=call.id) }}" style="margin-top:8px">
+            <textarea class="sg-input" name="comment" rows="3" required>{{ review.comment }}</textarea>
+            <button class="sg-btn sg-btn--sm" type="submit" style="margin-top:6px">Сохранить</button>
+          </form>
+        </details>
+        {% endif %}
+      {% elif review.is_owner %}
+        <p class="sg-muted sg-sm">Напишите, <b>что поняли и что исправите в следующий раз</b> — тогда звонок считается разобранным.
+          {% if review.due %}Срок: до конца {{ review.due.strftime('%d.%m') }}.{% endif %}</p>
+        <form method="post" action="{{ url_for('calls.review', call_id=call.id) }}">
+          <textarea class="sg-input" name="comment" rows="3" required
+                    placeholder="Напр.: не уточнил время перезвона — в следующий раз всегда фиксирую конкретный день и час."></textarea>
+          <button class="sg-btn sg-btn--primary" type="submit" style="margin-top:8px">✓ Я изучил звонок</button>
+        </form>
+      {% else %}
+        <p class="sg-muted sg-sm">Менеджер ещё не разобрал этот звонок.
+          {% if review.due %}Срок — до конца {{ review.due.strftime('%d.%m') }}.{% endif %}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {# --- Потенциал сделки (скоринг лида) от НейроGuru (по запросу) --- #}
     <div class="sg-card sg-card--pad">
       <div class="sg-page__head">

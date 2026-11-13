@@ -6,6 +6,36 @@
 <section class="sg-page">
   <h1 class="sg-h1">Мой кабинет</h1>
 
+  {# --- На разбор: обязательный самоконтроль --- #}
+  {% if review_pending_count %}
+  <div class="sg-card sg-card--pad" style="border:1px solid {{ 'rgba(229,72,77,.4)' if review_overdue else 'rgba(245,197,66,.35)' }};margin-bottom:14px">
+    <h3 class="sg-h3">📝 На разбор: {{ review_pending_count }}
+      {% if review_overdue %}<span class="sg-badge sg-badge--lost">{{ review_overdue }} просрочено</span>{% endif %}
+    </h3>
+    <p class="sg-muted sg-sm">Разбери свои звонки — напиши, что исправишь. Срок: до конца следующего рабочего дня.</p>
+    <div style="overflow-x:auto">
+      <table class="sg-table">
+        <thead><tr><th>Дата</th><th>Клиент</th><th>Балл</th><th>Зона</th><th></th></tr></thead>
+        <tbody>
+          {% for c in review_pending %}
+          <tr class="{{ 'sg-row--red' if c.zone == 'red' }}">
+            <td class="sg-mono sg-sm">{{ c.started_at.strftime('%d.%m %H:%M') if c.started_at else '—' }}</td>
+            <td>{{ c.client.name or c.client.phone_normalized if c.client else '—' }}</td>
+            <td class="sg-mono">{{ c.overall_score if c.overall_score is not none else '—' }}</td>
+            <td>{{ zone_badge(c.zone) }}</td>
+            <td><a class="sg-btn sg-btn--sm sg-btn--primary" href="{{ url_for('calls.detail', call_id=c.id) }}#review">Разобрать →</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="sg-card sg-card--pad" style="border:1px solid rgba(23,178,106,.3);margin-bottom:14px">
+    <span class="sg-ok">✅ Все звонки разобраны.</span> <span class="sg-muted sg-sm">Молодец — так и держи.</span>
+  </div>
+  {% endif %}
+
   {# --- KPI --- #}
   <div class="sg-cards">
     <div class="sg-card">

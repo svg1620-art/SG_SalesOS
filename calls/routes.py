@@ -91,6 +91,15 @@ def index():
         calls = [c for c in calls if call_outcomes.get(c.id) == outcome]
     calls = calls[:500]
 
+    # состояние разбора + фильтр «не разобранные»
+    import review as _review
+    review_param = request.args.get("review") or ""
+    review_states = _review.states_for(calls)
+    if review_param == "pending":
+        calls = [c for c in calls if review_states.get(c.id) in ("pending", "overdue")]
+    elif review_param == "overdue":
+        calls = [c for c in calls if review_states.get(c.id) == "overdue"]
+
     managers = (
         User.query.filter_by(is_active=True).order_by(User.full_name, User.email).all()
         if current_user.is_admin else []
@@ -104,10 +113,11 @@ def index():
         "manager_id": manager_id,
         "zone": zone,
         "outcome": outcome,
+        "review": review_param,
     }
     return render_template(
         "calls/index.html", calls=calls, managers=managers, filters=filters,
-        balances=balances, call_outcomes=call_outcomes,
+        balances=balances, call_outcomes=call_outcomes, review_states=review_states,
         query_string=request.query_string.decode(),
     )
 
@@ -267,6 +277,7 @@ def _panel_context(call):
     from settings_store import amo_base_domain
     from utils import amo_entity_url
 
+    import review as _review
     return {
         "call": call,
         "in_progress": IN_PROGRESS,
@@ -277,6 +288,14 @@ def _panel_context(call):
             amo_base_domain(), call.amo_entity_type, call.amo_entity_id
         ),
         "deal_outcome": _deal_outcome(call),
+        "review": {
+            "required": _review.is_scored(call),
+            "state": _review.state(call),
+            "due": _review.due_date(call),
+            "comment": call.manager_comment,
+            "reviewed_at": call.reviewed_at,
+            "is_owner": call.manager_id == current_user.id,
+        },
     }
 
 
@@ -286,6 +305,24 @@ def _deal_outcome(call):
         return deal_outcome_for_call(call)
     except Exception:  # noqa: BLE001
         return None
+
+
+@calls_bp.route("/<int:call_id>/review", methods=["POST"])
+@login_required
+def review(call_id):
+    """Менеджер отмечает звонок разобранным (комментарий обязателен)."""
+    call = _get_call_or_404(call_id)
+    if call.manager_id != current_user.id:
+        abort(403)  # разбор пишет только владелец звонка
+    comment = (request.form.get("comment") or "").strip()
+    if len(comment) < 3:
+        flash("Напишите комментарий: что вы поняли и что исправите в следующий раз.", "error")
+        return redirect(url_for("calls.detail", call_id=call.id) + "#review")
+    call.manager_comment = comment[:4000]
+    call.reviewed_at = datetime.utcnow()
+    db.session.commit()
+    flash("Звонок отмечен как разобранный.", "success")
+    return redirect(url_for("calls.detail", call_id=call.id) + "#review")
 
 
 @calls_bp.route("/<int:call_id>")

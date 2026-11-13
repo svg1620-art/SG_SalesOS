@@ -40,6 +40,13 @@
 - Зона считается **на звонок**. Диалог хранит агрегат (avg_score, last_zone, trend).
 - Дефолтный чек-лист (8 критериев, домен-агностичный) — Приложение A в ТЗ, заливается сидом на Этапе 2.
 
+## Самоконтроль менеджера (разбор звонков)
+`Call.manager_comment` + `Call.reviewed_at`. Разбор обязателен для ВСЕХ
+оценённых звонков, комментарий обязателен, срок — до конца следующего рабочего
+дня (`review.py`: state reviewed/pending/overdue/na). Карточка звонка — блок
+«Мой разбор»; список звонков — колонка/фильтр «разбор»; `/me` — блок «На
+разбор»; дашборд РОПа — «Разбор звонков» (% по менеджерам + просрочки). Без XP.
+
 ## Модель данных (кратко; детали в ТЗ, разд. 4)
 `User(role)`, `Checklist`, `Criterion(weight,is_critical)`, `Client(phone_normalized)`, `Dialog`, `Call(status,transcript_json,overall_score,zone)`, `CallCriterionScore`, `Recommendation`, `MissedMoment`, `DailyDigest`, `AmoToken`.
 Статусы звонка: `new→downloading→transcribing→analyzing→done` / `failed(+error)`.

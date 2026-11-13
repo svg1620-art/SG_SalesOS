@@ -290,6 +290,30 @@
     <a class="sg-btn sg-btn--sm" href="{{ url_for('calls.index') }}">→ Перейти к звонкам</a>
   </div>
 
+  {# --- Разбор звонков: дисциплина самоконтроля --- #}
+  {% if review_rows %}
+  <div class="sg-page__head" style="margin-top:22px"><h2 class="sg-h2">📝 Разбор звонков</h2></div>
+  <div class="sg-card sg-card--pad">
+    <p class="sg-muted sg-sm" style="margin-top:0">Изучают ли менеджеры свои звонки и фиксируют ли выводы. За выбранный период.</p>
+    <div style="overflow-x:auto">
+      <table class="sg-table">
+        <thead><tr><th>Менеджер</th><th>Оценено</th><th>Разобрано</th><th>%</th><th>Просрочено</th></tr></thead>
+        <tbody>
+          {% for r in review_rows %}
+          <tr class="{{ 'sg-row--red' if r.overdue }}">
+            <td>{{ r.name }}</td>
+            <td class="sg-mono">{{ r.total }}</td>
+            <td class="sg-mono">{{ r.reviewed }}</td>
+            <td class="sg-mono"><b style="color:{{ '#39d98a' if r.pct is not none and r.pct >= 80 else ('#f5c542' if r.pct is not none and r.pct >= 50 else 'var(--sg-red)') }}">{{ r.pct if r.pct is not none else '—' }}%</b></td>
+            <td class="sg-mono" style="{{ 'color:var(--sg-red);font-weight:700' if r.overdue }}">{{ r.overdue or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
   {# --- Вовлечённость команды --- #}
   {% if eng_team_data %}
   {{ eng_styles() }}
