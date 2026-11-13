@@ -25,11 +25,37 @@
     </form>
     <form method="post" action="{{ url_for('ops.renewals_sync_now') }}" style="margin-top:10px">
       <button class="sg-btn sg-btn--primary" type="submit">↻ Синхронизировать продления</button>
+      {% if pipeline_id %}<a class="sg-btn sg-btn--sm" href="{{ url_for('ops.renewals', diag='fields', department_id=department_id) }}" style="margin-left:8px">🔍 Показать поля сделок</a>{% endif %}
       <span class="sg-muted sg-sm" style="margin-left:10px">
         {% if total_renewals %}В базе: <b>{{ total_renewals }}</b> сделок{% if last_sync %} · обновлено {{ last_sync.strftime('%d.%m %H:%M') }} UTC{% endif %}{% else %}Сделки ещё не загружены{% endif %}
       </span>
     </form>
     {% if pipelines_error %}<p class="sg-sm" style="color:var(--sg-yellow)">amoCRM: {{ pipelines_error }}</p>{% endif %}
+
+    {% if field_diag %}
+      {% if field_diag.error %}
+      <div class="sg-flash sg-flash--error" style="margin-top:10px">Диагностика: {{ field_diag.error }}</div>
+      {% else %}
+      <div style="margin-top:12px">
+        <div class="sg-sm sg-muted" style="margin-bottom:6px">Доп-поля сделок воронки (по {{ field_diag.leads }} сделкам). Найдите поле с датой окончания и <b>скопируйте его id (или имя)</b> в настройку выше.</div>
+        <div style="overflow-x:auto">
+          <table class="sg-table">
+            <thead><tr><th>id поля</th><th>Имя</th><th>Примеры значений</th></tr></thead>
+            <tbody>
+              {% for f in field_diag.fields %}
+              <tr style="{{ 'background:rgba(0,191,220,.07)' if f.looks_date }}">
+                <td class="sg-mono">{{ f.id }}{% if f.looks_date %} 📅{% endif %}</td>
+                <td>{{ f.name }}</td>
+                <td class="sg-sm sg-muted">{{ f.examples|join(', ') }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="sg-muted sg-sm" style="margin-top:6px">📅 — поле похоже на дату. Обычно это и есть «дата окончания подписки».</p>
+      </div>
+      {% endif %}
+    {% endif %}
   </div>
 
   {% if not pipeline_id %}

@@ -505,6 +505,12 @@ def renewals():
             except Exception:  # noqa: BLE001
                 db.session.rollback()
 
+    # диагностика доп-полей сделки (чтобы найти поле «дата окончания подписки»)
+    field_diag = None
+    if request.args.get("diag") == "fields" and pid:
+        from ingest.renewals_sync import sample_custom_fields
+        field_diag = sample_custom_fields()
+
     pipelines, pl_err = _pipelines()
     last_sync = None
     try:
@@ -518,7 +524,7 @@ def renewals():
         pipeline_id=pid, date_field=date_field, configured=configured,
         total_renewals=Renewal.query.count() if pid else 0, last_sync=last_sync,
         worklist=worklist, plan=plan, touches=touches, heat=heat,
-        rm_list=rm_list, sel_rm=sel_rm, wband=wband,
+        rm_list=rm_list, sel_rm=sel_rm, wband=wband, field_diag=field_diag,
     )
 
 

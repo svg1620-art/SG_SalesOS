@@ -77,16 +77,27 @@ def _parse_date_field(lead, field_cfg):
         vals = cf.get("values") or []
         if not vals:
             return None
-        raw = vals[0].get("value")
-        try:
-            ts = int(raw)
+        return _to_date(vals[0].get("value"))
+    return None
+
+
+def _to_date(raw):
+    """Значение поля даты amoCRM → date. Поддержка unix-ts (int/str) и строк."""
+    if raw is None or raw == "":
+        return None
+    # unix timestamp (секунды) — основной формат date-полей amoCRM
+    try:
+        ts = int(raw)
+        if ts > 10 ** 8:  # похоже на unix-время, а не на «12»
             return datetime.utcfromtimestamp(ts).date()
-        except (TypeError, ValueError):
-            # иногда дата строкой YYYY-MM-DD
-            try:
-                return datetime.strptime(str(raw)[:10], "%Y-%m-%d").date()
-            except ValueError:
-                return None
+    except (TypeError, ValueError):
+        pass
+    s = str(raw).strip()[:10]
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%Y.%m.%d"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
     return None
 
 
@@ -103,6 +114,44 @@ def _main_contact_id(lead):
         if c.get("is_main"):
             return c.get("id")
     return cts[0].get("id")
+
+
+def sample_custom_fields(app=None, limit_leads=10) -> dict:
+    """Диагностика: какие доп-поля есть у сделок воронки и их значения.
+
+    Помогает найти точный id/имя поля «дата окончания подписки».
+    """
+    app = app or current_app
+    if not amo_configured(app):
+        return {"error": "amoCRM не настроен"}
+    pid = ops_int("renewals_pipeline_id", 0)
+    if not pid:
+        return {"error": "Не задана воронка продлений"}
+    try:
+        client = _client()
+        fields, n = {}, 0
+        for lead in client.iter_leads(pipeline_id=pid, max_pages=1, order="desc"):
+            for cf in (lead.get("custom_fields_values") or []):
+                fid = cf.get("field_id")
+                ent = fields.setdefault(fid, {
+                    "id": fid, "name": cf.get("field_name") or "",
+                    "type": cf.get("field_type") or "", "examples": [], "looks_date": False,
+                })
+                vals = cf.get("values") or []
+                raw = vals[0].get("value") if vals else None
+                d = _to_date(raw)
+                disp = (d.strftime("%d.%m.%Y") if d else str(raw))
+                if d:
+                    ent["looks_date"] = True
+                if disp and disp not in ent["examples"] and len(ent["examples"]) < 3:
+                    ent["examples"].append(disp)
+            n += 1
+            if n >= limit_leads:
+                break
+        rows = sorted(fields.values(), key=lambda f: (not f["looks_date"], str(f["name"])))
+        return {"ok": True, "leads": n, "fields": rows}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)[:300]}
 
 
 def sync_renewals(app=None) -> dict:
