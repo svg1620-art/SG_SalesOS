@@ -43,16 +43,24 @@ def _kw_list(key):
     return [s.strip().lower() for s in (get_ops_setting(key) or "").split(",") if s.strip()]
 
 
-def _zone_for(status_name, status_type, red_kw, yellow_kw):
-    """Зона по этапу: тип статуса (won/lost) приоритетнее, иначе по ключевым словам."""
+def _zone_for(status_name, status_type, kw):
+    """Зона по этапу. Терминальные (оплатил/отказался) закрывают сделку.
+
+    Приоритет: системный тип статуса (won/lost) → имя этапа (оплатил/отказался)
+    → риск-слова (🔴/🟡) → иначе 🟢 открытая.
+    """
     if status_type == 1:
         return "paid", False
     if status_type == 2:
         return "churn", False
     nm = (status_name or "").lower()
-    if any(k in nm for k in red_kw):
+    if any(k in nm for k in kw["churn"]):
+        return "churn", False
+    if any(k in nm for k in kw["paid"]):
+        return "paid", False
+    if any(k in nm for k in kw["red"]):
         return "red", True
-    if any(k in nm for k in yellow_kw):
+    if any(k in nm for k in kw["yellow"]):
         return "yellow", True
     return "green", True
 
@@ -109,7 +117,12 @@ def sync_renewals(app=None) -> dict:
     if not pid:
         return {"ok": False, "error": "Не задана воронка продлений (renewals_pipeline_id)"}
     field_cfg = get_ops_setting("renewals_date_field")
-    red_kw, yellow_kw = _kw_list("renewal_zone_red"), _kw_list("renewal_zone_yellow")
+    kw = {
+        "paid": _kw_list("renewal_zone_paid"),
+        "churn": _kw_list("renewal_zone_churn"),
+        "red": _kw_list("renewal_zone_red"),
+        "yellow": _kw_list("renewal_zone_yellow"),
+    }
 
     client = _client()
     mgr_map = _manager_map()
@@ -123,7 +136,7 @@ def sync_renewals(app=None) -> dict:
                 continue
             status_id = int(lead.get("status_id") or 0)
             st_name, st_type = st_idx.get(status_id, ("", 0))
-            zone, is_open = _zone_for(st_name, st_type, red_kw, yellow_kw)
+            zone, is_open = _zone_for(st_name, st_type, kw)
             rend = _parse_date_field(lead, field_cfg)
             if rend is None:
                 no_date += 1
