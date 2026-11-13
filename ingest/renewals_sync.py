@@ -44,10 +44,11 @@ def _kw_list(key):
 
 
 def _zone_for(status_name, status_type, kw):
-    """Зона по этапу. Терминальные (оплатил/отказался) закрывают сделку.
+    """Терминальность сделки по этапу: оплатил / отказался / открыта.
 
-    Приоритет: системный тип статуса (won/lost) → имя этапа (оплатил/отказался)
-    → риск-слова (🔴/🟡) → иначе 🟢 открытая.
+    Этапы как операционный статус НЕ используем (они не поддерживаются). Берём
+    только факт исхода: системный won/lost или имя терминального этапа.
+    Статус-светофор открытых сделок считается по данным (дата+касания) при показе.
     """
     if status_type == 1:
         return "paid", False
@@ -58,11 +59,7 @@ def _zone_for(status_name, status_type, kw):
         return "churn", False
     if any(k in nm for k in kw["paid"]):
         return "paid", False
-    if any(k in nm for k in kw["red"]):
-        return "red", True
-    if any(k in nm for k in kw["yellow"]):
-        return "yellow", True
-    return "green", True
+    return "open", True
 
 
 def _parse_date_field(lead, field_cfg):

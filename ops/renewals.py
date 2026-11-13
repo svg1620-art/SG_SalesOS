@@ -115,8 +115,8 @@ def board(period="month", manager_ids=None, today=None):
             "key": key, "label": label, "color": color,
             "count": len(s), "sum": sum(int(r.price or 0) for r in s),
             "untouched": sum(1 for r in s if untouched(r)),
-            "yellow": sum(1 for r in s if r.zone == "yellow"),
-            "red": sum(1 for r in s if r.zone == "red"),
+            "yellow": sum(1 for r in s if _health(r._band, untouched(r)) == "yellow"),
+            "red": sum(1 for r in s if _health(r._band, untouched(r)) == "red"),
             "focus": key in ("work", "hot"),
         })
 
@@ -139,7 +139,7 @@ def board(period="month", manager_ids=None, today=None):
     paid_sum = sum(int(r.price or 0) for r in paid)
     churn_sum = sum(int(r.price or 0) for r in churn)
     risk_sum = sum(int(r.price or 0) for r in scope
-                   if r.is_open and r._band in ("hot", "crit") and r.zone in ("yellow", "red"))
+                   if r.is_open and r._band in ("hot", "crit") and untouched(r))
     money = {
         "plan_sum": plan_sum, "scope_cnt": len(scope),
         "paid_sum": paid_sum, "paid_cnt": len(paid),
@@ -159,6 +159,26 @@ BAND_SHORT = {"work": "Рабочее окно", "hot": "Горит", "crit": "�
               "early": "Рано", "nodate": "Без даты"}
 BAND_COLOR = {k: c for k, _l, c in [(m[0], m[1], m[2]) for m in BAND_META]}
 _PRIORITY = {"crit": 0, "hot": 1, "work": 2, "early": 3, "nodate": 4}
+
+
+def _health(band, untouched):
+    """Статус-светофор открытой сделки по данным (срок + свежесть касания).
+
+    🔴 горит/критично и давно не тронут; 🟡 брошен или критичный срок;
+    🟢 в работе и тронут недавно. Этапы воронки не используются.
+    """
+    if untouched and band in ("crit", "hot"):
+        return "red"
+    if untouched or band == "crit":
+        return "yellow"
+    return "green"
+
+
+def status_of(zone, band, untouched):
+    """Итоговый статус: терминальный исход (paid/churn) или health открытой."""
+    if zone in ("paid", "churn"):
+        return zone
+    return _health(band, untouched)
 
 
 def renewal_managers():
@@ -239,7 +259,8 @@ def worklist(manager_ids=None, band_filter="all", limit=20, today=None):
             "end": r.renewal_end, "days_left": dl, "band": r._band,
             "band_label": BAND_SHORT.get(r._band, ""), "band_color": BAND_COLOR.get(r._band),
             "last_touch": d, "untouched": (d is None or d >= cfg["sla"]),
-            "zone": r.zone, "agreement": notes.get(r.amo_lead_id) or r.status_name or "—",
+            "zone": status_of(r.zone, r._band, d is None or d >= cfg["sla"]),
+            "agreement": notes.get(r.amo_lead_id) or "—",
             "amo_lead_id": r.amo_lead_id,
         })
         if len(out) >= limit:
@@ -282,19 +303,24 @@ def today_touches(manager_ids, today=None, limit=40):
     cfg = _cfg()
     TYPE_LABEL = {"call_out": "Звонок", "call_in": "Входящий", "msg_out": "Сообщение",
                   "msg_in": "Входящее", "note": "Примечание", "task_done": "Задача"}
-    out = []
+    matched = []
     for e in ev:
         r = (by_lead.get(e.lead_id) if e.lead_id else None) or \
             (by_contact.get(e.contact_id) if e.contact_id else None)
-        if r is None:
-            continue
+        if r is not None:
+            matched.append((e, r))
+    touch = _last_touch_days([r for _e, r in matched])
+    out = []
+    for e, r in matched:
         dl = (r.renewal_end - today).days if r.renewal_end else None
+        b = band_of(r.renewal_end, today, cfg)
+        d = touch.get(r.amo_lead_id)
         out.append({
             "time": to_local(e.occurred_at).strftime("%H:%M"),
             "name": _display_name(r), "contact": r.name,
             "type": TYPE_LABEL.get(e.type, e.type),
-            "days_left": dl, "zone": r.zone, "amo_lead_id": r.amo_lead_id,
-            "band": band_of(r.renewal_end, today, cfg),
+            "days_left": dl, "band": b, "amo_lead_id": r.amo_lead_id,
+            "zone": status_of(r.zone, b, d is None or d >= cfg["sla"]),
         })
         if len(out) >= limit:
             break
