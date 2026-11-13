@@ -4,7 +4,7 @@ import threading
 from datetime import datetime, timedelta
 
 from flask import (
-    Blueprint, render_template, redirect, url_for, request, flash, current_app,
+    Blueprint, render_template, redirect, url_for, request, flash, current_app, abort,
 )
 
 from auth.decorators import admin_required
@@ -520,6 +520,17 @@ def renewals():
         worklist=worklist, plan=plan, touches=touches, heat=heat,
         rm_list=rm_list, sel_rm=sel_rm, wband=wband,
     )
+
+
+@ops_bp.route("/renewals/<int:lead_id>")
+@admin_required
+def renewal_client(lead_id):
+    """Карточка клиента продления: сводка + история взаимодействий."""
+    from ops.renewals import client_card
+    card = client_card(lead_id)
+    if card is None:
+        abort(404)
+    return render_template("ops/renewal_client.html", card=card)
 
 
 @ops_bp.route("/renewals/config", methods=["POST"])

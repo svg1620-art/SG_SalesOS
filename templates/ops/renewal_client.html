@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ card.name }} — Продление{% endblock %}
+
+{% macro money(n) %}{% if n and n >= 1000000 %}{{ '%.2f'|format(n/1000000) }} млн{% elif n %}{{ (n/1000)|round|int }}к{% else %}—{% endif %}{% endmacro %}
+
+{% block content %}
+{% set zp = {'green':['#39d98a','🟢 на треке'],'yellow':['#f5c542','🟡 риск'],'red':['#ff6b6e','🔴 критично'],'paid':['#39d98a','🟢 продлил'],'churn':['#8A8A96','⚫ отвал']} %}
+<section class="sg-page">
+  <div class="sg-breadcrumbs sg-sm"><a href="{{ url_for('ops.renewals') }}">Продления</a> / Клиент</div>
+  <div class="sg-page__head">
+    <h1 class="sg-h1">{{ card.name }}</h1>
+    <div>
+      <span class="rpill" style="background:rgba(255,255,255,.06);color:{{ zp[card.status][0] }};padding:3px 11px;border-radius:999px;font-weight:700">{{ zp[card.status][1] }}</span>
+      {% if card.amo_url %}<a class="sg-btn sg-btn--sm" href="{{ card.amo_url }}" target="_blank" rel="noopener" style="margin-left:8px">Сделка в amoCRM ↗</a>{% endif %}
+    </div>
+  </div>
+  {% if card.r.name and card.r.name != card.name %}<p class="sg-muted sg-sm" style="margin-top:-6px">{{ card.r.name }}</p>{% endif %}
+
+  <style>
+    .rstats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
+    .rstats .st{background:var(--sg-panel,#141419);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 13px}
+    .rstats .k{font-size:.7rem;color:var(--sg-muted,#8A8A96);text-transform:uppercase;letter-spacing:.03em}
+    .rstats .v{font-size:1.15rem;font-weight:700;margin-top:4px;font-family:var(--sg-mono,monospace)}
+    .tl{list-style:none;margin:0;padding:0}
+    .tl li{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+    .tl .ic{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);font-size:.9rem}
+    .tl .body{flex:1;min-width:0}
+    .tl .dt{font-family:var(--sg-mono,monospace);font-size:.76rem;color:var(--sg-muted,#8A8A96)}
+    .rwarn{color:var(--sg-red,#e5484d);font-weight:700}
+  </style>
+
+  <div class="rstats">
+    <div class="st"><div class="k">Сумма сделки</div><div class="v">{{ money(card.r.price) }} ₽</div></div>
+    <div class="st"><div class="k">Окончание подписки</div><div class="v">{{ card.r.renewal_end.strftime('%d.%m.%Y') if card.r.renewal_end else '—' }}</div></div>
+    <div class="st"><div class="k">До конца</div><div class="v {{ 'rwarn' if card.days_left is not none and card.days_left < 0 }}">{% if card.days_left is none %}—{% elif card.days_left < 0 %}просроч. {{ -card.days_left }}д{% else %}{{ card.days_left }} дн{% endif %}</div></div>
+    <div class="st"><div class="k">Срок до продления</div><div class="v"><span style="color:{{ card.band_color }}">{{ card.band_label }}</span></div></div>
+    <div class="st"><div class="k">Всего касаний</div><div class="v">{{ card.touch_count }}</div></div>
+    <div class="st"><div class="k">Последнее касание</div><div class="v {{ 'rwarn' if card.last_touch is none or card.last_touch >= 4 }}">{% if card.last_touch is none %}нет{% else %}{{ card.last_touch }} дн назад{% endif %}</div></div>
+  </div>
+
+  {% if card.agreement %}
+  <div class="sg-card sg-card--pad" style="margin-top:14px">
+    <div class="sg-muted sg-sm">Последняя договорённость (из примечания)</div>
+    <p style="margin:4px 0 0;white-space:pre-wrap">{{ card.agreement }}</p>
+  </div>
+  {% endif %}
+
+  <div class="sg-card sg-card--pad" style="margin-top:14px">
+    <h3 class="sg-h3">История взаимодействий</h3>
+    {% if card.history %}
+    <ul class="tl">
+      {% for h in card.history %}
+      <li>
+        <span class="ic">{{ h.icon }}</span>
+        <div class="body">
+          <div class="dt">{{ h.when.strftime('%d.%m.%Y %H:%M') }} · {{ h.label }}</div>
+          {% if h.text %}<div class="sg-sm" style="white-space:pre-wrap">{{ h.text }}</div>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="sg-muted">Касаний по этому клиенту пока нет.</p>
+    {% endif %}
+  </div>
+
+  <p class="sg-muted sg-sm" style="margin-top:14px">Следующий этап: разбор звонков (транскрибация + выводы нейронки из модуля ОКК) прямо в истории.</p>
+</section>
+{% endblock %}

@@ -268,6 +268,72 @@ def worklist(manager_ids=None, band_filter="all", limit=20, today=None):
     return out
 
 
+_HIST_META = {
+    "call_out": ("📞", "Звонок (исх.)"), "call_in": ("📞", "Звонок (вх.)"),
+    "msg_out": ("💬", "Сообщение"), "msg_in": ("💬", "Входящее сообщение"),
+    "note": ("📝", "Примечание"), "task_done": ("✅", "Задача выполнена"),
+}
+
+
+def _event_text(e):
+    raw = e.raw or {}
+    if e.type == "note":
+        try:
+            return raw.get("params", {}).get("text") or raw.get("text") or ""
+        except Exception:  # noqa: BLE001
+            return ""
+    if e.type in ("call_out", "call_in"):
+        if e.is_connected:
+            mins = int((e.duration_sec or 0) // 60)
+            return f"дозвон, {mins} мин" if mins else "дозвон"
+        return "недозвон"
+    if e.type == "task_done":
+        try:
+            return (raw.get("result") or {}).get("text") or raw.get("text") or ""
+        except Exception:  # noqa: BLE001
+            return ""
+    return ""
+
+
+def client_card(lead_id, today=None):
+    """Карточка клиента продления: сводка + полная история взаимодействий."""
+    from utils import to_local, amo_entity_url
+    from settings_store import amo_base_domain
+    today = today or date.today()
+    cfg = _cfg()
+    r = db.session.get(Renewal, lead_id)
+    if r is None:
+        return None
+    band = band_of(r.renewal_end, today, cfg)
+    conds = [OpsActivityEvent.lead_id == lead_id]
+    if r.amo_contact_id:
+        conds.append(OpsActivityEvent.contact_id == r.amo_contact_id)
+    ev = (
+        OpsActivityEvent.query.filter(db.or_(*conds))
+        .order_by(OpsActivityEvent.occurred_at.desc()).limit(300).all()
+    )
+    now = datetime.utcnow()
+    last_touch = min(((now - e.occurred_at).days for e in ev), default=None)
+    history = [{
+        "when": to_local(e.occurred_at), "type": e.type,
+        "icon": _HIST_META.get(e.type, ("•", e.type))[0],
+        "label": _HIST_META.get(e.type, ("•", e.type))[1],
+        "text": _event_text(e),
+    } for e in ev]
+    untouched = last_touch is None or last_touch >= cfg["sla"]
+    notes = _last_notes([r])
+    return {
+        "r": r, "name": _display_name(r), "band": band,
+        "band_label": BAND_SHORT.get(band, ""), "band_color": BAND_COLOR.get(band),
+        "status": status_of(r.zone, band, untouched),
+        "days_left": (r.renewal_end - today).days if r.renewal_end else None,
+        "touch_count": len(ev), "last_touch": last_touch,
+        "agreement": notes.get(r.amo_lead_id),
+        "history": history,
+        "amo_url": amo_entity_url(amo_base_domain(), "leads", r.amo_lead_id),
+    }
+
+
 def touch_plan(manager_ids, today=None):
     """Дневной план касаний менеджера(ов) продлений: факт сегодня / план."""
     from ops.metrics import _utc_bounds
