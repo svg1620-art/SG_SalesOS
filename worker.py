@@ -22,6 +22,12 @@ import logging
 # нет обработчика и INFO-строки теряются. Настраиваем вывод в stdout.
 logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+# httpx на INFO пишет полный URL (с токеном бота в getUpdates) — приглушаем.
+# APScheduler на INFO спамит каждым запуском джобы (tg_poll раз в 2 мин) — тоже.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.scheduler").setLevel(logging.WARNING)
 
 # Должно стоять ДО импорта app (Config читает env на импорте).
 # ПРИНУДИТЕЛЬНО: worker.py — это и есть фоновый сервис, он всегда с планировщиком
