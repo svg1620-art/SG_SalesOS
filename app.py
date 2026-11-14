@@ -362,75 +362,50 @@ def _add_schedule_jobs(app: Flask) -> None:
     except Exception:  # noqa: BLE001
         ops_min = 5
 
-    scheduler.add_job(
-        _run_pulse, CronTrigger(hour=t_hour, minute=0, timezone=tz),
-        id="telegram_pulse", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _run_digest, CronTrigger(hour=d_hour, minute=0, timezone=tz),
-        id="daily_digest", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _run_amo, IntervalTrigger(minutes=poll_min),
-        id="amo_poll", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _run_ops_sync, IntervalTrigger(minutes=ops_min),
-        id="ops_sync", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _run_ops_recompute_yesterday, CronTrigger(hour=0, minute=30, timezone=tz),
-        id="ops_recompute_yesterday", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _run_ops_generate_missions, CronTrigger(hour=6, minute=0, timezone=tz),
-        id="ops_generate_missions", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _run_renewals_sync, IntervalTrigger(hours=1),
-        id="renewals_sync", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _run_renewals_classify, CronTrigger(hour=5, minute=30, timezone=tz),
-        id="renewals_classify", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    # Этап 6: системные алерты (несколько раз в день) + AI-диагностика (пн 08:00)
-    scheduler.add_job(
-        _run_ops_alerts, CronTrigger(hour="8,12,16", minute=50, timezone=tz),
-        id="ops_alerts", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _run_ops_diagnosis, CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=tz),
-        id="ops_diagnosis", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    # Этап 6b: Telegram — polling входящих + чекпоинты/личные уведомления
-    scheduler.add_job(
-        _run_tg_poll, IntervalTrigger(minutes=2),
-        id="tg_poll", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _tg_checkpoint("mission", "send_manager_missions"),
-        CronTrigger(hour=9, minute=30, timezone=tz),
-        id="tg_mission", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _tg_checkpoint("morning", "checkpoint_morning"),
-        CronTrigger(hour=11, minute=0, timezone=tz),
-        id="tg_cp_morning", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _tg_checkpoint("afternoon", "checkpoint_afternoon"),
-        CronTrigger(hour=15, minute=0, timezone=tz),
-        id="tg_cp_afternoon", replace_existing=True, max_instances=1, coalesce=True,
-    )
-    scheduler.add_job(
-        _tg_checkpoint("finish", "send_finish_line"),
-        CronTrigger(hour=16, minute=0, timezone=tz),
-        id="tg_finish", replace_existing=True, max_instances=1, coalesce=True,
-    )
+    # --- роль сервиса: какие джобы здесь регистрируем ---
+    # "web"   — нужен Volume/аудио (amo_poll качает записи в /data, их отдаёт плеер);
+    # "worker" — всё остальное (БД/LLM/Telegram), Volume не нужен;
+    # "all"   — один сервис крутит обе группы (дефолт, без регрессий).
+    role = (app.config.get("SCHEDULER_ROLE") or "all").lower()
+    roles = {"web", "worker"} if role == "all" else {role}
+
+    def _job(job_role, func, trigger, job_id):
+        if job_role not in roles:
+            return
+        scheduler.add_job(func, trigger, id=job_id, replace_existing=True,
+                          max_instances=1, coalesce=True)
+
+    # web: аудио-пайплайн (скачивание записей в Volume + транскрибация)
+    _job("web", _run_amo, IntervalTrigger(minutes=poll_min), "amo_poll")
+
+    # worker: синхронизация метрик, пересчёты, геймификация, продления, LLM
+    _job("worker", _run_pulse, CronTrigger(hour=t_hour, minute=0, timezone=tz), "telegram_pulse")
+    _job("worker", _run_digest, CronTrigger(hour=d_hour, minute=0, timezone=tz), "daily_digest")
+    _job("worker", _run_ops_sync, IntervalTrigger(minutes=ops_min), "ops_sync")
+    _job("worker", _run_ops_recompute_yesterday,
+         CronTrigger(hour=0, minute=30, timezone=tz), "ops_recompute_yesterday")
+    _job("worker", _run_ops_generate_missions,
+         CronTrigger(hour=6, minute=0, timezone=tz), "ops_generate_missions")
+    _job("worker", _run_renewals_sync, IntervalTrigger(hours=1), "renewals_sync")
+    _job("worker", _run_renewals_classify,
+         CronTrigger(hour=5, minute=30, timezone=tz), "renewals_classify")
+    _job("worker", _run_ops_alerts,
+         CronTrigger(hour="8,12,16", minute=50, timezone=tz), "ops_alerts")
+    _job("worker", _run_ops_diagnosis,
+         CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=tz), "ops_diagnosis")
+    _job("worker", _run_tg_poll, IntervalTrigger(minutes=2), "tg_poll")
+    _job("worker", _tg_checkpoint("mission", "send_manager_missions"),
+         CronTrigger(hour=9, minute=30, timezone=tz), "tg_mission")
+    _job("worker", _tg_checkpoint("morning", "checkpoint_morning"),
+         CronTrigger(hour=11, minute=0, timezone=tz), "tg_cp_morning")
+    _job("worker", _tg_checkpoint("afternoon", "checkpoint_afternoon"),
+         CronTrigger(hour=15, minute=0, timezone=tz), "tg_cp_afternoon")
+    _job("worker", _tg_checkpoint("finish", "send_finish_line"),
+         CronTrigger(hour=16, minute=0, timezone=tz), "tg_finish")
+
     app.logger.info(
-        "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",
-        t_hour, d_hour, poll_min, tz,
+        "[scheduler] роль=%s, джоб=%d, пульс %s:00, сводка %s:00, amo %s мин (%s)",
+        role, len(scheduler.get_jobs()), t_hour, d_hour, poll_min, tz,
     )
 
 

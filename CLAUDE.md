@@ -83,11 +83,16 @@
   агрегат устарел (> 90с); фон (ops_sync) пересчитывает сам.
 - **Пул БД** (config, только Postgres): pool_size=10/max_overflow=20/
   pool_recycle=280/pool_timeout=30 (+pool_pre_ping). Для sqlite — только pre_ping.
-- **Узкое место инфраструктуры:** APScheduler крутится ВНУТРИ единственного
-  gunicorn-воркера (`--workers 1 --threads 4`). Тяжёлые/частые джобы (ops_sync
-  5 мин = сеть amoCRM, LLM-диагностика, синк продлений) конкурируют с веб-
-  запросами за GIL и пул. Рекомендация на будущее: вынести планировщик в
-  отдельный процесс/сервис Railway (web: `SCHEDULER_ENABLED=0`, worker: `=1`).
+- **Разнесение планировщика (worker.py + SCHEDULER_ROLE):** фон можно вынести на
+  отдельный Railway-сервис. Ограничение: Volume `/data` (аудио) монтируется
+  только к одному сервису, а `amo_poll` качает записи в Volume и веб их отдаёт
+  плеером. Поэтому делим по ролям `SCHEDULER_ROLE` (config): `web` — только
+  `amo_poll` (+ Volume/плеер), `worker` — все остальные джобы (БД/LLM/Telegram,
+  Volume не нужен), `all` — всё в одном (дефолт, без регрессий). Entrypoint
+  воркера — `worker.py` (`python worker.py`, сам ставит SCHEDULER_ENABLED=1 и
+  SCHEDULER_ROLE=worker). Веб остаётся `--workers 1` (держит amo_poll). Пошагово
+  — docs/WORKER_SETUP.md. Полный stateless (amo_poll тоже на worker) — только
+  после переноса аудио из Volume в объектное хранилище.
 
 ## Модуль «Операционный пульт» (в разработке)
 ТЗ: docs/SG_SalesOS_OpsMetrics_spec.md — читать целиком перед любой задачей по модулю.

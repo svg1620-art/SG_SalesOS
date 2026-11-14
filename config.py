@@ -83,6 +83,12 @@ class Config:
     TELEGRAM_HOUR = int(os.environ.get("TELEGRAM_HOUR", "19"))
     TZ = os.environ.get("TZ", "Europe/Moscow")
     SCHEDULER_ENABLED = _bool(os.environ.get("SCHEDULER_ENABLED"), default=False)
+    # Роль планировщика при разнесении на два сервиса Railway:
+    #   all    — один сервис крутит все джобы (по умолчанию, без регрессий);
+    #   web    — только джобы, которым нужен Volume/аудио (amo_poll) + playback;
+    #   worker — все остальные (БД/LLM/Telegram), Volume не нужен.
+    # Volume /data монтируется ТОЛЬКО к web, поэтому аудио-пайплайн живёт на web.
+    SCHEDULER_ROLE = (os.environ.get("SCHEDULER_ROLE", "all") or "all").strip().lower()
     # сколько звонков обрабатывать параллельно (ограниченный пул воркеров)
     WORKER_CONCURRENCY = int(os.environ.get("WORKER_CONCURRENCY", "2"))
 
