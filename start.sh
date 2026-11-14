@@ -9,7 +9,7 @@ set -e
 
 if [ "${SCHEDULER_ROLE}" = "worker" ]; then
   echo "[start] SCHEDULER_ROLE=worker → python worker.py (фоновый планировщик)"
-  exec python worker.py
+  exec python -u worker.py
 else
   echo "[start] SCHEDULER_ROLE=${SCHEDULER_ROLE:-all} → миграции + gunicorn (web)"
   flask --app app db upgrade

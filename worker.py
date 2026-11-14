@@ -16,6 +16,12 @@ Volume /data к этому сервису НЕ монтируется — ауд
 import os
 import sys
 import time
+import logging
+
+# Логи видимыми в Railway: при запуске напрямую (не gunicorn) у Flask-логгера
+# нет обработчика и INFO-строки теряются. Настраиваем вывод в stdout.
+logging.basicConfig(level=logging.INFO, stream=sys.stdout,
+                    format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 # Должно стоять ДО импорта app (Config читает env на импорте).
 # ПРИНУДИТЕЛЬНО: worker.py — это и есть фоновый сервис, он всегда с планировщиком
@@ -56,20 +62,19 @@ def _start_health_server() -> None:
         app.logger.warning("[worker] health-сервер не поднялся: %s", exc)
         return
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    app.logger.info("[worker] health-сервер на :%s", port)
+    print(f"[worker] health-сервер на :{port}", flush=True)
 
 
 def main() -> int:
+    print("[worker] entrypoint: инициализация", flush=True)
     _start_health_server()
     if not scheduler.running:
-        app.logger.error(
-            "[worker] планировщик не запущен — проверь SCHEDULER_ENABLED=1 "
-            "и SCHEDULER_ROLE=worker в переменных сервиса."
-        )
+        print("[worker] ОШИБКА: планировщик не запущен "
+              "(проверь SCHEDULER_ENABLED/SCHEDULER_ROLE)", flush=True)
         return 1
     jobs = [j.id for j in scheduler.get_jobs()]
-    app.logger.info("[worker] старт: роль=%s, джоб=%d %s",
-                    app.config.get("SCHEDULER_ROLE"), len(jobs), jobs)
+    print(f"[worker] старт: роль={app.config.get('SCHEDULER_ROLE')}, "
+          f"джоб={len(jobs)} {jobs}", flush=True)
     try:
         while True:
             time.sleep(3600)
