@@ -18,8 +18,11 @@ import sys
 import time
 
 # Должно стоять ДО импорта app (Config читает env на импорте).
-os.environ.setdefault("SCHEDULER_ENABLED", "1")
-os.environ.setdefault("SCHEDULER_ROLE", "worker")
+# ПРИНУДИТЕЛЬНО: worker.py — это и есть фоновый сервис, он всегда с планировщиком
+# и в роли worker, даже если в переменных Railway осталось SCHEDULER_ENABLED=false
+# (Railway подставляет его в «Suggested Variables»).
+os.environ["SCHEDULER_ENABLED"] = "1"
+os.environ["SCHEDULER_ROLE"] = "worker"
 
 from app import app  # noqa: E402 — импорт создаёт app и стартует планировщик
 from extensions import scheduler  # noqa: E402
