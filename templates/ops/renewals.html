@@ -159,10 +159,25 @@
       </div>
       {% endif %}
     </div>
-    <div class="sg-sm" style="margin:12px 0">
-      {% for key, lbl in [('all','Все'),('work','Рабочее окно'),('hot','Горит'),('crit','Критично'),('untouched','Без касания '~data.kpi.sla~'д+')] %}
-        <a class="sg-chip {{ 'sg-chip--active' if wband==key }}" href="{{ url_for('ops.renewals', period=period, department_id=department_id, wband=key, rm=sel_rm) }}">{{ lbl }}</a>
-      {% endfor %}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0">
+      <div class="sg-sm">
+        {% for key, lbl in [('all','Все'),('work','Рабочее окно'),('hot','Горит'),('crit','Критично'),('untouched','Без касания '~data.kpi.sla~'д+')] %}
+          <a class="sg-chip {{ 'sg-chip--active' if wband==key }}" href="{{ url_for('ops.renewals', period=period, department_id=department_id, wband=key, rm=sel_rm, wl_month=wl_month) }}">{{ lbl }}</a>
+        {% endfor %}
+      </div>
+      <form method="get" action="{{ url_for('ops.renewals') }}" style="display:flex;align-items:center;gap:6px">
+        <input type="hidden" name="period" value="{{ period }}">
+        <input type="hidden" name="department_id" value="{{ department_id or '' }}">
+        <input type="hidden" name="wband" value="{{ wband }}">
+        {% if sel_rm %}<input type="hidden" name="rm" value="{{ sel_rm }}">{% endif %}
+        <span class="sg-muted sg-sm">Месяц продления:</span>
+        <select class="sg-input sg-sm" name="wl_month" onchange="this.form.submit()" style="width:auto;padding:5px 9px">
+          <option value="">Все месяцы</option>
+          {% for m in wl_months %}
+          <option value="{{ '%04d-%02d'|format(m.year, m.month) }}" {{ 'selected' if wl_month == '%04d-%02d'|format(m.year, m.month) }}>{{ '%02d.%d'|format(m.month, m.year) }}</option>
+          {% endfor %}
+        </select>
+      </form>
     </div>
     <div style="overflow-x:auto">
       <table class="sg-table">
@@ -170,7 +185,7 @@
         <tbody>
           {% for w in worklist %}
           <tr>
-            <td><a href="{{ url_for('ops.renewal_client', lead_id=w.lead_id) }}" style="color:var(--sg-cyan,#00BFDC);text-decoration:none"><b>{{ w.name }}</b></a>{% if w.contact and w.contact != w.name %}<div class="sg-muted sg-sm">{{ w.contact }}</div>{% endif %}</td>
+            <td><a href="{{ url_for('ops.renewal_client', lead_id=w.lead_id) }}" style="color:var(--sg-cyan,#00BFDC);text-decoration:none"><b>{{ w.name }}</b></a>{% if w.contact and w.contact != w.name %}<div class="sg-muted sg-sm">{{ w.contact }}</div>{% endif %}<div class="sg-muted sg-sm">👤 {{ w.manager }}</div></td>
             <td class="sg-mono">{{ w.end.strftime('%d.%m.%Y') if w.end else '—' }}</td>
             <td class="sg-mono {{ 'rwarn' if w.days_left is not none and w.days_left < 0 }}">{% if w.days_left is none %}—{% elif w.days_left < 0 %}просроч. {{ -w.days_left }}д{% else %}{{ w.days_left }} дн{% endif %}</td>
             <td><span class="bdot" style="background:{{ w.band_color }}"></span> {{ w.band_label }}</td>

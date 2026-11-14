@@ -523,18 +523,30 @@ def renewals():
     # --- Этап B: рабочий список, план, тепловая карта, касания сегодня ---
     worklist = plan = touches = heat = rm_list = None
     sel_rm = None
+    wl_months = []
     wband = request.args.get("wband", "all")
     if wband not in ("all", "work", "hot", "crit", "early", "nodate", "untouched"):
         wband = "all"
+    # фильтр рабочего списка по месяцу продления (YYYY-MM)
+    wlm_raw = (request.args.get("wl_month") or "").strip()
+    sel_wl_month = None
+    if wlm_raw:
+        try:
+            _wy, _wm = map(int, wlm_raw.split("-"))
+            sel_wl_month = _date(_wy, _wm, 1)
+        except Exception:  # noqa: BLE001
+            sel_wl_month = None
     if data is not None:
         from ops.renewals import (
             worklist as _worklist, touch_plan, today_touches, renewal_managers,
+            worklist_months,
         )
         rm_list = renewal_managers()
         if mgr_ids is not None:
             rm_list = [m for m in rm_list if m["id"] in mgr_ids]
         rm_ids = [m["id"] for m in rm_list]
-        worklist = _worklist(manager_ids=mgr_ids, band_filter=wband)
+        wl_months = worklist_months()
+        worklist = _worklist(manager_ids=mgr_ids, band_filter=wband, month=sel_wl_month)
         plan = touch_plan(rm_ids)
         touches = today_touches(rm_ids)
         # тепловая карта касаний выбранного менеджера продлений
@@ -569,6 +581,7 @@ def renewals():
         worklist=worklist, plan=plan, touches=touches, heat=heat,
         rm_list=rm_list, sel_rm=sel_rm, wband=wband, field_diag=field_diag,
         sel_month=(month_raw if sel_month else ""),
+        wl_months=wl_months, wl_month=(wlm_raw if sel_wl_month else ""),
     )
 
 

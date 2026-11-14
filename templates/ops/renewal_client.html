@@ -40,7 +40,11 @@
     <div class="st"><div class="k">Срок до продления</div><div class="v"><span style="color:{{ card.band_color }}">{{ card.band_label }}</span></div></div>
     <div class="st"><div class="k">Всего касаний</div><div class="v">{{ card.touch_count }}</div></div>
     <div class="st"><div class="k">Последнее касание</div><div class="v {{ 'rwarn' if card.last_touch is none or card.last_touch >= 4 }}">{% if card.last_touch is none %}нет{% else %}{{ card.last_touch }} дн назад{% endif %}</div></div>
+    <div class="st"><div class="k">Ответственный</div><div class="v" style="font-size:.95rem">👤 {{ card.manager }}</div></div>
   </div>
+  {% if card.touched_by %}
+  <p class="sg-muted sg-sm" style="margin-top:8px">Касались клиента: {{ card.touched_by|join(', ') }}</p>
+  {% endif %}
 
   {% if card.agreement %}
   <div class="sg-card sg-card--pad" style="margin-top:14px">

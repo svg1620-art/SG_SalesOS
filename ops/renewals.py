@@ -362,17 +362,45 @@ def _display_name(r):
     return r.company or r.name or f"Сделка {r.amo_lead_id}"
 
 
-def worklist(manager_ids=None, band_filter="all", limit=20, today=None):
+def _manager_name_map():
+    """{user_id: отображаемое имя} для подписи ответственного по сделке."""
+    from models import User
+    return {u.id: (u.full_name or u.email) for u in User.query.all()}
+
+
+def manager_of(r, name_map=None):
+    """Ответственный менеджер по сделке: имя из связки, иначе amo-id, иначе —."""
+    name_map = name_map if name_map is not None else _manager_name_map()
+    if r.manager_id and r.manager_id in name_map:
+        return name_map[r.manager_id]
+    if r.amo_responsible_id:
+        return f"amo#{r.amo_responsible_id} (не привязан)"
+    return "—"
+
+
+def worklist_months():
+    """Месяцы (1-е число), в которых есть окончание у открытых сделок — для фильтра."""
+    rows = (db.session.query(Renewal.renewal_end)
+            .filter(Renewal.is_open.is_(True), Renewal.renewal_end.isnot(None)).all())
+    months = sorted({date(d[0].year, d[0].month, 1) for d in rows if d[0]})
+    return months
+
+
+def worklist(manager_ids=None, band_filter="all", limit=20, today=None, month=None):
     today = today or date.today()
     cfg = _cfg()
     q = Renewal.query.filter(Renewal.is_open.is_(True))
     if manager_ids is not None:
         q = q.filter(Renewal.manager_id.in_(list(manager_ids)))
     rows = q.all()
+    if month is not None:
+        w_from, w_to = _month_window(month)
+        rows = [r for r in rows if r.renewal_end and w_from <= r.renewal_end <= w_to]
     for r in rows:
         r._band = band_of(r.renewal_end, today, cfg)
     touch = _last_touch_days(rows)
     notes = _last_notes(rows)
+    names = _manager_name_map()
     rows.sort(key=lambda r: (_PRIORITY.get(r._band, 9),
                              -(touch.get(r.amo_lead_id) or 999)))
     out = []
@@ -390,7 +418,7 @@ def worklist(manager_ids=None, band_filter="all", limit=20, today=None):
             "end": r.renewal_end, "days_left": dl, "band": r._band,
             "band_label": BAND_SHORT.get(r._band, ""), "band_color": BAND_COLOR.get(r._band),
             "last_touch": d, "untouched": (d is None or d >= cfg["sla"]),
-            "zone": comm_status_of(r),
+            "zone": comm_status_of(r), "manager": manager_of(r, names),
             "agreement": r.comm_note or notes.get(r.amo_lead_id) or "—",
             "amo_lead_id": r.amo_lead_id,
         })
@@ -488,6 +516,10 @@ def client_card(lead_id, today=None):
         history.append(item)
     untouched = last_touch is None or last_touch >= cfg["sla"]
     notes = _last_notes([r])
+    # кто реально касался клиента (по событиям истории) + ответственный по сделке
+    names = _manager_name_map()
+    touched_ids = {e.manager_id for e in ev if e.manager_id}
+    touched_by = sorted(names.get(mid, f"amo#{mid}") for mid in touched_ids)
     return {
         "r": r, "name": _display_name(r), "band": band,
         "band_label": BAND_SHORT.get(band, ""), "band_color": BAND_COLOR.get(band),
@@ -495,6 +527,7 @@ def client_card(lead_id, today=None):
         "terminal": r.zone in ("paid", "churn"),
         "comm_source": r.comm_source, "comm_note": r.comm_note,
         "comm_updated_at": r.comm_updated_at,
+        "manager": manager_of(r, names), "touched_by": touched_by,
         "has_call": latest_analyzed_call(r) is not None,
         "days_left": (r.renewal_end - today).days if r.renewal_end else None,
         "touch_count": len(ev), "last_touch": last_touch,
