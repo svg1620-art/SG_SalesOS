@@ -28,10 +28,38 @@ def _utc_bounds(day: date):
     return local_to_utc_naive(start_local), local_to_utc_naive(end_local)
 
 
+# Кэш производственного календаря: один запрос всех переопределений на TTL
+# вместо db.get на каждый день (горячие циклы forecast/working_days/alerts).
+import time as _time
+
+_WC_TTL = 120.0
+_wc_cache = {"data": None, "exp": 0.0}
+
+
+def _work_calendar_map():
+    """{date: is_working_day} из WorkCalendar (кэш с TTL). {} при ошибке."""
+    now = _time.monotonic()
+    if _wc_cache["data"] is not None and now < _wc_cache["exp"]:
+        return _wc_cache["data"]
+    try:
+        rows = WorkCalendar.query.all()
+    except Exception:  # noqa: BLE001 — таблицы ещё нет
+        return {}
+    data = {r.date: bool(r.is_working_day) for r in rows}
+    _wc_cache["data"] = data
+    _wc_cache["exp"] = now + _WC_TTL
+    return data
+
+
+def invalidate_work_calendar_cache() -> None:
+    _wc_cache["data"] = None
+    _wc_cache["exp"] = 0.0
+
+
 def _is_working_day(day: date) -> bool:
-    row = db.session.get(WorkCalendar, day)
-    if row is not None:
-        return bool(row.is_working_day)
+    data = _work_calendar_map()
+    if day in data:
+        return data[day]
     return day.weekday() < 5
 
 

@@ -43,7 +43,20 @@ class Config:
         os.environ.get("DATABASE_URL", "sqlite:///salesos_dev.db")
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
+    # Пул соединений: для Postgres задаём размер/утилизацию и recycle, чтобы
+    # веб-потоки + планировщик не упирались в дефолтный пул из 5 и не ловили
+    # «протухшие» соединения (Railway/pg рвёт простаивающие ~5 мин).
+    # Для sqlite (локалка/тесты) эти опции неприменимы — оставляем pre_ping.
+    if SQLALCHEMY_DATABASE_URI.startswith("postgresql"):
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            "pool_pre_ping": True,
+            "pool_recycle": 280,
+            "pool_size": int(os.environ.get("DB_POOL_SIZE", "10")),
+            "max_overflow": int(os.environ.get("DB_MAX_OVERFLOW", "20")),
+            "pool_timeout": 30,
+        }
+    else:
+        SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
     # --- ИИ (модели не хардкодим, только из env) ---
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")

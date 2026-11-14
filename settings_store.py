@@ -30,14 +30,41 @@ _KEYS = {
 }
 
 
-def get_setting(key: str, default=None):
-    """Значение из БД или None, если нет (без обращения к env)."""
+# --- кэш таблицы настроек (TTL): читается в каждом запросе (llm/amo/telegram) ---
+import time as _time
+
+_CACHE_TTL = 30.0
+_cache = {"data": None, "exp": 0.0}
+
+
+def _all_settings():
+    """{key: value} всех записей Setting (кэш с TTL). None — таблицы ещё нет."""
+    now = _time.monotonic()
+    if _cache["data"] is not None and now < _cache["exp"]:
+        return _cache["data"]
     try:
-        s = Setting.query.filter_by(key=key).first()
+        rows = Setting.query.all()
     except Exception:
+        return None
+    data = {s.key: s.value for s in rows}
+    _cache["data"] = data
+    _cache["exp"] = now + _CACHE_TTL
+    return data
+
+
+def invalidate_settings_cache() -> None:
+    _cache["data"] = None
+    _cache["exp"] = 0.0
+
+
+def get_setting(key: str, default=None):
+    """Значение из БД (через кэш) или None, если нет (без обращения к env)."""
+    data = _all_settings()
+    if data is None:
         return default
-    if s is not None and s.value not in (None, ""):
-        return s.value
+    val = data.get(key)
+    if val not in (None, ""):
+        return val
     return default
 
 
@@ -49,6 +76,7 @@ def set_setting(key: str, value) -> None:
     else:
         s.value = value
     db.session.commit()
+    invalidate_settings_cache()
 
 
 def effective(key: str, app=None):

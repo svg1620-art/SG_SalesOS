@@ -31,8 +31,8 @@ def _month_bounds(mf: date):
 
 
 def _is_working_day(d: date) -> bool:
-    row = db.session.get(WorkCalendar, d)
-    return bool(row.is_working_day) if row is not None else d.weekday() < 5
+    from ops.metrics import _is_working_day as _wd  # кэш календаря
+    return _wd(d)
 
 
 def own_cost(sc: StaffCost):

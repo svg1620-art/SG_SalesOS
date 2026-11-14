@@ -99,14 +99,44 @@ def ops_json(key: str, default=None):
         return default
 
 
-def get_ops_setting(key: str):
-    """Значение из БД или дефолт (строка) или None."""
+# --- кэш таблицы настроек (один запрос на TTL вместо запроса на каждый ключ) ---
+# Настройки читаются в горячих циклах (recompute, доска, алерты) сотни раз за
+# запрос. Кэшируем всю таблицу целиком; сбрасываем при записи. Допустимая
+# задержка видимости правок — _OPS_CACHE_TTL секунд.
+import time as _time
+
+_OPS_CACHE_TTL = 30.0
+_ops_cache = {"data": None, "exp": 0.0}
+
+
+def _ops_all():
+    """{key: value} всех настроек из БД (кэш с TTL). None — таблицы ещё нет."""
+    now = _time.monotonic()
+    if _ops_cache["data"] is not None and now < _ops_cache["exp"]:
+        return _ops_cache["data"]
     try:
-        row = OpsSetting.query.filter_by(key=key).first()
+        rows = OpsSetting.query.all()
     except Exception:  # noqa: BLE001 — таблицы ещё нет (во время миграций)
+        return None
+    data = {r.key: r.value for r in rows}
+    _ops_cache["data"] = data
+    _ops_cache["exp"] = now + _OPS_CACHE_TTL
+    return data
+
+
+def invalidate_ops_cache() -> None:
+    _ops_cache["data"] = None
+    _ops_cache["exp"] = 0.0
+
+
+def get_ops_setting(key: str):
+    """Значение из БД (через кэш) или дефолт (строка) или None."""
+    data = _ops_all()
+    if data is None:
         return OPS_DEFAULTS.get(key)
-    if row is not None and row.value not in (None, ""):
-        return row.value
+    val = data.get(key)
+    if val not in (None, ""):
+        return val
     return OPS_DEFAULTS.get(key)
 
 
@@ -118,6 +148,7 @@ def set_ops_setting(key: str, value) -> None:
     else:
         row.value = value
     db.session.commit()
+    invalidate_ops_cache()
 
 
 def ops_int(key: str, default: int = 0) -> int:

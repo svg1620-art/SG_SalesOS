@@ -582,13 +582,19 @@ def me_today():
         abort(403)
 
     today = now_local().date()
-    # освежаем агрегаты за сегодня перед показом
-    try:
-        recompute_day(target.id, today)
-    except Exception:  # noqa: BLE001
-        db.session.rollback()
-
+    # освежаем агрегаты за сегодня перед показом, но НЕ на каждый заход:
+    # полный recompute_day — это несколько сканов событий/воронки/сделок. Фон
+    # (ops_sync) и так пересчитывает сегодня; здесь обновляем, только если
+    # агрегат устарел (> порога) — остальные заходы читают готовую строку.
     stat = db.session.get(ManagerDayStat, {"manager_id": target.id, "date": today})
+    _stale_sec = (datetime.utcnow() - stat.updated_at).total_seconds() if (
+        stat and stat.updated_at) else None
+    if stat is None or _stale_sec is None or _stale_sec > 90:
+        try:
+            recompute_day(target.id, today)
+            stat = db.session.get(ManagerDayStat, {"manager_id": target.id, "date": today})
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
     baseline = avg_day_baseline(target.id, today)
 
     def _val(field):
