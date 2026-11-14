@@ -98,9 +98,22 @@ action_for_manager,question_for_rop,risk_level} через extract_json, failure
 isolation по менеджеру. UI: на /ops/board — блок системных алертов + под каждым
 менеджером раскрываемый «🧠 Разбор недели» (РОП видит всё), кнопки «Пересчитать
 алерты» и «Разбор недели (ИИ)»; на /me/today — блок «Фокус недели» (менеджеру
-только action_for_manager, §12). Следующий этап: 6b (Telegram-привязка через
-/start с одноразовым кодом, чекпоинты РОПу 11:00/15:00, встраивание итога 19:00
-в существующий пульс, личные уведомления менеджерам).
+только action_for_manager, §12).
+Этап 6b (Telegram): notify/bot.py — привязка личного чата через /start <код>
+(код из профиля /me/notifications, User.telegram_code одноразовый → chat_id),
+/stop; poll_updates (getUpdates, offset в ops_settings tg_update_offset, cron
+каждые 2 мин, без inbound-вебхука); send_to_chat/notify_manager (уважает
+notify_enabled + тихие часы = рабочие часы ops). notify/checkpoints.py — РОПу в
+общий чат TELEGRAM_CHAT_IDS: 11:00 (кто не начал день + низкий connect rate),
+15:00 (светофор команды + красные с причиной); менеджеру лично: 09:30 миссия
+дня, 16:00 финишная прямая (до тира ≤ tg_finish_within_pct=25%); идемпотентно за
+день через ops_settings. Итог 19:00 встроен ops-блоком в notify/telegram.py
+(build_pulse: тиры миссий + встречи/счета/оплаты). Настройки:
+telegram_bot_username (для ссылки t.me/бот?start=код) на /settings; crons
+tg_poll/tg_mission 09:30/tg_cp_morning 11:00/tg_cp_afternoon 15:00/tg_finish
+16:00. Профиль /me/notifications: статус привязки, код+ссылка, тумблер
+уведомлений, отвязка. Токен/username бота — через settings_store (БД→env), не
+хардкодить. Модуль пульта (Этапы 1–6) готов.
 
 Модуль «Продления» (воронка Аккаунтинг, в разработке). Якорь — поле «дата
 окончания подписки» на сделке; этапы = статус 🟢/🟡/🔴 (не по срокам). Готов

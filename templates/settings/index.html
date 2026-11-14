@@ -38,9 +38,16 @@
     </label>
 
     <label class="sg-field">
-      <span class="sg-field__label">Получатели (chat_id через запятую)</span>
+      <span class="sg-field__label">Получатели чекпоинтов РОПа (chat_id через запятую)</span>
       <input class="sg-input sg-mono" name="telegram_chat_ids" value="{{ chat_ids }}"
              placeholder="12345678, -1001234567890">
+    </label>
+
+    <label class="sg-field">
+      <span class="sg-field__label">Username бота (без @) — для привязки менеджеров</span>
+      <input class="sg-input sg-mono" name="telegram_bot_username" value="{{ bot_username }}"
+             placeholder="sg_salesos_bot">
+      <span class="sg-muted sg-sm">Нужен, чтобы в профиле менеджера работала ссылка привязки t.me/бот?start=код.</span>
     </label>
 
     <div class="sg-grid-2">

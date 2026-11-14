@@ -67,7 +67,8 @@ def build_pulse(app, day) -> str:
 
     header = f"📊 <b>Пульс за {day:%d.%m.%Y}</b>"
     if not calls:
-        return header + "\n\nЗа день нет обработанных звонков." + _inactive_block(day)
+        return (header + "\n\nЗа день нет обработанных звонков."
+                + _ops_pulse_block(day) + _inactive_block(day))
 
     def _avg(mcalls):
         s = [c.overall_score for c in mcalls if c.overall_score is not None]
@@ -117,8 +118,36 @@ def build_pulse(app, day) -> str:
         for manager, mcalls in rows:
             blocks.append(_manager_line(manager, mcalls))
 
+    blocks.append(_ops_pulse_block(day))
     blocks.append(_inactive_block(day))
     return "".join(blocks)
+
+
+def _ops_pulse_block(day) -> str:
+    """Ops-итог дня (§10.2, 19:00): тиры миссий + воронка/результат за день."""
+    try:
+        from models import ManagerDayStat, DailyMission
+        drows = ManagerDayStat.query.filter(ManagerDayStat.date == day).all()
+        if not drows:
+            return ""
+        meetings = sum(int(r.meetings_held or 0) for r in drows)
+        invoices = sum(int(r.invoices or 0) for r in drows)
+        payments = sum(int(r.payments or 0) for r in drows)
+        pay_sum = sum(float(r.payments_sum or 0) for r in drows)
+        tiers = {"gold": 0, "silver": 0, "bronze": 0, "none": 0}
+        for mrow in DailyMission.query.filter(DailyMission.date == day).all():
+            tiers[mrow.tier_reached or "none"] = tiers.get(mrow.tier_reached or "none", 0) + 1
+        block = (
+            "\n\n📈 <b>Ops-итог дня</b>"
+            f"\n🥇 {tiers['gold']} · 🥈 {tiers['silver']} · 🥉 {tiers['bronze']}"
+            f" · без тира {tiers['none']}"
+            f"\nВстречи {meetings} · счета {invoices} · оплаты {payments}"
+        )
+        if pay_sum:
+            block += f" ({pay_sum/1000:.0f}к ₽)"
+        return block
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 def _inactive_block(day) -> str:

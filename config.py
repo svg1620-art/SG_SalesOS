@@ -77,6 +77,8 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     # получатели: chat_id через запятую (РОП, владелец)
     TELEGRAM_CHAT_IDS = os.environ.get("TELEGRAM_CHAT_IDS", "")
+    # username бота (без @) — для ссылки привязки t.me/<username>?start=<код>
+    TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "")
 
     # --- amoCRM (Этап 8) ---
     AMO_BASE_DOMAIN = os.environ.get("AMO_BASE_DOMAIN")

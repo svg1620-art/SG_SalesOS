@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Уведомления — SG SalesOS{% endblock %}
+
+{% block content %}
+<section class="sg-page" style="max-width:620px">
+  <div class="sg-breadcrumbs sg-sm"><a href="{{ url_for('dashboard.me_today') }}">Мой день</a> / Уведомления</div>
+  <h1 class="sg-h1">Уведомления в Telegram</h1>
+  <p class="sg-muted">Личные напоминания: миссия дня, финишная прямая, новые рекорды и уровни. Тихие часы — вне рабочего времени не беспокоим.</p>
+
+  {% if not bot_configured %}
+  <div class="sg-card sg-card--pad" style="border-color:rgba(245,197,66,.4)">
+    <b>⚠️ Бот ещё не настроен администратором.</b>
+    <p class="sg-muted sg-sm" style="margin:6px 0 0">Как только РОП добавит токен бота в «Настройках», привязка заработает.</p>
+  </div>
+  {% endif %}
+
+  <div class="sg-card sg-card--pad" style="margin-top:14px">
+    {% if bound %}
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.4rem">✅</span>
+        <div>
+          <b>Чат привязан.</b>
+          <div class="sg-muted sg-sm">Уведомления сейчас {{ 'включены 🔔' if notify_enabled else 'выключены 🔕' }}.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <form method="post"><input type="hidden" name="action" value="toggle">
+          <button class="sg-btn sg-btn--sm" type="submit">{{ 'Выключить уведомления' if notify_enabled else 'Включить уведомления' }}</button>
+        </form>
+        <form method="post" onsubmit="return confirm('Отвязать этот чат?')"><input type="hidden" name="action" value="unbind">
+          <button class="sg-btn sg-btn--sm" type="submit">Отвязать чат</button>
+        </form>
+      </div>
+    {% else %}
+      <b>Чат ещё не привязан.</b>
+      <ol class="sg-sm" style="margin:10px 0 0;padding-left:20px;line-height:1.7">
+        <li>Нажмите «Создать код привязки».</li>
+        <li>Откройте бота{% if bot_username %} <a href="https://t.me/{{ bot_username }}" target="_blank" rel="noopener">@{{ bot_username }}</a>{% endif %} и отправьте ему <code>/start КОД</code> — или перейдите по готовой ссылке ниже.</li>
+        <li>Бот подтвердит привязку.</li>
+      </ol>
+
+      {% if code %}
+      <div style="margin-top:12px">
+        <div class="sg-muted sg-sm">Ваш одноразовый код:</div>
+        <div class="sg-mono" style="font-size:1.4rem;letter-spacing:.08em;margin-top:2px">{{ code }}</div>
+        {% if bind_link %}
+        <a class="sg-btn sg-btn--primary sg-btn--sm" style="margin-top:10px" href="{{ bind_link }}" target="_blank" rel="noopener">Открыть бота и привязать →</a>
+        {% elif bot_username %}
+        <a class="sg-btn sg-btn--primary sg-btn--sm" style="margin-top:10px" href="https://t.me/{{ bot_username }}?start={{ code }}" target="_blank" rel="noopener">Открыть бота и привязать →</a>
+        {% else %}
+        <p class="sg-muted sg-sm" style="margin-top:8px">Отправьте боту: <code>/start {{ code }}</code></p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <form method="post" style="margin-top:12px"><input type="hidden" name="action" value="gen_code">
+        <button class="sg-btn sg-btn--sm" type="submit">{{ 'Обновить код' if code else 'Создать код привязки' }}</button>
+      </form>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

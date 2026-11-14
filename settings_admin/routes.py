@@ -123,6 +123,7 @@ def index():
         lost_last=lost_last,
         token_set=bool(telegram_token()),
         chat_ids=", ".join(telegram_chat_ids()),
+        bot_username=get_setting("telegram_bot_username") or "",
         telegram_hour=telegram_hour(),
         digest_hour=digest_hour(),
         scheduler_running=scheduler.running,
@@ -156,6 +157,8 @@ def save():
         set_setting("telegram_bot_token", token)
 
     set_setting("telegram_chat_ids", (request.form.get("telegram_chat_ids") or "").strip())
+    set_setting("telegram_bot_username",
+                (request.form.get("telegram_bot_username") or "").strip().lstrip("@"))
     set_setting("telegram_hour", _clamp_hour(request.form.get("telegram_hour"), 19))
     set_setting("digest_hour", _clamp_hour(request.form.get("digest_hour"), 20))
 

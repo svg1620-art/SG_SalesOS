@@ -12,6 +12,7 @@ from models import Setting
 _KEYS = {
     "telegram_bot_token": "TELEGRAM_BOT_TOKEN",
     "telegram_chat_ids": "TELEGRAM_CHAT_IDS",
+    "telegram_bot_username": "TELEGRAM_BOT_USERNAME",
     "telegram_hour": "TELEGRAM_HOUR",
     "digest_hour": "DIGEST_HOUR",
     "amo_base_domain": "AMO_BASE_DOMAIN",
@@ -77,6 +78,11 @@ def _int_setting(key: str, app=None, default=0) -> int:
         return int(val)
     except (TypeError, ValueError):
         return default
+
+
+def telegram_bot_username(app=None):
+    val = effective("telegram_bot_username", app)
+    return (val or "").strip().lstrip("@") or None
 
 
 def telegram_hour(app=None) -> int:

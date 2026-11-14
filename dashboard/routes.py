@@ -5,7 +5,8 @@
 from calendar import monthrange
 from datetime import datetime, timedelta
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
+from flask import (Blueprint, render_template, redirect, url_for, request, flash,
+                   abort, current_app)
 from flask_login import login_required, current_user
 
 from collections import defaultdict
@@ -793,6 +794,43 @@ def me_today():
         month=month,
         mission=mission, progress=progress, quest=quest,
         eng=eng, eng_metric_chips=eng_metric_chips,
+    )
+
+
+@dashboard_bp.route("/me/notifications", methods=["GET", "POST"])
+@login_required
+def me_notifications():
+    """Привязка личных уведомлений Telegram: код, тумблер, отвязка (Этап 6b)."""
+    from notify.bot import gen_code, bind_link
+    from settings_store import telegram_bot_username, telegram_token
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "gen_code":
+            gen_code(current_user)
+            flash("Новый код создан. Отправьте его боту или перейдите по ссылке.", "success")
+        elif action == "toggle":
+            current_user.notify_enabled = not current_user.notify_enabled
+            db.session.commit()
+            flash("Личные уведомления " +
+                  ("включены." if current_user.notify_enabled else "выключены."), "success")
+        elif action == "unbind":
+            current_user.telegram_chat_id = None
+            current_user.telegram_code = None
+            db.session.commit()
+            flash("Чат отвязан.", "success")
+        return redirect(url_for("dashboard.me_notifications"))
+
+    link = bind_link(current_app._get_current_object(), current_user.telegram_code) \
+        if current_user.telegram_code else None
+    return render_template(
+        "dashboard/notifications.html",
+        bound=bool(current_user.telegram_chat_id),
+        notify_enabled=current_user.notify_enabled,
+        code=current_user.telegram_code,
+        bind_link=link,
+        bot_username=telegram_bot_username(current_app._get_current_object()),
+        bot_configured=bool(telegram_token(current_app._get_current_object())),
     )
 
 

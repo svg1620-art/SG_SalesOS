@@ -13,6 +13,7 @@
   <p class="sg-muted sg-sm">{{ today.strftime('%d.%m.%Y') }}
     {% if connect_rate is not none %}· connect rate <b class="sg-mono">{{ connect_rate }}%</b>{% endif %}
     {% if first_action_label %}· старт {{ first_action_label }}{% endif %}
+    {% if is_self %}· <a href="{{ url_for('dashboard.me_notifications') }}">🔔 Уведомления</a>{% endif %}
   </p>
 
   {# --- Фокус недели (AI-диагностика, Этап 6) --- #}

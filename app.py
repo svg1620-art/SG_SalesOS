@@ -314,6 +314,24 @@ def _add_schedule_jobs(app: Flask) -> None:
             except Exception as exc:  # noqa: BLE001
                 app.logger.warning("[diagnosis] разбор недели пропущен: %s", exc)
 
+    def _run_tg_poll():
+        with app.app_context():
+            try:
+                from notify.bot import poll_updates
+                poll_updates(app)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.warning("[tg-bot] polling пропущен: %s", exc)
+
+    def _tg_checkpoint(name, fn_name):
+        def _job():
+            with app.app_context():
+                try:
+                    import notify.checkpoints as cp
+                    getattr(cp, fn_name)(app)
+                except Exception as exc:  # noqa: BLE001
+                    app.logger.warning("[tg-%s] пропущен: %s", name, exc)
+        return _job
+
     def _run_renewals_sync():
         with app.app_context():
             from settings_store import amo_configured
@@ -384,6 +402,31 @@ def _add_schedule_jobs(app: Flask) -> None:
     scheduler.add_job(
         _run_ops_diagnosis, CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=tz),
         id="ops_diagnosis", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    # Этап 6b: Telegram — polling входящих + чекпоинты/личные уведомления
+    scheduler.add_job(
+        _run_tg_poll, IntervalTrigger(minutes=2),
+        id="tg_poll", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _tg_checkpoint("mission", "send_manager_missions"),
+        CronTrigger(hour=9, minute=30, timezone=tz),
+        id="tg_mission", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _tg_checkpoint("morning", "checkpoint_morning"),
+        CronTrigger(hour=11, minute=0, timezone=tz),
+        id="tg_cp_morning", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _tg_checkpoint("afternoon", "checkpoint_afternoon"),
+        CronTrigger(hour=15, minute=0, timezone=tz),
+        id="tg_cp_afternoon", replace_existing=True, max_instances=1, coalesce=True,
+    )
+    scheduler.add_job(
+        _tg_checkpoint("finish", "send_finish_line"),
+        CronTrigger(hour=16, minute=0, timezone=tz),
+        id="tg_finish", replace_existing=True, max_instances=1, coalesce=True,
     )
     app.logger.info(
         "[scheduler] пульс %s:00, сводка %s:00, amo каждые %s мин (%s)",

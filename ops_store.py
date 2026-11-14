@@ -82,6 +82,8 @@ OPS_DEFAULTS = {
     "alert_payback_min": "0.8",          # payback 2 мес подряд < X (вне адаптации) → алерт
     "overdue_tasks_limit": "5",          # просроченных задач > X → crm_hygiene
     "alert_min_working_days": "3",       # не считать алерт при истории < X раб.дней
+    # --- Этап 6b: Telegram-уведомления ---
+    "tg_finish_within_pct": "25",        # «финишная прямая» если до тира ≤ X%
 }
 
 
