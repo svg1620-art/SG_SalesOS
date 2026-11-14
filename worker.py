@@ -25,7 +25,39 @@ from app import app  # noqa: E402 — импорт создаёт app и ста�
 from extensions import scheduler  # noqa: E402
 
 
+def _start_health_server() -> None:
+    """Мини-HTTP на $PORT, чтобы проходил общий healthcheck Railway (/healthz).
+
+    У worker нет веб-сервера, но railway.toml задаёт healthcheckPath для обоих
+    сервисов. Отдаём 200 на любой путь, чтобы Railway считал процесс живым.
+    """
+    port = os.environ.get("PORT")
+    if not port:
+        return
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _H(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *args):  # тише в логах
+            return
+
+    try:
+        srv = HTTPServer(("0.0.0.0", int(port)), _H)
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning("[worker] health-сервер не поднялся: %s", exc)
+        return
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    app.logger.info("[worker] health-сервер на :%s", port)
+
+
 def main() -> int:
+    _start_health_server()
     if not scheduler.running:
         app.logger.error(
             "[worker] планировщик не запущен — проверь SCHEDULER_ENABLED=1 "

@@ -6,9 +6,10 @@
 builder = "NIXPACKS"
 
 [deploy]
-# Миграции применяются автоматически перед стартом веб-процесса.
-# 1 воркер + потоки: APScheduler (пульс/сводка) не должен дублироваться.
-startCommand = "flask --app app db upgrade && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120"
+# Один старт-скрипт для обоих сервисов (web и worker) — ветвится по SCHEDULER_ROLE.
+# web: миграции + gunicorn (1 воркер + потоки, чтобы amo_poll не задвоился).
+# worker: python worker.py (фоновый планировщик; healthcheck проходит мини-сервером).
+startCommand = "bash start.sh"
 healthcheckPath = "/healthz"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
