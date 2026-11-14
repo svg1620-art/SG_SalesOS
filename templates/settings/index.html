@@ -5,6 +5,18 @@
 <section class="sg-page">
   <h1 class="sg-h1">Настройки</h1>
 
+  {# --- Управление (перенесено из верхнего меню) --- #}
+  <div class="sg-card sg-card--pad">
+    <h3 class="sg-h3">Управление</h3>
+    <p class="sg-muted sg-sm">Справочники и доступы.</p>
+    <div class="sg-manage-links">
+      <a class="sg-btn" href="{{ url_for('checklists.index') }}">📋 Чек-листы</a>
+      <a class="sg-btn" href="{{ url_for('users.index') }}">👥 Пользователи</a>
+      <a class="sg-btn" href="{{ url_for('departments.index') }}">🏢 Отделы</a>
+    </div>
+  </div>
+  <style>.sg-manage-links{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}</style>
+
   {# --- Статус планировщика --- #}
   <div class="sg-card sg-card--pad">
     <h3 class="sg-h3">Расписание</h3>

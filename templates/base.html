@@ -157,12 +157,10 @@
         <a href="{{ url_for('calls.index') }}">Звонки</a>
         <a href="{{ url_for('dialogs.index') }}">Диалоги</a>
         <a href="{{ url_for('leaderboard.index') }}">🏆 Leaderboard</a>
-        <a href="{{ url_for('checklists.index') }}">Чек-листы</a>
-        <a href="{{ url_for('users.index') }}">Пользователи</a>
-        <a href="{{ url_for('departments.index') }}">Отделы</a>
         <a href="{{ url_for('ops.board') }}">🛰 Пульт</a>
+        <a href="{{ url_for('ops.renewals') }}">📅 Продления</a>
         <a href="{{ url_for('ops.validation') }}">⚙ Ops</a>
-        <a href="{{ url_for('settings.index') }}">Настройки</a>
+        <a href="{{ url_for('settings.index') }}">⚙️ Настройки</a>
       {% else %}
         <a href="{{ url_for('dashboard.me_today') }}">Мой день</a>
         <a href="{{ url_for('dashboard.manager_home') }}">Качество</a>
