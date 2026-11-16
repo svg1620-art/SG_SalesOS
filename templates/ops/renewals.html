@@ -227,24 +227,49 @@
   </div>
   {% endif %}
 
+  {# --- Оценка рабочего времени --- #}
+  {% if worktime and worktime.count %}
+  <div class="sg-card sg-card--pad" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <h3 class="sg-h3">Оценка рабочего времени сегодня</h3>
+      <span class="sg-muted sg-sm">Звонок = разговор + набор/завершение; сообщение / задача / примечание — норматив (настраивается)</span>
+    </div>
+    <div class="wt-grid">
+      <div class="wt"><div class="k">Активная работа</div><div class="v" style="color:var(--sg-cyan,#00BFDC)">≈ {{ worktime.total_label }}</div><div class="d">из них разговоры {{ worktime.talk_label }}</div></div>
+      <div class="wt"><div class="k">Промежуток дня</div><div class="v">{{ worktime.first }}–{{ worktime.last }}</div><div class="d">{{ worktime.span_label }} от первого до последнего касания</div></div>
+      <div class="wt"><div class="k">Простой</div><div class="v {{ 'rwarn' if worktime.load_pct is not none and worktime.load_pct < 50 }}">≈ {{ worktime.idle_label }}</div><div class="d">время между касаниями без активности</div></div>
+      <div class="wt"><div class="k">Загрузка</div><div class="v {{ 'rwarn' if worktime.load_pct is not none and worktime.load_pct < 50 }}">{{ worktime.load_pct if worktime.load_pct is not none else '—' }}%</div><div class="d">{{ worktime.by.calls }} зв · {{ worktime.by.msgs }} сооб · {{ worktime.by.tasks }} зад</div></div>
+    </div>
+  </div>
+  <style>
+    .wt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:12px}
+    .wt{background:var(--sg-panel,#141419);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 13px}
+    .wt .k{font-size:.7rem;color:var(--sg-muted,#8A8A96);text-transform:uppercase;letter-spacing:.04em}
+    .wt .v{font-size:1.3rem;font-weight:800;margin-top:4px;font-family:var(--sg-mono,monospace)}
+    .wt .d{color:var(--sg-muted,#8A8A96);font-size:.8rem;margin-top:4px}
+    .wt .rwarn{color:var(--sg-red,#e5484d)}
+  </style>
+  {% endif %}
+
   {# --- Касания сегодня --- #}
   <div class="sg-card sg-card--pad" style="margin-top:16px">
     <h3 class="sg-h3">Касания сегодня → клиент → продление</h3>
-    <div class="sg-muted sg-sm">С кем конкретно менеджер работал сегодня.</div>
+    <div class="sg-muted sg-sm">С кем конкретно менеджер работал сегодня. «≈ время» — оценка затраченного на касание.</div>
     <div style="overflow-x:auto;margin-top:10px">
       <table class="sg-table">
-        <thead><tr><th>Время</th><th>Клиент</th><th>Тип</th><th>Осталось</th><th>Статус</th></tr></thead>
+        <thead><tr><th>Время</th><th>Клиент</th><th>Тип</th><th>≈ время</th><th>Осталось</th><th>Статус</th></tr></thead>
         <tbody>
           {% for t in touches %}
           <tr>
             <td class="sg-mono sg-muted">{{ t.time }}</td>
             <td><a href="{{ url_for('ops.renewal_client', lead_id=t.amo_lead_id) }}" style="color:var(--sg-cyan,#00BFDC);text-decoration:none"><b>{{ t.name }}</b></a>{% if t.contact and t.contact != t.name %} <span class="sg-muted sg-sm">{{ t.contact }}</span>{% endif %}</td>
             <td>{{ t.type }}</td>
+            <td class="sg-mono sg-muted">{{ t.work_label }}</td>
             <td class="sg-mono">{% if t.days_left is none %}—{% elif t.days_left < 0 %}просроч.{% else %}{{ t.days_left }} дн{% endif %}</td>
             <td><span class="rpill" style="background:rgba(255,255,255,.06);color:{{ zp[t.zone][0] }}">{{ zp[t.zone][1] }}</span></td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="sg-muted">Сегодня касаний по клиентам продлений ещё нет.</td></tr>
+          <tr><td colspan="6" class="sg-muted">Сегодня касаний по клиентам продлений ещё нет.</td></tr>
           {% endfor %}
         </tbody>
       </table>

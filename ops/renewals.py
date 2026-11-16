@@ -537,6 +537,101 @@ def client_card(lead_id, today=None):
     }
 
 
+# ================= Оценка реального рабочего времени по касаниям =============
+
+def _work_cfg():
+    return {
+        "call_overhead": ops_int("touch_call_overhead_sec", 30),
+        "msg": ops_int("touch_msg_sec", 30),
+        "task": ops_int("touch_task_sec", 30),
+        "note": ops_int("touch_note_sec", 30),
+    }
+
+
+def _event_work_sec(e, cfg):
+    """Оценка затраченного времени на событие, сек.
+
+    Звонок: длительность разговора (для дозвона) + накладные на набор/завершение;
+    недозвон — только накладные. Сообщение/задача/примечание — фикс. норматив.
+    """
+    t = e.type
+    if t in ("call_out", "call_in"):
+        base = cfg["call_overhead"]
+        if e.is_connected:
+            base += int(e.duration_sec or 0)
+        return base
+    if t in ("msg_out", "msg_in"):
+        return cfg["msg"]
+    if t == "task_done":
+        return cfg["task"]
+    if t == "note":
+        return cfg["note"]
+    return 0
+
+
+def _fmt_dur(sec):
+    sec = int(sec or 0)
+    if sec < 60:
+        return f"{sec} с"
+    m = sec // 60
+    if m < 60:
+        return f"{m} мин"
+    return f"{m // 60} ч {m % 60:02d} мин"
+
+
+def work_time_today(manager_ids, today=None):
+    """Оценка активного рабочего времени менеджера(ов) продлений за сегодня.
+
+    Возвращает total (активная работа), span (промежуток первого→последнего
+    касания), load_pct (загрузка = total/span) и разбивку по типам. Показывает,
+    что час между касаниями — это не час разговора, а в основном простой.
+    """
+    from ops.metrics import _utc_bounds
+    from utils import to_local
+    today = today or date.today()
+    if not manager_ids:
+        return None
+    uf, ut = _utc_bounds(today)
+    ev = OpsActivityEvent.query.filter(
+        OpsActivityEvent.manager_id.in_(list(manager_ids)),
+        OpsActivityEvent.occurred_at >= uf, OpsActivityEvent.occurred_at < ut,
+    ).all()
+    cfg = _work_cfg()
+    total = 0
+    talk = 0
+    by = {"calls": 0, "msgs": 0, "tasks": 0, "notes": 0}
+    times = []
+    for e in ev:
+        total += _event_work_sec(e, cfg)
+        times.append(e.occurred_at)
+        if e.type in ("call_out", "call_in"):
+            by["calls"] += 1
+            if e.is_connected:
+                talk += int(e.duration_sec or 0)
+        elif e.type in ("msg_out", "msg_in"):
+            by["msgs"] += 1
+        elif e.type == "task_done":
+            by["tasks"] += 1
+        elif e.type == "note":
+            by["notes"] += 1
+    if not times:
+        return {"count": 0, "total_sec": 0, "total_label": "0 мин", "span_sec": 0,
+                "span_label": "—", "load_pct": None, "idle_sec": 0, "idle_label": "—",
+                "talk_label": "0 мин", "by": by, "first": None, "last": None}
+    first, last = min(times), max(times)
+    span = int((last - first).total_seconds())
+    load = round(total / span * 100) if span > 0 else None
+    return {
+        "count": len(ev), "total_sec": total, "total_label": _fmt_dur(total),
+        "span_sec": span, "span_label": _fmt_dur(span),
+        "load_pct": min(100, load) if load is not None else None,
+        "idle_sec": max(0, span - total), "idle_label": _fmt_dur(max(0, span - total)),
+        "talk_label": _fmt_dur(talk), "by": by,
+        "first": to_local(first).strftime("%H:%M"),
+        "last": to_local(last).strftime("%H:%M"),
+    }
+
+
 def touch_plan(manager_ids, today=None):
     """Дневной план касаний менеджера(ов) продлений: факт сегодня / план."""
     from ops.metrics import _utc_bounds
@@ -579,6 +674,7 @@ def today_touches(manager_ids, today=None, limit=40):
         if r is not None:
             matched.append((e, r))
     touch = _last_touch_days([r for _e, r in matched])
+    wcfg = _work_cfg()
     out = []
     for e, r in matched:
         dl = (r.renewal_end - today).days if r.renewal_end else None
@@ -590,6 +686,7 @@ def today_touches(manager_ids, today=None, limit=40):
             "type": TYPE_LABEL.get(e.type, e.type),
             "days_left": dl, "band": b, "amo_lead_id": r.amo_lead_id,
             "zone": comm_status_of(r),
+            "work_label": _fmt_dur(_event_work_sec(e, wcfg)),
         })
         if len(out) >= limit:
             break

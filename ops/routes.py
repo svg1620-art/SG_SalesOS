@@ -523,7 +523,7 @@ def renewals():
     data = board(period=period, manager_ids=mgr_ids, month=sel_month) if pid else None
 
     # --- Этап B: рабочий список, план, тепловая карта, касания сегодня ---
-    worklist = plan = touches = heat = rm_list = None
+    worklist = plan = touches = heat = rm_list = worktime = None
     sel_rm = None
     wl_months = []
     wband = request.args.get("wband", "all")
@@ -541,7 +541,7 @@ def renewals():
     if data is not None:
         from ops.renewals import (
             worklist as _worklist, touch_plan, today_touches, renewal_managers,
-            worklist_months,
+            worklist_months, work_time_today,
         )
         rm_list = renewal_managers()
         if mgr_ids is not None:
@@ -551,6 +551,7 @@ def renewals():
         worklist = _worklist(manager_ids=mgr_ids, band_filter=wband, month=sel_wl_month)
         plan = touch_plan(rm_ids)
         touches = today_touches(rm_ids)
+        worktime = work_time_today(rm_ids)
         # тепловая карта касаний выбранного менеджера продлений
         sel = request.args.get("rm")
         sel_rm = int(sel) if sel and sel.isdigit() and int(sel) in rm_ids else (
@@ -581,7 +582,7 @@ def renewals():
         pipeline_id=pid, date_field=date_field, configured=configured,
         touch_plan_cfg=touch_plan_cfg, sla_cfg=sla_cfg,
         total_renewals=Renewal.query.count() if pid else 0, last_sync=last_sync,
-        worklist=worklist, plan=plan, touches=touches, heat=heat,
+        worklist=worklist, plan=plan, touches=touches, heat=heat, worktime=worktime,
         rm_list=rm_list, sel_rm=sel_rm, wband=wband, field_diag=field_diag,
         sel_month=(month_raw if sel_month else ""),
         wl_months=wl_months, wl_month=(wlm_raw if sel_wl_month else ""),
