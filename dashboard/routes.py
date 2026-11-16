@@ -386,9 +386,33 @@ def index():
             review_rows.append({"name": m.full_name or m.email, **st})
     review_rows.sort(key=lambda r: (r["pct"] if r["pct"] is not None else 101, -r["overdue"]))
 
+    # --- загрузка команды сегодня (активное время / норма) по обоим отделам ---
+    team_load = []
+    net_label = None
+    try:
+        from ops.worktime import (active_sec_by_manager, load_pct as _lp,
+                                   fmt_dur as _fd, net_working_minutes)
+        mgrs = User.query.filter_by(role="manager", is_active=True).all()
+        if dept_manager_ids is not None:
+            mgrs = [u for u in mgrs if u.id in dept_manager_ids]
+        act = active_sec_by_manager([u.id for u in mgrs], now_l.date())
+        for u in mgrs:
+            sec = act.get(u.id, 0)
+            team_load.append({
+                "id": u.id, "name": u.full_name or u.email,
+                "dept": u.department.name if u.department else "—",
+                "load_pct": _lp(sec), "active_label": _fd(sec),
+            })
+        team_load.sort(key=lambda r: r["load_pct"])  # низкие сверху — на что смотреть
+        net_label = _fd(net_working_minutes() * 60)
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        team_load = []
+
     return render_template(
         "dashboard/index.html",
         review_rows=review_rows,
+        team_load=team_load, team_net_label=net_label,
         kpi=kpi,
         leaderboard=leaderboard,
         manager_cards=manager_cards,
