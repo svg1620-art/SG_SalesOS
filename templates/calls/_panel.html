@@ -93,7 +93,7 @@
         {% endif %}
       {% elif review.is_owner %}
         <p class="sg-muted sg-sm">Напишите, <b>что поняли и что исправите в следующий раз</b> — тогда звонок считается разобранным.
-          {% if review.due %}Срок: до конца {{ review.due.strftime('%d.%m') }}.{% endif %}</p>
+          {% if review.due %}Срок: до {{ review.due.strftime('%H:%M %d.%m') }}.{% endif %}</p>
         <form method="post" action="{{ url_for('calls.review', call_id=call.id) }}">
           <textarea class="sg-input" name="comment" rows="3" required
                     placeholder="Напр.: не уточнил время перезвона — в следующий раз всегда фиксирую конкретный день и час."></textarea>
@@ -101,7 +101,7 @@
         </form>
       {% else %}
         <p class="sg-muted sg-sm">Менеджер ещё не разобрал этот звонок.
-          {% if review.due %}Срок — до конца {{ review.due.strftime('%d.%m') }}.{% endif %}</p>
+          {% if review.due %}Срок — до {{ review.due.strftime('%H:%M %d.%m') }}.{% endif %}</p>
       {% endif %}
     </div>
     {% endif %}

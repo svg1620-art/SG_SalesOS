@@ -1,14 +1,15 @@
 """Самоконтроль менеджера: обязательный разбор своих звонков.
 
 Разбор обязателен для ВСЕХ оценённых звонков (status=done, есть балл, не
-исключён). Комментарий менеджера обязателен. Срок — до конца следующего
-рабочего дня после звонка; просрочка подсвечивается.
+исключён). Комментарий менеджера обязателен. Срок — до REVIEW_DUE_HOUR (деф.
+14:00) следующего рабочего дня после звонка; просрочка подсвечивается.
 """
-from datetime import timedelta
+from datetime import timedelta, datetime, time
 
 from extensions import db
 from models import Call, WorkCalendar
-from utils import to_local, now_local
+from utils import to_local, now_local, app_tz
+from ops_store import ops_int
 
 
 def is_scored(call) -> bool:
@@ -25,7 +26,11 @@ def _is_working_day(d) -> bool:
 
 
 def due_date(call):
-    """Крайний день разбора: конец следующего рабочего дня после звонка."""
+    """Крайний срок разбора: следующий рабочий день, REVIEW_DUE_HOUR:00 (деф. 14:00).
+
+    Возвращает локальный datetime крайнего срока (не дату), чтобы менеджеры не
+    тянули до конца дня — разбор за вчера должен быть сделан к 14:00 сегодня.
+    """
     base = call.started_at or call.created_at
     if base is None:
         return None
@@ -35,7 +40,8 @@ def due_date(call):
     while not _is_working_day(nxt) and guard < 10:
         nxt += timedelta(days=1)
         guard += 1
-    return nxt
+    hour = max(0, min(23, ops_int("review_due_hour", 14)))
+    return datetime.combine(nxt, time(hour, 0), tzinfo=app_tz())
 
 
 def state(call) -> str:
@@ -45,7 +51,7 @@ def state(call) -> str:
     if not is_scored(call):
         return "na"
     due = due_date(call)
-    if due is not None and now_local().date() > due:
+    if due is not None and now_local() > due:
         return "overdue"
     return "pending"
 

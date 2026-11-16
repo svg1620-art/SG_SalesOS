@@ -53,6 +53,10 @@
 
   .lead{margin-top:24px;font-size:1.12rem;color:var(--fg)}
   .lead b{color:var(--cyan)}
+  .when{margin-top:16px;background:color-mix(in srgb,var(--cyan) 12%,transparent);
+    border:1px solid color-mix(in srgb,var(--cyan) 40%,var(--border));border-radius:12px;
+    padding:13px 16px;font-size:1rem}
+  .when b{color:var(--cyan)}
 
   section{margin-top:34px}
   .shead{display:flex;align-items:center;gap:10px;margin-bottom:14px}
@@ -132,6 +136,9 @@
     заходит в карточку звонка в SalesOS, изучает запись и выводы и оставляет свой комментарий.
     Это не формальность — это способ увидеть свои ошибки раньше, чем их увидит клиент.</p>
 
+  <div class="when">⏰ Рекомендованное время разбора — <b>18:00–19:00</b>, пока звонки свежи в памяти.
+    Крайний срок — <b>до 14:00 следующего рабочего дня</b>, иначе звонок уходит в просрочку.</div>
+
   <section>
     <div class="shead"><span class="n">01</span><h2>Правило</h2></div>
     <div class="rules">
@@ -142,8 +149,8 @@
       </div>
       <div class="rule">
         <div class="k">Срок</div>
-        <div class="v">До конца следующего рабочего дня</div>
-        <div class="d">Звонок за понедельник должен быть разобран не позднее конца вторника. Выходные не считаются.</div>
+        <div class="v">До 14:00 следующего рабочего дня</div>
+        <div class="d">Звонок за понедельник должен быть разобран не позднее 14:00 вторника. Выходные не считаются.</div>
       </div>
       <div class="rule">
         <div class="k">Что обязательно</div>
@@ -209,7 +216,7 @@
     <div class="stats">
       <div class="st st--g"><span class="dot"></span><div><b>🟢 Разобран</b> &nbsp; <span>комментарий оставлен, отметка «Я изучил» стоит</span></div></div>
       <div class="st st--y"><span class="dot"></span><div><b>🟡 Ждёт разбора</b> &nbsp; <span>оценён, но ещё не разобран — срок не вышел</span></div></div>
-      <div class="st st--r"><span class="dot"></span><div><b>🔴 Просрочен</b> &nbsp; <span>срок (конец следующего рабочего дня) прошёл, разбора нет</span></div></div>
+      <div class="st st--r"><span class="dot"></span><div><b>🔴 Просрочен</b> &nbsp; <span>14:00 следующего рабочего дня прошло, разбора нет</span></div></div>
     </div>
     <div class="note">РОП видит <b>процент разобранных звонков по каждому менеджеру и просрочки</b> на своём дашборде.
       Красная зона всегда на виду — не копи просрочки, разбирай звонки в тот же вечер.</div>
