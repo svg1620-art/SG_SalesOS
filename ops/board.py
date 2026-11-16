@@ -155,6 +155,10 @@ def board_rows(today: date = None, dept_manager_ids=None) -> list:
         ).all()
     }
 
+    # активная загрузка (оценка рабочего времени по касаниям) — одним запросом
+    from ops.worktime import active_sec_by_manager, load_pct as _load_pct, fmt_dur as _fmt_dur
+    active = active_sec_by_manager([m.id for m in managers], today)
+
     # медианы команды за сегодня
     crs, calls = [], []
     for m in managers:
@@ -199,6 +203,9 @@ def board_rows(today: date = None, dept_manager_ids=None) -> list:
             "last_action_label": _ago_label(minutes_since),
             "avg_call_score": s.avg_call_score if s else None,
             "month": fc,
+            "active_sec": active.get(m.id, 0),
+            "active_label": _fmt_dur(active.get(m.id, 0)),
+            "load_pct": _load_pct(active.get(m.id, 0)),
         }
         row["status"] = _status(row, team_median_cr, team_median_calls, now_l)
         rows.append(row)

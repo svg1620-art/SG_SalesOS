@@ -336,6 +336,7 @@ def board():
         "calls": lambda r: -r["calls_connected"],
         "connect": lambda r: -(r["connect_rate"] or 0),
         "quality": lambda r: -(r["avg_call_score"] or 0),
+        "load": lambda r: -(r["load_pct"] or 0),
         "month": lambda r: -((r["month"] or {}).get("progress_pct") or 0),
     }
     rows.sort(key=keymap.get(sort, keymap["status"]))
@@ -358,12 +359,32 @@ def board():
             "risk": d.risk_level, "week": d.week_start, "error": d.error,
         }
 
+    from ops_store import ops_int
+    from ops.worktime import net_working_minutes, fmt_dur
     return render_template(
         "ops/board.html", rows=rows, summary=summary, sort=sort,
         departments=departments, department_id=dep_id,
         now_label=now_local().strftime("%H:%M"),
         alerts=alerts, diag_rows=diag_rows,
+        wh_from=ops_int("work_hours_from", 10), wh_to=ops_int("work_hours_to", 19),
+        lunch_min=ops_int("lunch_break_min", 60),
+        net_label=fmt_dur(net_working_minutes() * 60),
     )
+
+
+@ops_bp.route("/worktime-config", methods=["POST"])
+@admin_required
+def worktime_config():
+    from ops_store import set_ops_setting
+    f, t = (request.form.get("wh_from") or "").strip(), (request.form.get("wh_to") or "").strip()
+    lunch = (request.form.get("lunch_min") or "").strip()
+    if f.isdigit() and t.isdigit() and 0 <= int(f) < int(t) <= 24:
+        set_ops_setting("work_hours_from", f)
+        set_ops_setting("work_hours_to", t)
+    if lunch.isdigit() and 0 <= int(lunch) < 600:
+        set_ops_setting("lunch_break_min", lunch)
+    flash("Рабочее время обновлено.", "success")
+    return redirect(url_for("ops.board", department_id=request.form.get("department_id") or None))
 
 
 @ops_bp.route("/board/refresh", methods=["POST"])

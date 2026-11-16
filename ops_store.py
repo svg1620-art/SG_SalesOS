@@ -14,8 +14,9 @@ OPS_DEFAULTS = {
     "connect_min_sec": "30",
     "idle_gap_min": "60",
     "late_start_time": "10:00",
-    "work_hours_from": "9",
-    "work_hours_to": "20",
+    "work_hours_from": "10",
+    "work_hours_to": "19",
+    "lunch_break_min": "60",               # обед, мин — вычитается из нормы рабочего дня
     "ops_timezone": "Europe/Moscow",
     "sync_interval_min": "5",
     "sync_overlap_min": "10",

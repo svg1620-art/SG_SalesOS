@@ -238,7 +238,7 @@
       <div class="wt"><div class="k">Активная работа</div><div class="v" style="color:var(--sg-cyan,#00BFDC)">≈ {{ worktime.total_label }}</div><div class="d">из них разговоры {{ worktime.talk_label }}</div></div>
       <div class="wt"><div class="k">Промежуток дня</div><div class="v">{{ worktime.first }}–{{ worktime.last }}</div><div class="d">{{ worktime.span_label }} от первого до последнего касания</div></div>
       <div class="wt"><div class="k">Простой</div><div class="v {{ 'rwarn' if worktime.load_pct is not none and worktime.load_pct < 50 }}">≈ {{ worktime.idle_label }}</div><div class="d">время между касаниями без активности</div></div>
-      <div class="wt"><div class="k">Загрузка</div><div class="v {{ 'rwarn' if worktime.load_pct is not none and worktime.load_pct < 50 }}">{{ worktime.load_pct if worktime.load_pct is not none else '—' }}%</div><div class="d">{{ worktime.by.calls }} зв · {{ worktime.by.msgs }} сооб · {{ worktime.by.tasks }} зад</div></div>
+      <div class="wt"><div class="k">Загрузка смены</div><div class="v {{ 'rwarn' if worktime.shift_load_pct is not none and worktime.shift_load_pct < 50 }}">{{ worktime.shift_load_pct if worktime.shift_load_pct is not none else '—' }}%</div><div class="d">из нормы {{ worktime.net_label }} · {{ worktime.by.calls }} зв · {{ worktime.by.msgs }} сооб · {{ worktime.by.tasks }} зад</div></div>
     </div>
   </div>
   <style>

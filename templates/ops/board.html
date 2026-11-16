@@ -42,6 +42,20 @@
     </div>
   </div>
 
+  <details class="wt-cfg">
+    <summary>🕙 Рабочее время: {{ '%02d'|format(wh_from) }}:00–{{ '%02d'|format(wh_to) }}:00, обед {{ lunch_min }} мин · норма {{ net_label }} <span class="sg-muted sg-sm">(загрузка считается от неё)</span></summary>
+    <form method="post" action="{{ url_for('ops.worktime_config') }}" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px">
+      <input type="hidden" name="department_id" value="{{ department_id or '' }}">
+      <label class="sg-field" style="max-width:120px"><span class="sg-field__label">Начало, ч</span>
+        <input class="sg-input sg-mono" type="number" min="0" max="23" name="wh_from" value="{{ wh_from }}"></label>
+      <label class="sg-field" style="max-width:120px"><span class="sg-field__label">Конец, ч</span>
+        <input class="sg-input sg-mono" type="number" min="1" max="24" name="wh_to" value="{{ wh_to }}"></label>
+      <label class="sg-field" style="max-width:140px"><span class="sg-field__label">Обед, мин</span>
+        <input class="sg-input sg-mono" type="number" min="0" max="240" name="lunch_min" value="{{ lunch_min }}"></label>
+      <button class="sg-btn" type="submit">Сохранить</button>
+    </form>
+  </details>
+
   {% if alerts %}
   <div class="sg-card sg-card--pad alerts-box">
     <h3 class="sg-h3" style="margin:0 0 8px">⚠️ Системные алерты <span class="sg-muted sg-sm">({{ alerts|length }})</span></h3>
@@ -72,6 +86,7 @@
         <th>Сообщ.</th>
         <th>Квал / Назн / Пров</th>
         <th>Посл. действие</th>
+        <th>{{ sort_link('load','Загрузка') }}</th>
         <th>{{ sort_link('month','Месяц') }}</th>
         <th>{{ sort_link('quality','Качество') }}</th>
       </tr>
@@ -93,6 +108,11 @@
         <td class="sg-mono">{{ r.messages_out }}</td>
         <td class="sg-mono sg-sm">{{ r.qualified }} / {{ r.meetings_set }} / {{ r.meetings_held }}</td>
         <td class="sg-sm {{ 'sg-red-text' if r.minutes_since_last and r.minutes_since_last > 120 }}">{{ r.last_action_label }}</td>
+        <td class="sg-mono {{ 'sg-red-text' if r.load_pct is not none and r.load_pct < 50 }}">
+          {{ r.load_pct }}%
+          <div class="sg-bar"><div class="sg-bar__fill" style="width:{{ [r.load_pct, 100]|min }}%;{{ 'background:var(--sg-red,#e5484d)' if r.load_pct < 50 }}"></div></div>
+          <span class="sg-muted sg-sm">{{ r.active_label }}</span>
+        </td>
         <td class="sg-mono sg-sm">
           {% if r.month.progress_pct is not none %}{{ r.month.progress_pct }}%{% else %}—{% endif %}
           {% if r.month.forecast_pct is not none %}<span class="sg-muted">(прогноз {{ r.month.forecast_pct }}%)</span>{% endif %}
@@ -103,7 +123,7 @@
       {% if dg and not dg.error and dg.main_cause %}
       {% set rr = {'high':['#e5484d','высокий'],'medium':['#f5c542','средний'],'low':['#17b26a','низкий']} %}
       <tr class="diag-row">
-        <td colspan="11">
+        <td colspan="12">
           <details class="diag">
             <summary>
               <span class="diag__risk" style="background:{{ rr.get(dg.risk,['#8A8A96','—'])[0] }}"></span>
@@ -120,10 +140,10 @@
         </td>
       </tr>
       {% elif dg and dg.error %}
-      <tr class="diag-row"><td colspan="11" class="sg-muted sg-sm">🧠 {{ r.name }}: разбор не удался — {{ dg.error }}</td></tr>
+      <tr class="diag-row"><td colspan="12" class="sg-muted sg-sm">🧠 {{ r.name }}: разбор не удался — {{ dg.error }}</td></tr>
       {% endif %}
       {% else %}
-      <tr><td colspan="11" class="sg-muted">Нет активных менеджеров / данных за сегодня.</td></tr>
+      <tr><td colspan="12" class="sg-muted">Нет активных менеджеров / данных за сегодня.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -139,6 +159,9 @@
   .sg-bar__fill{height:100%;background:var(--sg-blue,#1467F5);border-radius:3px}
   .sg-chip{display:inline-block;padding:3px 10px;margin-right:6px;border-radius:999px;border:1px solid rgba(255,255,255,.12);text-decoration:none;color:inherit}
   .sg-chip--active{background:var(--sg-blue,#1467F5);border-color:transparent;color:#fff}
+  .wt-cfg{margin:0 0 14px;background:var(--sg-panel,#141419);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 13px}
+  .wt-cfg>summary{cursor:pointer;font-size:.9rem;list-style:none}
+  .wt-cfg>summary::-webkit-details-marker{display:none}
   .alerts-box{margin:0 0 14px}
   .alerts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:9px}
   .alert{border:1px solid rgba(255,255,255,.1);border-left-width:3px;border-radius:9px;padding:9px 11px;background:rgba(255,255,255,.03)}

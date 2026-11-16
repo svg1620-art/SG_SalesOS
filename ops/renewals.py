@@ -537,46 +537,11 @@ def client_card(lead_id, today=None):
     }
 
 
-# ================= Оценка реального рабочего времени по касаниям =============
-
-def _work_cfg():
-    return {
-        "call_overhead": ops_int("touch_call_overhead_sec", 30),
-        "msg": ops_int("touch_msg_sec", 30),
-        "task": ops_int("touch_task_sec", 30),
-        "note": ops_int("touch_note_sec", 30),
-    }
-
-
-def _event_work_sec(e, cfg):
-    """Оценка затраченного времени на событие, сек.
-
-    Звонок: длительность разговора (для дозвона) + накладные на набор/завершение;
-    недозвон — только накладные. Сообщение/задача/примечание — фикс. норматив.
-    """
-    t = e.type
-    if t in ("call_out", "call_in"):
-        base = cfg["call_overhead"]
-        if e.is_connected:
-            base += int(e.duration_sec or 0)
-        return base
-    if t in ("msg_out", "msg_in"):
-        return cfg["msg"]
-    if t == "task_done":
-        return cfg["task"]
-    if t == "note":
-        return cfg["note"]
-    return 0
-
-
-def _fmt_dur(sec):
-    sec = int(sec or 0)
-    if sec < 60:
-        return f"{sec} с"
-    m = sec // 60
-    if m < 60:
-        return f"{m} мин"
-    return f"{m // 60} ч {m % 60:02d} мин"
+# ===== Оценка рабочего времени по касаниям — общий модуль ops.worktime =====
+from ops.worktime import (  # noqa: E402
+    work_cfg as _work_cfg, event_work_sec as _event_work_sec, fmt_dur as _fmt_dur,
+    net_working_minutes as _net_working_minutes, load_pct as _load_pct,
+)
 
 
 def work_time_today(manager_ids, today=None):
@@ -621,10 +586,12 @@ def work_time_today(manager_ids, today=None):
     first, last = min(times), max(times)
     span = int((last - first).total_seconds())
     load = round(total / span * 100) if span > 0 else None
+    net_min = _net_working_minutes()
     return {
         "count": len(ev), "total_sec": total, "total_label": _fmt_dur(total),
         "span_sec": span, "span_label": _fmt_dur(span),
         "load_pct": min(100, load) if load is not None else None,
+        "shift_load_pct": _load_pct(total), "net_label": _fmt_dur(net_min * 60),
         "idle_sec": max(0, span - total), "idle_label": _fmt_dur(max(0, span - total)),
         "talk_label": _fmt_dur(talk), "by": by,
         "first": to_local(first).strftime("%H:%M"),
