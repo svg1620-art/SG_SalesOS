@@ -517,6 +517,8 @@ def renewals():
             sel_month = None
     pid = get_ops_setting("renewals_pipeline_id")
     date_field = get_ops_setting("renewals_date_field")
+    touch_plan_cfg = get_ops_setting("renewal_touch_plan")
+    sla_cfg = get_ops_setting("renewal_sla_days")
     configured = bool(pid) and Renewal.query.count() > 0
     data = board(period=period, manager_ids=mgr_ids, month=sel_month) if pid else None
 
@@ -577,6 +579,7 @@ def renewals():
         departments=departments, department_id=dep_id, period=period,
         data=data, pipelines=pipelines, pipelines_error=pl_err,
         pipeline_id=pid, date_field=date_field, configured=configured,
+        touch_plan_cfg=touch_plan_cfg, sla_cfg=sla_cfg,
         total_renewals=Renewal.query.count() if pid else 0, last_sync=last_sync,
         worklist=worklist, plan=plan, touches=touches, heat=heat,
         rm_list=rm_list, sel_rm=sel_rm, wband=wband, field_diag=field_diag,
@@ -635,6 +638,12 @@ def renewals_config():
     from ops_store import set_ops_setting
     set_ops_setting("renewals_pipeline_id", (request.form.get("pipeline_id") or "").strip())
     set_ops_setting("renewals_date_field", (request.form.get("date_field") or "").strip())
+    tp = (request.form.get("touch_plan") or "").strip()
+    if tp.isdigit() and int(tp) > 0:
+        set_ops_setting("renewal_touch_plan", tp)
+    sla = (request.form.get("sla_days") or "").strip()
+    if sla.isdigit() and int(sla) > 0:
+        set_ops_setting("renewal_sla_days", sla)
     flash("Настройки воронки продлений сохранены. Запустите синхронизацию.", "success")
     return redirect(url_for("ops.renewals"))
 

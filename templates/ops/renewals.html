@@ -21,6 +21,10 @@
         </select></label>
       <label class="sg-field" style="max-width:320px"><span class="sg-field__label">Поле «дата окончания подписки» (id или имя)</span>
         <input class="sg-input sg-mono" name="date_field" value="{{ date_field or '' }}" placeholder="напр. 1234567 или Дата окончания подписки"></label>
+      <label class="sg-field" style="max-width:150px"><span class="sg-field__label">План касаний в день</span>
+        <input class="sg-input sg-mono" type="number" min="1" name="touch_plan" value="{{ touch_plan_cfg or 150 }}"></label>
+      <label class="sg-field" style="max-width:170px"><span class="sg-field__label">SLA: дней без касания</span>
+        <input class="sg-input sg-mono" type="number" min="1" name="sla_days" value="{{ sla_cfg or 4 }}"></label>
       <button class="sg-btn" type="submit">Сохранить</button>
     </form>
     <form method="post" action="{{ url_for('ops.renewals_sync_now') }}" style="margin-top:10px">
