@@ -28,6 +28,35 @@
   </div>
   {% endif %}
 
+  {# --- Загрузка по дням (динамика) --- #}
+  {% if load_chart %}
+  <div class="sg-card sg-card--pad" style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+      <h3 class="sg-h3" style="margin:0">📊 Загрузка по дням</h3>
+      {% if load_today %}<span class="sg-muted sg-sm">Сегодня: <b style="color:var(--sg-cyan,#00BFDC)">{{ load_today.load_pct }}%</b> · {{ load_today.total_label }} из нормы {{ load_today.net_label }}</span>{% endif %}
+    </div>
+    <div style="position:relative;height:220px;margin-top:10px"><canvas id="loadChart"></canvas></div>
+    <p class="sg-muted sg-sm" style="margin-top:8px">Активное время по касаниям (звонки + разговор, сообщения, задачи) к норме рабочего дня. Последние {{ load_chart|length }} рабочих дней.</p>
+  </div>
+  <script>
+  (function(){
+    var labels={{ load_labels|tojson }}, pct={{ load_pcts|tojson }};
+    function draw(){
+      if(!window.Chart){return setTimeout(draw,120);}
+      var el=document.getElementById('loadChart'); if(!el)return;
+      new Chart(el,{type:'line',data:{labels:labels,datasets:[{label:'Загрузка, %',data:pct,
+        borderColor:'#00BFDC',backgroundColor:'rgba(0,191,220,.15)',fill:true,tension:.3,
+        pointRadius:3,pointBackgroundColor:'#1467F5',pointBorderColor:'#1467F5'}]},
+        options:{responsive:true,maintainAspectRatio:false,
+          scales:{y:{beginAtZero:true,suggestedMax:100,ticks:{color:'#8A8A96',callback:function(v){return v+'%';}},grid:{color:'rgba(128,128,140,.15)'}},
+                  x:{ticks:{color:'#8A8A96'},grid:{display:false}}},
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y+'%';}}}}}});
+    }
+    if(document.readyState!=='loading')draw(); else document.addEventListener('DOMContentLoaded',draw);
+  })();
+  </script>
+  {% endif %}
+
   {# --- Миссия дня (геймификация, Этап 5) --- #}
   {% if mission %}
   <div class="sg-card sg-card--pad sg-mission" style="margin-top:14px">

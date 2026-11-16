@@ -369,6 +369,8 @@ def board():
         wh_from=ops_int("work_hours_from", 10), wh_to=ops_int("work_hours_to", 19),
         lunch_min=ops_int("lunch_break_min", 60),
         net_label=fmt_dur(net_working_minutes() * 60),
+        call_sec=ops_int("touch_call_overhead_sec", 30), msg_sec=ops_int("touch_msg_sec", 60),
+        task_sec=ops_int("touch_task_sec", 60), note_sec=ops_int("touch_note_sec", 60),
     )
 
 
@@ -383,6 +385,13 @@ def worktime_config():
         set_ops_setting("work_hours_to", t)
     if lunch.isdigit() and 0 <= int(lunch) < 600:
         set_ops_setting("lunch_break_min", lunch)
+    # нормативы времени на касание (сек)
+    for key, field in (("touch_call_overhead_sec", "call_sec"),
+                       ("touch_msg_sec", "msg_sec"), ("touch_task_sec", "task_sec"),
+                       ("touch_note_sec", "note_sec")):
+        v = (request.form.get(field) or "").strip()
+        if v.isdigit() and 0 <= int(v) <= 3600:
+            set_ops_setting(key, v)
     flash("Рабочее время обновлено.", "success")
     return redirect(url_for("ops.board", department_id=request.form.get("department_id") or None))
 

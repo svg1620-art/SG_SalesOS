@@ -790,9 +790,23 @@ def me_today():
     except Exception:  # noqa: BLE001
         db.session.rollback()
 
+    # загрузка по дням (динамика) — менеджер видит сам, РОП через ?manager_id
+    load_chart = load_today = None
+    load_labels = load_pcts = []
+    try:
+        from ops.worktime import daily_load, manager_load
+        load_chart = daily_load(target.id, 14, up_to=today)
+        load_labels = [d["label"] for d in load_chart]
+        load_pcts = [d["load_pct"] for d in load_chart]
+        load_today = manager_load(target.id, today)
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+
     return render_template(
         "dashboard/me_today.html",
         payback=payback, focus=focus,
+        load_chart=load_chart, load_today=load_today,
+        load_labels=load_labels, load_pcts=load_pcts,
         target=target, is_self=(target.id == current_user.id),
         today=today, stat=stat, cards=cards, connect_rate=connect_rate,
         first_action_label=first_action_label,

@@ -52,6 +52,15 @@
         <input class="sg-input sg-mono" type="number" min="1" max="24" name="wh_to" value="{{ wh_to }}"></label>
       <label class="sg-field" style="max-width:140px"><span class="sg-field__label">Обед, мин</span>
         <input class="sg-input sg-mono" type="number" min="0" max="240" name="lunch_min" value="{{ lunch_min }}"></label>
+      <span class="sg-field__label" style="width:100%;margin-top:4px">Нормативы времени на касание (сек):</span>
+      <label class="sg-field" style="max-width:130px"><span class="sg-field__label">Звонок +набор</span>
+        <input class="sg-input sg-mono" type="number" min="0" max="600" name="call_sec" value="{{ call_sec }}"></label>
+      <label class="sg-field" style="max-width:120px"><span class="sg-field__label">Сообщение</span>
+        <input class="sg-input sg-mono" type="number" min="0" max="600" name="msg_sec" value="{{ msg_sec }}"></label>
+      <label class="sg-field" style="max-width:110px"><span class="sg-field__label">Задача</span>
+        <input class="sg-input sg-mono" type="number" min="0" max="600" name="task_sec" value="{{ task_sec }}"></label>
+      <label class="sg-field" style="max-width:120px"><span class="sg-field__label">Примечание</span>
+        <input class="sg-input sg-mono" type="number" min="0" max="600" name="note_sec" value="{{ note_sec }}"></label>
       <button class="sg-btn" type="submit">Сохранить</button>
     </form>
   </details>

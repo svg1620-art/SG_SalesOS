@@ -84,6 +84,41 @@ def load_pct(active_sec) -> int:
     return min(100, round(active_sec / net_sec * 100)) if net_sec else 0
 
 
+def daily_load(manager_id, days=14, up_to=None) -> list:
+    """Загрузка по рабочим дням (старые→свежие) для графика динамики.
+
+    [{date, label, active_sec, active_label, load_pct}] за последние `days`
+    рабочих дней. Показывает менеджеру и РОПу динамику активной загрузки.
+    """
+    from ops.metrics import recent_working_days, _utc_bounds
+    from utils import to_local
+    up_to = up_to or date.today()
+    wd = sorted(recent_working_days(up_to, days))  # старые → свежие
+    if not wd:
+        return []
+    uf, _ = _utc_bounds(wd[0])
+    _, ut = _utc_bounds(wd[-1])
+    ev = OpsActivityEvent.query.filter(
+        OpsActivityEvent.manager_id == manager_id,
+        OpsActivityEvent.occurred_at >= uf, OpsActivityEvent.occurred_at < ut,
+    ).all()
+    cfg = work_cfg()
+    net_sec = net_working_minutes() * 60
+    by_day = {}
+    for e in ev:
+        d = to_local(e.occurred_at).date()
+        by_day[d] = by_day.get(d, 0) + event_work_sec(e, cfg)
+    out = []
+    for d in wd:
+        sec = by_day.get(d, 0)
+        out.append({
+            "date": d, "label": d.strftime("%d.%m"), "active_sec": sec,
+            "active_label": fmt_dur(sec),
+            "load_pct": min(100, round(sec / net_sec * 100)) if net_sec else 0,
+        })
+    return out
+
+
 def manager_load(manager_id, day=None) -> dict:
     """Детальная оценка по одному менеджеру за день (для карточки/детали)."""
     day = day or date.today()
