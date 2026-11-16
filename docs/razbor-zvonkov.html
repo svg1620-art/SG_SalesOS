@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Разбор звонков — SG SalesOS</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+  /* Layout: одна колонка-«документ», карточки-правила в сетке, нумерованный порядок действий */
+  :root{
+    --bg:#0A0A0D; --surface:#141419; --surface-2:#1b1b23; --border:rgba(255,255,255,.1);
+    --fg:#ECECEF; --muted:#9A9AA6; --blue:#1467F5; --cyan:#00BFDC;
+    --green:#39D98A; --amber:#F5A524; --red:#E5484D;
+    color-scheme:dark;
+    --display:"Manrope",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  @media (prefers-color-scheme:light){ :root:not([data-theme="dark"]){
+    --bg:#F5F6F8; --surface:#FFFFFF; --surface-2:#EEF1F5; --border:rgba(10,10,13,.12);
+    --fg:#17171C; --muted:#5B5B67; --blue:#0F57D6; --cyan:#0089A0;
+    color-scheme:light;
+  }}
+  :root[data-theme="light"]{
+    --bg:#F5F6F8; --surface:#FFFFFF; --surface-2:#EEF1F5; --border:rgba(10,10,13,.12);
+    --fg:#17171C; --muted:#5B5B67; --blue:#0F57D6; --cyan:#0089A0;
+    color-scheme:light;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  img{max-width:100%}
+  body{background:var(--bg);color:var(--fg);font-family:var(--display);line-height:1.55;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px));
+    padding-block:32px 48px}
+  h1,h2,h3{font-weight:800;text-wrap:balance;margin:0}
+  p{margin:0}
+  .mono{font-family:var(--mono)}
+
+  /* Шапка */
+  .head{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;
+    padding-bottom:22px;border-bottom:1px solid var(--border)}
+  .logo{flex:none;width:46px;height:46px;border-radius:12px;display:flex;align-items:center;
+    justify-content:center;font-weight:800;font-size:1.15rem;letter-spacing:.02em;color:#fff;
+    background:linear-gradient(135deg,var(--blue),var(--cyan))}
+  .head .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--cyan)}
+  .head h1{font-size:2rem;line-height:1.1;margin:4px 0 6px}
+  .head .sub{color:var(--muted);font-size:.95rem}
+
+  .lead{margin-top:24px;font-size:1.12rem;color:var(--fg)}
+  .lead b{color:var(--cyan)}
+
+  section{margin-top:34px}
+  .shead{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .shead h2{font-size:1.18rem}
+  .shead .n{font-family:var(--mono);font-size:.78rem;color:var(--muted);
+    border:1px solid var(--border);border-radius:7px;padding:2px 8px}
+
+  /* Правило — три карточки */
+  .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .rule{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:16px 17px;min-width:0}
+  .rule .k{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted)}
+  .rule .v{font-size:1.05rem;font-weight:700;margin-top:6px}
+  .rule .d{color:var(--muted);font-size:.88rem;margin-top:5px}
+
+  /* Порядок действий — нумерованные шаги */
+  .steps{display:flex;flex-direction:column;gap:2px;counter-reset:step}
+  .step{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--border)}
+  .step:last-child{border-bottom:0}
+  .step .num{counter-increment:step;flex:none;width:34px;height:34px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;
+    background:var(--surface-2);color:var(--cyan);border:1px solid var(--border)}
+  .step .num::before{content:counter(step)}
+  .step .body{min-width:0}
+  .step .t{font-weight:700;font-size:1.02rem}
+  .step .t .pill{font-family:var(--mono);font-size:.74rem;font-weight:600;color:var(--blue);
+    background:color-mix(in srgb,var(--blue) 16%,transparent);border-radius:6px;padding:2px 7px;
+    margin-left:6px;white-space:nowrap}
+  .step .x{color:var(--muted);font-size:.92rem;margin-top:4px}
+
+  /* Что писать — два примера */
+  .ex{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:15px 16px;min-width:0}
+  .card.bad{border-color:color-mix(in srgb,var(--red) 45%,var(--border))}
+  .card.good{border-color:color-mix(in srgb,var(--green) 45%,var(--border))}
+  .card .tag{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;font-weight:700}
+  .card.bad .tag{color:var(--red)}
+  .card.good .tag{color:var(--green)}
+  .card .q{margin-top:8px;font-size:.95rem;font-style:italic}
+  .card ul{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:.86rem}
+  .card li{margin-top:3px}
+
+  /* Статусы */
+  .stats{display:flex;flex-direction:column;gap:10px}
+  .st{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:12px 15px}
+  .st .dot{flex:none;width:12px;height:12px;border-radius:50%}
+  .st b{font-size:.98rem}
+  .st span{color:var(--muted);font-size:.9rem}
+  .st--g .dot{background:var(--green)} .st--y .dot{background:var(--amber)} .st--r .dot{background:var(--red)}
+
+  .note{margin-top:20px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;
+    padding:14px 16px;color:var(--muted);font-size:.92rem}
+  .note b{color:var(--fg)}
+
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--border);
+    color:var(--muted);font-size:.85rem;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+  @media (max-width:560px){ .ex{grid-template-columns:1fr} .head h1{font-size:1.6rem} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="logo">SG</div>
+    <div>
+      <div class="eyebrow">ServiceGuru · SalesOS · Положение</div>
+      <h1>Разбор звонков</h1>
+      <div class="sub">Обязательная фиксация обратной связи по каждому звонку для менеджеров отдела продаж</div>
+    </div>
+  </div>
+
+  <p class="lead">В конце каждого рабочего дня менеджер <b>разбирает каждый свой оценённый звонок</b>:
+    заходит в карточку звонка в SalesOS, изучает запись и выводы и оставляет свой комментарий.
+    Это не формальность — это способ увидеть свои ошибки раньше, чем их увидит клиент.</p>
+
+  <section>
+    <div class="shead"><span class="n">01</span><h2>Правило</h2></div>
+    <div class="rules">
+      <div class="rule">
+        <div class="k">Что разбираем</div>
+        <div class="v">Каждый оценённый звонок</div>
+        <div class="d">Все звонки со статусом «готов» и выставленным баллом. Исключённые звонки — не требуют разбора.</div>
+      </div>
+      <div class="rule">
+        <div class="k">Срок</div>
+        <div class="v">До конца следующего рабочего дня</div>
+        <div class="d">Звонок за понедельник должен быть разобран не позднее конца вторника. Выходные не считаются.</div>
+      </div>
+      <div class="rule">
+        <div class="k">Что обязательно</div>
+        <div class="v">Комментарий + отметка «Я изучил»</div>
+        <div class="d">Пустой разбор не принимается. Нужен содержательный комментарий своими словами.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">02</span><h2>Порядок действий в конце дня</h2></div>
+    <div class="steps">
+      <div class="step"><div class="num"></div><div class="body">
+        <div class="t">Открой список звонков<span class="pill">Звонки → фильтр «На разбор»</span></div>
+        <div class="x">В меню «Звонки» включи фильтр «разбор» — останутся только те, что ждут твоего разбора.</div>
+      </div></div>
+      <div class="step"><div class="num"></div><div class="body">
+        <div class="t">Зайди в карточку звонка</div>
+        <div class="x">Клик по звонку открывает карточку: плеер, транскрибация с ролями, саммери, скоркарта и рекомендации.</div>
+      </div></div>
+      <div class="step"><div class="num"></div><div class="body">
+        <div class="t">Изучи звонок</div>
+        <div class="x">Послушай запись или прочитай транскрибацию. Посмотри балл и зону 🟢/🟡/🔴, рекомендации по навыкам и упущенные моменты (подсвечены в тексте).</div>
+      </div></div>
+      <div class="step"><div class="num"></div><div class="body">
+        <div class="t">Напиши комментарий<span class="pill">блок «Мой разбор»</span></div>
+        <div class="x">Своими словами: что получилось, какой момент упустил и что сделаешь иначе в следующем звонке.</div>
+      </div></div>
+      <div class="step"><div class="num"></div><div class="body">
+        <div class="t">Нажми «Я изучил»</div>
+        <div class="x">Звонок помечается разобранным и уходит из списка «На разбор». Готово.</div>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">03</span><h2>Что писать в комментарии</h2></div>
+    <div class="ex">
+      <div class="card bad">
+        <div class="tag">✗ ТАК НЕ НАДО</div>
+        <div class="q">«Ок», «Нормальный звонок», «Согласен с оценкой»</div>
+        <ul>
+          <li>Нет конкретики — непонятно, что ты понял</li>
+          <li>Нет вывода на будущее</li>
+          <li>Не засчитывается как разбор</li>
+        </ul>
+      </div>
+      <div class="card good">
+        <div class="tag">✓ ТАК НАДО</div>
+        <div class="q">«Хорошо отработал потребность, но не назвал цену сам и не закрыл на следующий шаг.
+          В следующий раз называю цену до возражения и сразу предлагаю встречу.»</div>
+        <ul>
+          <li>Что получилось</li>
+          <li>Что упустил (с привязкой к моменту)</li>
+          <li>Конкретное действие на будущее</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">04</span><h2>Статусы разбора</h2></div>
+    <div class="stats">
+      <div class="st st--g"><span class="dot"></span><div><b>🟢 Разобран</b> &nbsp; <span>комментарий оставлен, отметка «Я изучил» стоит</span></div></div>
+      <div class="st st--y"><span class="dot"></span><div><b>🟡 Ждёт разбора</b> &nbsp; <span>оценён, но ещё не разобран — срок не вышел</span></div></div>
+      <div class="st st--r"><span class="dot"></span><div><b>🔴 Просрочен</b> &nbsp; <span>срок (конец следующего рабочего дня) прошёл, разбора нет</span></div></div>
+    </div>
+    <div class="note">РОП видит <b>процент разобранных звонков по каждому менеджеру и просрочки</b> на своём дашборде.
+      Красная зона всегда на виду — не копи просрочки, разбирай звонки в тот же вечер.</div>
+  </section>
+
+  <footer>
+    <span>SG SalesOS · Отдел продаж ServiceGuru</span>
+    <span>Вопросы по разбору — руководителю отдела продаж</span>
+  </footer>
+
+</div>
+</body>
+</html>
