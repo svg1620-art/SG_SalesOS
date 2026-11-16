@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Продления — памятка менеджера</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+  /* Layout: документ в одну колонку; чек-лист полей карточки, правила-карточки, приоритет-бэнды */
+  :root{
+    --bg:#0A0A0D; --surface:#141419; --surface-2:#1b1b23; --border:rgba(255,255,255,.1);
+    --fg:#ECECEF; --muted:#9A9AA6; --blue:#1467F5; --cyan:#00BFDC;
+    --green:#39D98A; --amber:#F5A524; --orange:#F5A524; --red:#E5484D; --early:#6b93e6;
+    color-scheme:dark;
+    --display:"Manrope",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  @media (prefers-color-scheme:light){ :root:not([data-theme="dark"]){
+    --bg:#F5F6F8; --surface:#FFFFFF; --surface-2:#EEF1F5; --border:rgba(10,10,13,.12);
+    --fg:#17171C; --muted:#5B5B67; --blue:#0F57D6; --cyan:#0089A0;
+    color-scheme:light;
+  }}
+  :root[data-theme="light"]{
+    --bg:#F5F6F8; --surface:#FFFFFF; --surface-2:#EEF1F5; --border:rgba(10,10,13,.12);
+    --fg:#17171C; --muted:#5B5B67; --blue:#0F57D6; --cyan:#0089A0;
+    color-scheme:light;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  img{max-width:100%}
+  body{background:var(--bg);color:var(--fg);font-family:var(--display);line-height:1.55;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px));
+    padding-block:32px 48px}
+  h1,h2,h3{font-weight:800;text-wrap:balance;margin:0}
+  p{margin:0}
+
+  .head{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;
+    padding-bottom:22px;border-bottom:1px solid var(--border)}
+  .logo{flex:none;width:46px;height:46px;border-radius:12px;display:flex;align-items:center;
+    justify-content:center;font-weight:800;font-size:1.15rem;color:#fff;
+    background:linear-gradient(135deg,var(--blue),var(--cyan))}
+  .head .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--cyan)}
+  .head h1{font-size:2rem;line-height:1.1;margin:4px 0 6px}
+  .head .sub{color:var(--muted);font-size:.95rem}
+
+  .lead{margin-top:24px;font-size:1.12rem}
+  .lead b{color:var(--cyan)}
+  .when{margin-top:16px;background:color-mix(in srgb,var(--cyan) 12%,transparent);
+    border:1px solid color-mix(in srgb,var(--cyan) 40%,var(--border));border-radius:12px;
+    padding:13px 16px;font-size:1rem}
+  .when b{color:var(--cyan)}
+
+  section{margin-top:34px}
+  .shead{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .shead h2{font-size:1.18rem}
+  .shead .n{font-family:var(--mono);font-size:.78rem;color:var(--muted);
+    border:1px solid var(--border);border-radius:7px;padding:2px 8px}
+  .intro{color:var(--muted);font-size:.95rem;margin:-6px 0 14px}
+
+  /* Чек-лист полей карточки */
+  .chk{display:flex;flex-direction:column;gap:10px}
+  .chk li{list-style:none;display:flex;gap:12px;background:var(--surface);
+    border:1px solid var(--border);border-radius:12px;padding:13px 15px}
+  .chk .mk{flex:none;width:24px;height:24px;border-radius:7px;display:flex;align-items:center;
+    justify-content:center;font-weight:800;color:#fff;background:var(--green);font-size:.9rem}
+  .chk .b{min-width:0}
+  .chk .b b{font-size:1rem}
+  .chk .b span{display:block;color:var(--muted);font-size:.88rem;margin-top:3px}
+  .chk .tagc{display:inline-block;font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 40%,var(--border));
+    border-radius:6px;padding:1px 7px;margin-left:8px;vertical-align:middle}
+
+  /* Правила-шаги */
+  .steps{display:flex;flex-direction:column;gap:2px}
+  .step{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--border)}
+  .step:last-child{border-bottom:0}
+  .step .ic{flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;
+    justify-content:center;background:var(--surface-2);border:1px solid var(--border);font-size:1rem}
+  .step .body{min-width:0}
+  .step .t{font-weight:700;font-size:1.02rem}
+  .step .x{color:var(--muted);font-size:.92rem;margin-top:4px}
+  .step .x b{color:var(--fg)}
+
+  /* Приоритет — бэнды */
+  .bands{display:flex;flex-direction:column;gap:9px}
+  .bnd{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:12px 15px}
+  .bnd .dot{flex:none;width:12px;height:12px;border-radius:50%}
+  .bnd b{font-size:.98rem} .bnd span{color:var(--muted);font-size:.9rem}
+  .bnd .ord{margin-left:auto;font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+
+  /* Статус переговоров */
+  .stats{display:flex;flex-direction:column;gap:10px}
+  .st{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:12px 15px}
+  .st .dot{flex:none;width:12px;height:12px;border-radius:50%}
+  .st b{font-size:.98rem} .st span{color:var(--muted);font-size:.9rem}
+  .st--g .dot{background:var(--green)} .st--y .dot{background:var(--amber)} .st--r .dot{background:var(--red)}
+
+  .note{margin-top:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;
+    padding:14px 16px;color:var(--muted);font-size:.92rem}
+  .note b{color:var(--fg)}
+  .note.warn{border-color:color-mix(in srgb,var(--red) 40%,var(--border))}
+  .note.warn b{color:var(--red)}
+
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--border);
+    color:var(--muted);font-size:.85rem;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  @media (max-width:560px){ .head h1{font-size:1.6rem} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="logo">SG</div>
+    <div>
+      <div class="eyebrow">ServiceGuru · SalesOS · Положение</div>
+      <h1>Продления</h1>
+      <div class="sub">Как вести клиентов на продление в amoCRM — памятка для менеджера по продлениям</div>
+    </div>
+  </div>
+
+  <p class="lead">Твоя задача — чтобы <b>каждый клиент продлил подписку вовремя</b>.
+    Главный принцип: порядок в карточке amoCRM = порядок в работе. Всё, что ты делаешь в amo
+    (дата, этап, звонки, задачи), автоматически видно руководителю в SalesOS на доске «Продления».
+    Ведёшь аккуратно — система сама подсказывает, кого брать сегодня.</p>
+
+  <div class="when">⏰ <b>Ритм дня:</b> план — 20 касаний. Ни один клиент не должен оставаться
+    без касания дольше <b>4 дней</b> — особенно те, у кого продление близко.</div>
+
+  <section>
+    <div class="shead"><span class="n">01</span><h2>Карточка сделки в amoCRM</h2></div>
+    <p class="intro">Эти поля должны быть заполнены и актуальны у каждой сделки воронки «Аккаунтинг» — по ним строится вся работа.</p>
+    <ul class="chk">
+      <li><span class="mk">✓</span><div class="b"><b>Дата окончания подписки <span class="tagc">якорь</span></b>
+        <span>Главное поле. По нему определяется, кого и когда продлевать. Узнал новую дату — сразу обнови, не откладывай.</span></div></li>
+      <li><span class="mk">✓</span><div class="b"><b>Ответственный — ты</b>
+        <span>Сделка попадает в твой рабочий список и статистику только если ответственный = ты. Проверяй при передаче клиента.</span></div></li>
+      <li><span class="mk">✓</span><div class="b"><b>Контакт и компания (юрлицо)</b>
+        <span>Привязаны к сделке — иначе история звонков и сообщений не соберётся в карточке клиента.</span></div></li>
+      <li><span class="mk">✓</span><div class="b"><b>Сумма сделки = сумма продления</b>
+        <span>По ней считаются план сборов, подтверждённые и сумма риска. Держи актуальной.</span></div></li>
+      <li><span class="mk">✓</span><div class="b"><b>Актуальный этап воронки</b>
+        <span>Сделка стоит на том этапе, который отражает реальное положение дел (см. п. 02).</span></div></li>
+    </ul>
+    <div class="note warn"><b>Нет даты окончания — клиент выпадает из плана</b> и висит в разделе «без даты».
+      Такие сделки РОП видит отдельно. Заполни дату в первую очередь.</div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">02</span><h2>Этапы воронки — как двигать сделку</h2></div>
+    <div class="steps">
+      <div class="step"><div class="ic">➡️</div><div class="body">
+        <div class="t">Операционные этапы — двигай по факту работы</div>
+        <div class="x">Этапы нужны для твоего фокуса. Переводи сделку по мере реального продвижения, не держи на «мёртвом» этапе и не двигай «для галочки».</div>
+      </div></div>
+      <div class="step"><div class="ic">✅</div><div class="body">
+        <div class="t">«Оплатил продление» — только после оплаты</div>
+        <div class="x">Ставь этот этап, когда оплата реально прошла. Это фиксирует продление как <b>подтверждённое</b> в сборах.</div>
+      </div></div>
+      <div class="step"><div class="ic">⛔</div><div class="body">
+        <div class="t">«Отказался продлевать» — только реальный отвал</div>
+        <div class="x">Переводи сюда, когда клиент окончательно отказался. Это единственный этап отвала — он идёт в churn. Не ставь его «на эмоциях», пока есть шанс.</div>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">03</span><h2>Касания — фиксируй каждый контакт</h2></div>
+    <div class="steps">
+      <div class="step"><div class="ic">📞</div><div class="body">
+        <div class="t">Любой контакт — в amoCRM</div>
+        <div class="x">Звонок, сообщение в чате, письмо — всё через amo. Эти касания автоматически попадают в историю клиента в SalesOS и в тепловую карту.</div>
+      </div></div>
+      <div class="step"><div class="ic">📝</div><div class="body">
+        <div class="t">После контакта — короткий итог в примечание</div>
+        <div class="x">Одной строкой: <b>что решили и какой следующий шаг</b>. Это становится «последней договорённостью», которую видно в рабочем списке и карточке клиента.</div>
+      </div></div>
+      <div class="step"><div class="ic">⏱️</div><div class="body">
+        <div class="t">Держи SLA — не дольше 4 дней без касания</div>
+        <div class="x">Клиент, которого не трогали 4+ дня, подсвечивается как «протух». В зонах «горит» и «критично» это недопустимо.</div>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">04</span><h2>Задачи в amoCRM</h2></div>
+    <div class="steps">
+      <div class="step"><div class="ic">1️⃣</div><div class="body">
+        <div class="t">На каждой активной сделке — одна открытая задача</div>
+        <div class="x">С <b>конкретным шагом и датой</b>: «перезвонить 18.11», «выставить счёт», «дожать на оплату». Без задачи сделка легко теряется.</div>
+      </div></div>
+      <div class="step"><div class="ic">🔁</div><div class="body">
+        <div class="t">Выполнил задачу — сразу ставь следующую</div>
+        <div class="x">Закрыл шаг — тут же назначь следующий. Сделка никогда не остаётся без открытой задачи, пока не продлена или не в отвале.</div>
+      </div></div>
+      <div class="step"><div class="ic">🚫</div><div class="body">
+        <div class="t">Не копи просроченные задачи</div>
+        <div class="x">Просрочки по задачам — сигнал РОПу, что работа встала. Разбирай их в тот же день.</div>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">05</span><h2>Приоритет на день</h2></div>
+    <p class="intro">Бери клиентов в этом порядке — так же отсортирован «Рабочий список на сегодня» в SalesOS. Внутри каждой группы — сначала тех, кого дольше не касались.</p>
+    <div class="bands">
+      <div class="bnd"><span class="dot" style="background:var(--red)"></span><div><b>Критично</b> &nbsp; <span>≤ 1 месяца до окончания или просрочено</span></div><span class="ord">в первую очередь</span></div>
+      <div class="bnd"><span class="dot" style="background:var(--orange)"></span><div><b>Горит</b> &nbsp; <span>1–3 месяца до окончания</span></div><span class="ord">затем</span></div>
+      <div class="bnd"><span class="dot" style="background:var(--cyan)"></span><div><b>Рабочее окно</b> &nbsp; <span>4–6 месяцев — основная проработка</span></div><span class="ord">планово</span></div>
+      <div class="bnd"><span class="dot" style="background:var(--early)"></span><div><b>Рано</b> &nbsp; <span>больше 6 месяцев — пока наблюдаем</span></div><span class="ord">позже</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">06</span><h2>Статус переговоров 🟢/🟡/🔴</h2></div>
+    <p class="intro">Это статус <b>коммуникации</b> (как идут переговоры), а не срок. Его выставляет РОП вручную или НейроGuru по звонку. Твоя задача — чтобы по каждому клиенту была свежая договорённость, по которой этот статус понятен.</p>
+    <div class="stats">
+      <div class="st st--g"><span class="dot"></span><div><b>🟢 Договорились</b> &nbsp; <span>клиент согласен/готов продлевать</span></div></div>
+      <div class="st st--y"><span class="dot"></span><div><b>🟡 Думает / риск</b> &nbsp; <span>сомневается, просит время/КП/скидку — нужен следующий шаг</span></div></div>
+      <div class="st st--r"><span class="dot"></span><div><b>🔴 Возражение / уходит</b> &nbsp; <span>недоволен, смотрит конкурентов, не выходит на связь</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="n">07</span><h2>Что видит руководитель</h2></div>
+    <div class="note">На доске «Продления» РОП в любой момент видит: <b>покрытие по срокам (бэнды), деньги —
+      план сборов / подтверждено / риск / отвал и % churn, тепловую карту твоих касаний и клиентов без даты окончания.</b>
+      Всё это собирается из твоей работы в amoCRM. Ведёшь карточки и задачи аккуратно — у тебя всегда зелёная картина и нет лишних вопросов.</div>
+  </section>
+
+  <footer>
+    <span>SG SalesOS · Воронка «Аккаунтинг» · Продления</span>
+    <span>Вопросы — руководителю отдела</span>
+  </footer>
+
+</div>
+</body>
+</html>
