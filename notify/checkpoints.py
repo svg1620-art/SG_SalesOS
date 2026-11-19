@@ -89,14 +89,37 @@ def checkpoint_afternoon(app=None, day=None, force=False) -> bool:
     cnt = {"green": 0, "yellow": 0, "red": 0}
     for r in rows:
         cnt[r["status"]] = cnt.get(r["status"], 0) + 1
-    lines = [f"🕒 <b>Чекпоинт 15:00</b>\n\nСветофор команды: "
+    lines = [f"🕒 <b>Чекпоинт 15:00</b>\n\nСветофор команды ({len(rows)}): "
              f"🟢 {cnt['green']} · 🟡 {cnt['yellow']} · 🔴 {cnt['red']}"]
     reds = [r for r in rows if r["status"] == "red"]
+    yellows = [r for r in rows if r["status"] == "yellow"]
+    greens = [r for r in rows if r["status"] == "green"]
     if reds:
         lines.append("\n\n🔴 <b>Красная зона:</b>")
         for r in reds:
-            reason = _red_reason(r)
-            lines.append(f"\n   {escape(r['name'])} — {reason}")
+            lines.append(f"\n   {escape(r['name'])} — {_red_reason(r)}")
+    if yellows:
+        lines.append("\n\n🟡 <b>Внимание:</b>")
+        for r in yellows:
+            lines.append(f"\n   {escape(r['name'])} — {_red_reason(r)}")
+    if greens:
+        lines.append("\n\n🟢 <b>В норме:</b> "
+                     + ", ".join(escape(r["name"]) for r in greens))
+    # диагностика: активность, не привязанная ни к одному менеджеру SalesOS
+    try:
+        from models import OpsActivityEvent
+        from ops.metrics import _utc_bounds
+        uf, ut = _utc_bounds(day or date.today())
+        unlinked = OpsActivityEvent.query.filter(
+            OpsActivityEvent.occurred_at >= uf, OpsActivityEvent.occurred_at < ut,
+            OpsActivityEvent.manager_id.is_(None),
+        ).count()
+        if unlinked:
+            lines.append(f"\n\n⚠️ {unlinked} касаний сегодня без привязки к менеджеру — "
+                         "ответственный в amoCRM не связан с пользователем "
+                         "(заполните amo_user_id в «Пользователи»).")
+    except Exception:  # noqa: BLE001
+        pass
     return _send_rop(app, "".join(lines))
 
 
