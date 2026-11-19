@@ -86,6 +86,13 @@
   агрегат устарел (> 90с); фон (ops_sync) пересчитывает сам.
 - **Пул БД** (config, только Postgres): pool_size=10/max_overflow=20/
   pool_recycle=280/pool_timeout=30 (+pool_pre_ping). Для sqlite — только pre_ping.
+- **Список звонков /calls**: откладывает тяжёлые колонки (`defer` transcript_json/
+  next_steps_json/lead_score_json/summary/error) — раньше тянул транскрибацию по
+  2000 звонкам на каждый заход. Баланс «говорил/слушал» (`talk_listen_from`)
+  считается из transcript_json, догруженного ОДНИМ батчем только по показанным
+  ≤500 звонкам. Индексы на calls: started_at, manager_id, status, составной
+  (manager_id, started_at) — миграция d0e1f2a3b4c5 (список фильтрует/сортирует по
+  ним). Шаблон списка не обращается к отложенным колонкам (иначе N+1).
 - **Разнесение планировщика (worker.py + SCHEDULER_ROLE):** фон можно вынести на
   отдельный Railway-сервис. Ограничение: Volume `/data` (аудио) монтируется
   только к одному сервису, а `amo_poll` качает записи в Volume и веб их отдаёт

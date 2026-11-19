@@ -26,17 +26,22 @@ def _accumulate(segments, mgr=0.0, cli=0.0):
     return mgr, cli
 
 
-def talk_listen(call):
-    """Баланс менеджера по звонку: {'talk': %, 'listen': %} или None.
-
-    None — когда роли неизвестны (моно-звонок) или нет транскрибации.
-    """
-    mgr, cli = _accumulate(call.transcript_json)
+def talk_listen_from(segments):
+    """Баланс по транскрибации (списку реплик) без объекта Call — для списка."""
+    mgr, cli = _accumulate(segments)
     total = mgr + cli
     if total <= 0:
         return None
     talk = round(mgr / total * 100)
     return {"talk": talk, "listen": 100 - talk}
+
+
+def talk_listen(call):
+    """Баланс менеджера по звонку: {'talk': %, 'listen': %} или None.
+
+    None — когда роли неизвестны (моно-звонок) или нет транскрибации.
+    """
+    return talk_listen_from(call.transcript_json)
 
 
 def aggregate_talk_listen(calls):

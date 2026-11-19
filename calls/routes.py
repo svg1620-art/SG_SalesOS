@@ -62,11 +62,17 @@ def index():
     manager_id = request.args.get("manager_id")
     manager_id = int(manager_id) if manager_id and manager_id.isdigit() else None
 
-    from sqlalchemy.orm import joinedload
+    from sqlalchemy.orm import joinedload, defer
     # eager-load client/manager — иначе список делает N+1 запросов (c.client,
-    # c.manager) на каждый звонок и страница висит на больших объёмах
+    # c.manager) на каждый звонок и страница висит на больших объёмах.
+    # ВАЖНО: откладываем тяжёлые колонки (транскрибация и JSON-блобы) — список их
+    # не показывает, а раньше тянул transcript_json по 2000 звонкам на каждый
+    # заход → страница грузилась «адски долго». Транскрибацию для баланса
+    # «говорил/слушал» догружаем одним батчем только по показанным звонкам.
     query = Call.query.options(
-        joinedload(Call.client), joinedload(Call.manager)
+        joinedload(Call.client), joinedload(Call.manager),
+        defer(Call.transcript_json), defer(Call.next_steps_json),
+        defer(Call.lead_score_json), defer(Call.summary), defer(Call.error),
     ).filter(Call.started_at >= date_from, Call.started_at <= date_to)
     if not current_user.is_admin:
         query = query.filter(Call.manager_id == current_user.id)
@@ -104,9 +110,17 @@ def index():
         User.query.filter_by(is_active=True).order_by(User.full_name, User.email).all()
         if current_user.is_admin else []
     )
-    # баланс «говорил/слушал» по каждому звонку
-    from processing.metrics import talk_listen
-    balances = {c.id: talk_listen(c) for c in calls}
+    # баланс «говорил/слушал» — транскрибацию догружаем ОДНИМ батчем только по
+    # показанным звонкам (не по всем 2000), чтобы не тянуть тысячи транскрибаций
+    from processing.metrics import talk_listen_from
+    disp_ids = [c.id for c in calls]
+    tj = {}
+    if disp_ids:
+        for cid, segs in db.session.query(Call.id, Call.transcript_json).filter(
+            Call.id.in_(disp_ids)
+        ).all():
+            tj[cid] = segs
+    balances = {c.id: talk_listen_from(tj.get(c.id)) for c in calls}
     filters = {
         "from": df_naive.strftime("%Y-%m-%d"),
         "to": dt_naive.strftime("%Y-%m-%d"),

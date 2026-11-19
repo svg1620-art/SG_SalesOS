@@ -181,7 +181,7 @@ class Call(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     dialog_id = db.Column(db.Integer, db.ForeignKey("dialogs.id"), nullable=True)
-    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=True)
     checklist_id = db.Column(db.Integer, db.ForeignKey("checklists.id"), nullable=True)
 
@@ -190,12 +190,12 @@ class Call(db.Model):
     amo_entity_type = db.Column(db.String(20))  # contacts|leads
     amo_entity_id = db.Column(db.BigInteger)
     direction = db.Column(db.String(3))  # in|out
-    started_at = db.Column(db.DateTime)
+    started_at = db.Column(db.DateTime, index=True)
     duration_sec = db.Column(db.Integer)
     source_link = db.Column(db.Text)  # ссылка amoCRM/телефонии
     audio_path = db.Column(db.Text)  # путь в Volume
 
-    status = db.Column(db.String(20), nullable=False, default="new")
+    status = db.Column(db.String(20), nullable=False, default="new", index=True)
     # new|downloading|transcribing|analyzing|done|failed
     error = db.Column(db.Text, nullable=True)
 
